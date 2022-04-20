@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "pop"
+version = "0.1.0"
+description = "Powergrid Operation with MultiAgent Reinforcement Learning"
+authors = ["dpaletti <danielepaletti98@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.9, <3.11"
+Grid2Op = "^1.6.5"
+torch = "^1.11.0"
+networkx = "^2.8"
+prettytable = "^3.2.0"
+dgl = {url = "https://data.dgl.ai/wheels/dgl-0.8.1-cp39-cp39-manylinux1_x86_64.whl", platform = "linux"}
+dglgo = "^0.0.1"
+numba = "^0.55.1"
+scipy = "^1.8.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+black = "^22.3.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
