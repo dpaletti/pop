@@ -1,5 +1,7 @@
 import grid2op
 from pathlib import Path
+
+from dgl import DGLHeteroGraph
 from tqdm import tqdm
 from grid2op.Agent import AgentWithConverter
 from grid2op.Converter import Converter, IdToAct
@@ -224,7 +226,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
 
     def compute_loss(
         self, transitions_batch: Transition, sampling_weights: th.Tensor
-    ) -> Tuple[th.Tensor, th.Tensor]:
+    ) -> tuple[Tensor, Tensor, DGLHeteroGraph, DGLHeteroGraph]:
         """
         Computes the current loss given a batch of transitions and the sampling weights from
         the prioritized experience replay buffer.

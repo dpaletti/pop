@@ -5,6 +5,7 @@ import networkx as nx
 import networkx.linalg as nx_linalg
 import numpy as np
 from louvain import louvain_communities
+from power_supply_modularity import belong_to_same_community
 
 
 class CommunityDetector:
@@ -23,13 +24,6 @@ class CommunityDetector:
     @staticmethod
     def community_degree(graph: nx.Graph, community: Set[int]) -> int:
         return sum([graph.degree[i] for i in community])
-
-    @staticmethod
-    def belong_to_same_community(node1: int, node2: int, communities: List[Set[int]]):
-        for community in communities:
-            if node1 in community and node2 in community:
-                return True
-        return False
 
     @staticmethod
     def get_community(node_1: int, communities: List[Set[int]]) -> int:
@@ -62,7 +56,7 @@ class CommunityDetector:
         added_edges = nx.difference(graph_t1, graph_t).edges
         removed_edges = nx.difference(graph_t, graph_t1).edges
         for edge in removed_edges:
-            if self.belong_to_same_community(edge[0], edge[1], comm_t):
+            if belong_to_same_community(edge[0], edge[1], comm_t):
                 singleton_communities.add(
                     self.get_community(edge[0], comm_t)
                 )  # edge[0] and edge[1] belong to same community
@@ -71,7 +65,7 @@ class CommunityDetector:
                         singleton_communities.add(self.get_community(neighbor, comm_t))
 
         for edge in added_edges:
-            if self.belong_to_same_community(edge[0], edge[1], comm_t):
+            if belong_to_same_community(edge[0], edge[1], comm_t):
                 two_verticies_communities.add(edge)
                 singleton_communities.add(self.get_community(edge[0], comm_t))
             else:
@@ -114,6 +108,9 @@ class CommunityDetector:
         graph_t: nx.Graph,
         graph_t1: Optional[nx.Graph] = None,
         comm_t: Optional[List[Set[int]]] = None,
+        enable_power_supply_modularity=False,
+        alpha: float = 0.5,
+        beta: float = 0.5,
     ) -> List[Set[int]]:
         """
         Two phases:
@@ -134,6 +131,9 @@ class CommunityDetector:
                 resolution=self.resolution,
                 threshold=self.threshold,
                 seed=Random(self.seed),
+                enable_power_supply_modularity=enable_power_supply_modularity,
+                alpha=alpha,
+                beta=beta,
             )
         if (not comm_t and graph_t1) or (comm_t and not graph_t1):
             raise Exception(
@@ -169,4 +169,7 @@ class CommunityDetector:
             resolution=self.resolution,
             threshold=self.threshold,
             seed=Random(self.seed),
+            enable_power_supply_modularity=enable_power_supply_modularity,
+            alpha=alpha,
+            beta=beta,
         )

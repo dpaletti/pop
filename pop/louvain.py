@@ -4,6 +4,7 @@ from typing import List
 import networkx as nx
 from networkx.algorithms.community import modularity
 from networkx.utils import py_random_state
+from pop.power_supply_modularity import power_supply_modularity
 
 
 def louvain_communities(
@@ -13,9 +14,22 @@ def louvain_communities(
     resolution=1,
     threshold=0.0000001,
     seed=None,
+    enable_power_supply_modularity: bool = False,
+    alpha: float = 0.5,
+    beta: float = 0.5,
 ):
 
-    d = louvain_partitions(G, partition, weight, resolution, threshold, seed)
+    d = louvain_partitions(
+        G,
+        partition,
+        weight,
+        resolution,
+        threshold,
+        seed,
+        enable_power_supply_modularity=enable_power_supply_modularity,
+        alpha=alpha,
+        beta=beta,
+    )
     q = deque(d, maxlen=1)
     return q.pop()
 
@@ -27,10 +41,16 @@ def louvain_partitions(
     resolution=1,
     threshold=0.0000001,
     seed=None,
+    enable_power_supply_modularity=False,
+    alpha: float = 0.5,
+    beta: float = 0.5,
 ):
 
     partition = partition
-    mod = modularity(G, partition, resolution=resolution, weight=weight)
+    if enable_power_supply_modularity:
+        mod = power_supply_modularity(G, partition, alpha, beta)
+    else:
+        mod = modularity(G, partition, resolution=resolution, weight=weight)
     is_directed = G.is_directed()
     if G.is_multigraph():
         graph = _convert_multigraph(G, weight, is_directed)
@@ -47,9 +67,12 @@ def louvain_partitions(
     improvement = True
     while improvement:
         yield partition
-        new_mod = modularity(
-            graph, inner_partition, resolution=resolution, weight="weight"
-        )
+        if enable_power_supply_modularity:
+            new_mod = power_supply_modularity(G, inner_partition, alpha, beta)
+        else:
+            new_mod = modularity(
+                graph, inner_partition, resolution=resolution, weight="weight"
+            )
         if new_mod - mod <= threshold:
             return
         mod = new_mod
