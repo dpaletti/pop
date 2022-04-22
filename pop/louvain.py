@@ -1,9 +1,9 @@
+# Adapted from networkx implementation
 from collections import deque, defaultdict, Set
 from typing import List
 
 import networkx as nx
 from networkx.algorithms.community import modularity
-from networkx.utils import py_random_state
 from pop.power_supply_modularity import power_supply_modularity
 
 
