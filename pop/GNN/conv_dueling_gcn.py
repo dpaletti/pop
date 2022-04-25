@@ -1,4 +1,3 @@
-import dgl
 from dgl import DGLHeteroGraph
 from dgl.nn.pytorch.conv import GraphConv
 from torch import Tensor
@@ -26,8 +25,6 @@ class ConvDuelingGCN(DuelingGCN):
             name,
             log_dir,
         )
-        self.advantage_stream: nn.Module = self.init_advantage_stream(action_space_size)
-        self.value_stream: nn.Module = self.init_value_stream()
 
         self.conv_1 = GraphConv(
             node_features,
@@ -82,6 +79,6 @@ class ConvDuelingGCN(DuelingGCN):
         )
         node_embeddings = self.conv_3(g, edge_conv)
 
-        g.ndata["node_embeddings"] = node_embeddings
-        graph_embedding: Tensor = dgl.mean_nodes(g, "node_embeddings")
+        graph_embedding = self.compute_graph_embedding(g, node_embeddings)
+
         return graph_embedding

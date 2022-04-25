@@ -4,7 +4,7 @@ from typing import List, Set, Tuple, Optional
 import networkx as nx
 import networkx.linalg as nx_linalg
 import numpy as np
-from louvain import louvain_communities
+from community_detection.louvain import louvain_communities
 from power_supply_modularity import belong_to_same_community
 
 

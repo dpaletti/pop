@@ -1,12 +1,11 @@
 import torch as th
+from dgl.nn.pytorch import GraphConv
 from dgl.nn.pytorch.conv import EGATConv
 import torch.nn as nn
-import torch.nn.functional as F
-import dgl
 from dgl.heterograph import DGLHeteroGraph
-from torch import Tensor, FloatTensor
+from torch import Tensor
 
-from dueling_gcn import DuelingGCN
+from GNN.dueling_gcn import DuelingGCN
 
 
 class EgatDuelingGCN(DuelingGCN):
@@ -27,9 +26,6 @@ class EgatDuelingGCN(DuelingGCN):
             name,
             log_dir,
         )
-
-        self.advantage_stream: nn.Module = self.init_advantage_stream(action_space_size)
-        self.value_stream: nn.Module = self.init_value_stream()
 
         if (
             self.architecture["hidden_node_feat_size"][2]
@@ -74,3 +70,44 @@ class EgatDuelingGCN(DuelingGCN):
             weight=True,
             allow_zero_in_degree=True,
         )
+
+    def init_value_stream(self) -> nn.Module:
+        return nn.Sequential(
+            nn.Linear(
+                self.architecture["hidden_output_size"]
+                * self.architecture["heads"][-1],
+                self.architecture["value_stream_size"],
+            ),
+            nn.ReLU(),
+            nn.Linear(self.architecture["value_stream_size"], 1),
+        )
+
+    def extract_features(self, g: DGLHeteroGraph) -> Tensor:
+        g = self.preprocess_graph(g)
+        node_embeddings, edge_embeddings = self.attention1(
+            g,
+            DuelingGCN.dict_to_tensor(dict(g.ndata)),
+            DuelingGCN.dict_to_tensor(dict(g.edata)),
+        )
+
+        node_embeddings = th.flatten(node_embeddings, 1)
+        edge_embeddings = th.flatten(edge_embeddings, 1)
+
+        node_embeddings, edge_embeddings = self.attention2(
+            g, node_embeddings, edge_embeddings
+        )
+
+        node_embeddings = th.flatten(node_embeddings, 1)
+        edge_embeddings = th.flatten(edge_embeddings, 1)
+
+        node_embeddings, edge_embeddings = self.attention3(
+            g, node_embeddings, edge_embeddings
+        )
+
+        node_embeddings = self.conv(g, node_embeddings, edge_weight=edge_embeddings)
+
+        graph_embedding = self.compute_graph_embedding(g, node_embeddings)
+
+        graph_embedding = th.flatten(graph_embedding, 1)
+
+        return graph_embedding

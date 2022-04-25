@@ -1,5 +1,5 @@
 {
-  "embedding": "attention",
+  "embedding": "egat",
   "pooling": "avg",
   "hidden_output_size": 256,
   "value_stream_size": 512,

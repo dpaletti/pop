@@ -1,11 +1,10 @@
-import grid2op
 from pathlib import Path
 
 from dgl import DGLHeteroGraph
 from tqdm import tqdm
 from grid2op.Agent import AgentWithConverter
-from grid2op.Converter import Converter, IdToAct
-from grid2op.Action import ActionSpace, BaseAction
+from grid2op.Converter import Converter
+from grid2op.Action import ActionSpace
 from grid2op.Observation import BaseObservation
 from grid2op.Environment import BaseEnv
 import torch as th
@@ -15,8 +14,8 @@ from torch.utils.tensorboard.writer import SummaryWriter
 import dgl
 import numpy as np
 
-from pop.dueling_gcn import DuelingGCN
-from pop.replay_buffer import ReplayMemory, Transition
+from GNN.dueling_gcn import DuelingGCN
+from agent.replay_buffer import ReplayMemory, Transition
 
 from typing import Tuple, List, Optional
 

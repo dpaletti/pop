@@ -8,6 +8,10 @@ from pathlib import Path
 from prettytable import PrettyTable
 from torch import Tensor
 
+from GNN.conv_dueling_gcn import ConvDuelingGCN
+from GNN.egat_dueling_gcn import EgatDuelingGCN
+from GNN.gat_dueling_gcn import GATDuelingGCN
+
 
 class GCN(nn.Module):
     def __init__(
@@ -41,16 +45,6 @@ class GCN(nn.Module):
         self.edge_features = edge_features
 
     @staticmethod
-    def get_GCN(
-        node_features: int,
-        edge_features: int,
-        architecture_path: str,
-        name: str,
-        log_dir: str = "./",
-        **kwargs,
-    ):
-        ...
-
     @abstractmethod
     def save(self):
         ...
@@ -112,4 +106,41 @@ class GCN(nn.Module):
             th.stack([column.data for column in list(d.values())])
             .transpose(0, 1)
             .float()
+        )
+
+
+def get_gcn(
+    is_dueling: bool,
+    node_features: int,
+    edge_features: int,
+    architecture_path: str,
+    name: str,
+    log_dir: str = "./",
+    **kwargs,
+) -> GCN:
+    embedding = json.load(open(architecture_path)).get("embedding")
+    if embedding is None:
+        raise Exception(
+            "Please add 'embedding' in the architecture json at: " + architecture_path
+        )
+    if is_dueling:
+        if kwargs["action_space_size"] is None:
+            print("Please pass action_space_size keyword argument for dueling GCNs")
+        if embedding == "conv":
+            gcn = ConvDuelingGCN
+        elif embedding == "egat":
+            gcn = EgatDuelingGCN
+        elif embedding == "gat":
+            gcn = GATDuelingGCN
+        else:
+            raise Exception(
+                "Available Embeddings for Dueling GCNs are: conv, egat and gat"
+            )
+        return gcn(
+            node_features,
+            edge_features,
+            kwargs["action_space_size"],
+            architecture_path,
+            name,
+            log_dir,
         )

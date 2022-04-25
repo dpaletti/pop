@@ -3,8 +3,8 @@ import torch as th
 from torch import nn
 
 from pointer_network_utilities import masked_max
-from pop.attention import Attention
-from pop.encoder import Encoder
+from pointer_network.attention import Attention
+from pointer_network.encoder import Encoder
 
 
 class PointerNetwork(nn.Module):

@@ -1,17 +1,15 @@
-import grid2op
 from pathlib import Path
 from grid2op.Agent import BaseAgent
-from grid2op.Agent.doNothing import DoNothingAgent
 from grid2op.Converter.IdToAct import IdToAct
-from grid2op.Reward import CombinedScaledReward, RedispReward, FlatReward, AlarmReward
+from grid2op.Reward import CombinedScaledReward, RedispReward, FlatReward
 import grid2op
 from grid2op.Chronics import MultifolderWithCache
 from typing import Union
 import grid2op.Environment
 import os
 from grid2op.Runner import Runner
-from pop.gcn_agent import DoubleDuelingGCNAgent, train
-from pop.dueling_gcn import DuelingGCN
+from agent.gcn_agent import DoubleDuelingGCNAgent, train
+from GNN.dueling_gcn import DuelingGCN
 from grid2op.Episode import EpisodeData
 import shutil
 import torch as th

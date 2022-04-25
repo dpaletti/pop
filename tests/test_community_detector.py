@@ -1,5 +1,5 @@
 import grid2op
-from pop.community_detector import CommunityDetector
+from community_detection.community_detector import CommunityDetector
 import networkx as nx
 import matplotlib.pyplot as plt
 
