@@ -1,6 +1,10 @@
 # Virtual Environments
 .envrc
 .python-version
+poetry.lock
+
+# Ignoring Tests, used only for development purposes for now
+tests/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

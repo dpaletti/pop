@@ -88,7 +88,7 @@ class PointerNetwork(nn.Module):
 
         row_mask_tensor = th.lt(
             range_tensor, each_len_tensor
-        )  # original implementation uses < (element-wise less-than)
+        )  # original implementation uses '<' (element-wise less-than)
         col_mask_tensor = row_mask_tensor.transpose(1, 2)
         mask_tensor = row_mask_tensor * col_mask_tensor
 
