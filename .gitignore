@@ -3,6 +3,7 @@
 .python-version
 poetry.lock
 
+.idea
 # Ignoring Tests, used only for development purposes for now
 tests/
 

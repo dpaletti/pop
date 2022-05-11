@@ -23,7 +23,7 @@ class ReplayMemory(object):
     the priority of transition 'i'.
     \alpha determines how much prioritization is used, with '\alpha > 0' corresponding
     to the uniform random sampling case.
-    In order for the agent to converge the bias introduced by the non-uniform sampling needs
+    In order for the node_agents to converge the bias introduced by the non-uniform sampling needs
     to be corrected. We use importance sampling so that we can use weights when computing
     the loss:
     :math:`w_i = (\frac{1}{N}\frac{1}{P(i)})^\beta`

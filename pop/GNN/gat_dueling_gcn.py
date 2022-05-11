@@ -53,9 +53,7 @@ class GATDuelingGCN(DuelingGCN):
     def extract_features(self, g: DGLHeteroGraph) -> Tensor:
         g = self.preprocess_graph(g)
 
-        node_embeddings: Tensor = self.attention1(
-            g, DuelingGCN.dict_to_tensor(dict(g.ndata))
-        )
+        node_embeddings: Tensor = self.attention1(g, self.dict_to_tensor(dict(g.ndata)))
 
         node_embeddings = th.flatten(node_embeddings, 1)
 

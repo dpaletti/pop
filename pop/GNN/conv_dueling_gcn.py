@@ -3,7 +3,7 @@ from dgl.nn.pytorch.conv import GraphConv
 from torch import Tensor
 import torch.nn.functional as F
 
-from dueling_gcn import DuelingGCN
+from pop.GNN.dueling_gcn import DuelingGCN
 import torch.nn as nn
 
 

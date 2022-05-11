@@ -5,7 +5,7 @@ import networkx as nx
 import networkx.linalg as nx_linalg
 import numpy as np
 from community_detection.louvain import louvain_communities
-from power_supply_modularity import belong_to_same_community
+from community_detection.power_supply_modularity import belong_to_same_community
 
 
 class CommunityDetector:
@@ -117,11 +117,6 @@ class CommunityDetector:
         - initialize an intermediate community structure
         - repeat the last two steps of Louvain algorithm on the intermediate
           community structure until the modularity gain is negligible
-
-        :param graph_t: graph structure at previous time step
-        :param comm_t: previous community structure
-        :param graph_t1: new graph
-        :return: community structure
         """
         if not comm_t and not graph_t1:
             return louvain_communities(

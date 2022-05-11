@@ -1,39 +1,25 @@
-import torch as th
-from dgl.nn.pytorch import GraphConv
-from dgl.nn.pytorch.conv import EGATConv
-import torch.nn as nn
-from dgl.heterograph import DGLHeteroGraph
+from typing import Tuple, Union
+
+from dgl import DGLHeteroGraph
+from dgl.nn.pytorch import EGATConv, GraphConv
 from torch import Tensor
 
-from GNN.dueling_gcn import DuelingGCN
+from GNN.gcn import GCN
+import torch as th
 
 
-class EgatDuelingGCN(DuelingGCN):
+class EgatGCN(GCN):
     def __init__(
         self,
         node_features: int,
         edge_features: int,
-        action_space_size: int,
         architecture_path: str,
         name: str,
-        log_dir: str = "./",
+        log_dir: str,
     ):
-        super(EgatDuelingGCN, self).__init__(
-            node_features,
-            edge_features,
-            action_space_size,
-            architecture_path,
-            name,
-            log_dir,
+        super(EgatGCN, self).__init__(
+            node_features, edge_features, architecture_path, name, log_dir
         )
-
-        if (
-            self.architecture["hidden_node_feat_size"][2]
-            != self.architecture["hidden_edge_feat_size"][2]
-        ):
-            raise Exception(
-                "Last value for hidden node and edge feature size must be equal"
-            )
         self.attention1 = EGATConv(
             node_features,
             edge_features,
@@ -71,18 +57,12 @@ class EgatDuelingGCN(DuelingGCN):
             allow_zero_in_degree=True,
         )
 
-    def init_value_stream(self) -> nn.Module:
-        return nn.Sequential(
-            nn.Linear(
-                self.architecture["hidden_output_size"]
-                * self.architecture["heads"][-1],
-                self.architecture["value_stream_size"],
-            ),
-            nn.ReLU(),
-            nn.Linear(self.architecture["value_stream_size"], 1),
-        )
+    def get_embedding_dimension(self):
+        return self.architecture["hidden_output_size"]
 
-    def extract_features(self, g: DGLHeteroGraph) -> Tensor:
+    def compute_embeddings(
+        self, g: DGLHeteroGraph, return_graph: bool = False
+    ) -> Union[Tuple[Tensor, Tensor], Tuple[Tensor, Tensor, DGLHeteroGraph]]:
         g = self.preprocess_graph(g)
         node_embeddings, edge_embeddings = self.attention1(
             g,
@@ -103,11 +83,17 @@ class EgatDuelingGCN(DuelingGCN):
         node_embeddings, edge_embeddings = self.attention3(
             g, node_embeddings, edge_embeddings
         )
+        if return_graph:
+            return node_embeddings, edge_embeddings, g
+        return node_embeddings, edge_embeddings
 
+    def compute_node_embedding(
+        self, g: DGLHeteroGraph, node_embeddings: th.Tensor, edge_embeddings: th.Tensor
+    ) -> Tensor:
         node_embeddings = self.conv(g, node_embeddings, edge_weight=edge_embeddings)
+        mean_over_heads = th.mean(node_embeddings, dim=1)
+        return mean_over_heads
 
-        graph_embedding = self.compute_graph_embedding(g, node_embeddings)
-
-        graph_embedding = th.flatten(graph_embedding, 1)
-
-        return graph_embedding
+    def forward(self, g: DGLHeteroGraph) -> Tensor:
+        node_embeddings, edge_embeddings = self.compute_embeddings(g)
+        return self.compute_node_embedding(g, node_embeddings, edge_embeddings)

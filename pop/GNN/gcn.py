@@ -1,16 +1,15 @@
 import json
 from abc import abstractmethod
-from typing import Any
+from typing import Any, Union
+import dgl
 
 import torch as th
 import torch.nn as nn
 from pathlib import Path
+
+from dgl import DGLHeteroGraph
 from prettytable import PrettyTable
 from torch import Tensor
-
-from GNN.conv_dueling_gcn import ConvDuelingGCN
-from GNN.egat_dueling_gcn import EgatDuelingGCN
-from GNN.gat_dueling_gcn import GATDuelingGCN
 
 
 class GCN(nn.Module):
@@ -44,32 +43,56 @@ class GCN(nn.Module):
         self.node_features = node_features
         self.edge_features = edge_features
 
-    @staticmethod
-    @abstractmethod
     def save(self):
-        ...
+        checkpoint = {
+            "name": self.name,
+            "network_state": self.state_dict(),
+            "node_features": self.node_features,
+            "edge_features": self.edge_features,
+        }
+        checkpoint = checkpoint | self.architecture
+        th.save(checkpoint, self.log_file)
 
-    @abstractmethod
     def load(self, log_dir: str):
-        ...
+        checkpoint = th.load(log_dir)
+        self.name = checkpoint["name"]
+        self.load_state_dict(checkpoint["network_state"])
+        self.node_features = checkpoint["node_features"]
+        self.edge_features = checkpoint["edge_features"]
+        self.architecture = {
+            i: j
+            for i, j in checkpoint.items()
+            if i
+            not in {
+                "network_state",
+                "node_features",
+                "edge_features",
+                "name",
+            }
+        }
+        print("Network Succesfully Loaded!")
 
-    def load_architecture(self, architecture_path: str) -> dict:
+    def load_architecture(self, architecture: Union[str, dict]) -> dict:
         try:
-            architecture_dict = json.load(open(architecture_path))
-            print(
-                "Architecture succesfully loaded for "
-                + self.name
-                + " from "
-                + architecture_path
-            )
-            return architecture_dict
+            if type(architecture) != dict:
+                architecture = json.load(open(architecture))
+                print(
+                    "Architecture succesfully loaded for "
+                    + self.name
+                    + " from "
+                    + architecture
+                )
+            return architecture
         except Exception as e:
             raise Exception(
                 "Could not open architecture json at "
-                + architecture_path
+                + architecture
                 + "\n encountered exception:\n"
                 + str(e)
             )
+
+    def get_embedding_dimension(self):
+        raise Exception("get_embedding_dimension is not implemented for " + self.name)
 
     @staticmethod
     def count_parameters(model):
@@ -108,39 +131,11 @@ class GCN(nn.Module):
             .float()
         )
 
-
-def get_gcn(
-    is_dueling: bool,
-    node_features: int,
-    edge_features: int,
-    architecture_path: str,
-    name: str,
-    log_dir: str = "./",
-    **kwargs,
-) -> GCN:
-    embedding = json.load(open(architecture_path)).get("embedding")
-    if embedding is None:
-        raise Exception(
-            "Please add 'embedding' in the architecture json at: " + architecture_path
-        )
-    if is_dueling:
-        if kwargs["action_space_size"] is None:
-            print("Please pass action_space_size keyword argument for dueling GCNs")
-        if embedding == "conv":
-            gcn = ConvDuelingGCN
-        elif embedding == "egat":
-            gcn = EgatDuelingGCN
-        elif embedding == "gat":
-            gcn = GATDuelingGCN
-        else:
-            raise Exception(
-                "Available Embeddings for Dueling GCNs are: conv, egat and gat"
-            )
-        return gcn(
-            node_features,
-            edge_features,
-            kwargs["action_space_size"],
-            architecture_path,
-            name,
-            log_dir,
-        )
+    @staticmethod
+    def preprocess_graph(g: DGLHeteroGraph) -> DGLHeteroGraph:
+        num_nodes = g.batch_num_nodes()
+        num_edges = g.batch_num_edges()
+        g = dgl.add_self_loop(g)
+        g.set_batch_num_nodes(num_nodes)
+        g.set_batch_num_edges(num_edges)
+        return g

@@ -54,15 +54,6 @@ class DuelingGCN(GCN):
             nn.Linear(self.architecture["value_stream_size"], 1),
         )
 
-    @staticmethod
-    def preprocess_graph(g: DGLHeteroGraph) -> DGLHeteroGraph:
-        num_nodes = g.batch_num_nodes()
-        num_edges = g.batch_num_edges()
-        g = dgl.add_self_loop(g)
-        g.set_batch_num_nodes(num_nodes)
-        g.set_batch_num_edges(num_edges)
-        return g
-
     @abstractmethod
     def extract_features(self, g: DGLHeteroGraph) -> Tensor:
         """

@@ -1,0 +1,32 @@
+{
+  "network": {
+    "embedding": "egat",
+    "pooling": "avg",
+    "hidden_output_size": 256,
+    "value_stream_size": 512,
+    "advantage_stream_size": 512,
+    "hidden_node_feat_size": [32, 64, 128],
+    "hidden_edge_feat_size": [32, 64, 128],
+    "heads": [2, 4, 8]
+  },
+  "converter_kwargs": {
+    "all_actions": null,
+    "set_line_status": false,
+    "change_bus_vect": true,
+    "set_topo_vect": false
+  },
+  "learning_frequency": 4,
+  "replace": 500,
+  "gamma": 0.99,
+  "max_epsilon": 1.0,
+  "min_epsilon": 0.01,
+  "epsilon_decay": 200,
+  "learning_rate": 1e-2,
+  "delta": 1.0,
+  "alpha": 0.5,
+  "max_beta": 1.0,
+  "min_beta": 0.0,
+  "beta_decay": 200,
+  "batch_size": 288,
+  "replay_memory_size": 100000
+}

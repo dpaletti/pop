@@ -1,10 +1,11 @@
 from pathlib import Path
+import json
 
 from dgl import DGLHeteroGraph
 from tqdm import tqdm
 from grid2op.Agent import AgentWithConverter
-from grid2op.Converter import Converter
-from grid2op.Action import ActionSpace
+from grid2op.Converter import IdToAct
+from grid2op.Action import BaseAction, ActionSpace
 from grid2op.Observation import BaseObservation
 from grid2op.Environment import BaseEnv
 import torch as th
@@ -14,15 +15,18 @@ from torch.utils.tensorboard.writer import SummaryWriter
 import dgl
 import numpy as np
 
-from GNN.dueling_gcn import DuelingGCN
-from agent.replay_buffer import ReplayMemory, Transition
+from GNN.gcn import GCN
+from GNN.gnn_factory import get_gcn
+from node_agents.replay_buffer import ReplayMemory, Transition
 
-from typing import Tuple, List, Optional
+from typing import List, Optional, Union
+
+from node_agents.utilities import to_dgl, batch_observations
 
 
 class DoubleDuelingGCNAgent(AgentWithConverter):
     """
-    Double Dueling Graph Convolutional Neural (GCN) N2048etwork Agent.
+    Double Dueling Graph Convolutional Neural (GCN) Network Agent.
     GCN is used to embed the graph.
     In the Dueling framework the Neural Network predicts:
     - the Value function for the current observation;
@@ -35,129 +39,74 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
     - the Q Network is updated at each timestep;
     - the Target Network is updated every :attribute:`replace` steps to avoid bias issues.
 
-
-    Attributes
-    ----------
-    q_network: :class:`nn.Module`
-        Q Network Model updated at every timestep.
-
-    target_network: :class:`nn.Module`
-        Target Network model updated every :replace:`timesteps`
-
-    action_space_converter: :class:`Converter`
-        Conversion class to map the action space to a suitable representation for the models
-
-    learning_frequency: `int`
-        Number of timesteps between one learning step and another
-
-    replace: ``int``
-        Number of steps after which the target network is updated (e.g. the parameters copied from the q_network)
-
-    gamma: ``float``
-        MDP charachteristic (not an agent parameter) which defines how much future steps influence current reward
-
-    max_epsilon: ``float``
-        Starting value for the decaying exploration parameter
-
-    min_epsilon: ``float``
-        Minimum value of the decaying exploration
-
-    epsilon_decay: ``int``
-        Exploration decay step, this is the parameter for the exponential decay equation
-
-    learning_rate: ``float``
-        Learning rate of the optimizer (Adam automatically handles learning rate decay)
-
-    delta: ``float``
-        delta parameter in Huber Loss for tuning between L1 and L2 loss
-
-    alpha: ``float``
-        controls how much prioritization is used between 0 and 1
-
-    max_beta: ``float``
-        Starting value for the beta parameter, controls bias correction the higher the more correction
-        in the Prioritized Experience Replay Buffer
-
-    min_beta: ``float``
-        Minimum value for the beta bias correction parameter
-
-    beta_decay: ``int``
-        Decay rate for exponential beta decay
-
-    batch_size: ``int``
-        Batch size, default value is length of 1 day in grid2op. 24 hours times 60 minutes
-        divided by 5 because timestamps are taken every 5 minutes
-
-    tensorboard_log_dir: ``str``
-        Directory where to save tensorboard logs. To disable it set it to None.
-
-    training: ``bool``
-        If training epsilon-greedy will be used to favour exploration else advantage method will
-        be used to select actions
     """
 
     def __init__(
         self,
-        action_space: ActionSpace,
-        q_network: DuelingGCN,
-        target_network: DuelingGCN,
-        action_space_converter: Converter,
-        name: str = "gcn_agent",
-        kwargs_converter: dict = {
-            "all_actions": None,
-            "set_line_status": False,
-            "change_bus_vect": True,
-            "set_topo_vect": False,
-        },
-        learning_frequency: int = 4,
-        replace: int = 500,
-        gamma: float = 0.99,
-        max_epsilon: float = 1.0,
-        min_epsilon: float = 0.01,
-        epsilon_decay: int = 200,
-        learning_rate: float = 1e-2,
-        delta: float = 1.0,
-        alpha: float = 0.5,
-        max_beta: float = 1.0,
-        min_beta: float = 0.0,
-        beta_decay: int = 200,
-        batch_size: int = int(24 * 60 / 5),  # 1 day in grid2Op environment
-        tensorboard_log_dir: str = "./runs/",
-        log_dir: str = ".",
-        training: bool = True,
+        agent_actions: List[BaseAction],
+        full_action_space: ActionSpace,
+        node_features: int,
+        edge_features: int,
+        architecture: Union[str, dict],
+        name: str,
+        seed: int,
+        training: bool,
+        tensorboard_log_dir: str,
+        log_dir,
         device: Optional[str] = None,
     ):
-        super().__init__(action_space, action_space_converter, **kwargs_converter)
+        self.architecture: dict = (
+            json.load(open(architecture)) if type(architecture) is str else architecture
+        )
+        super().__init__(
+            full_action_space,
+            IdToAct,
+            all_actions=agent_actions,
+            **self.architecture["converter_kwargs"]
+        )
 
         self.name = name
-        self.action_space_converter = action_space_converter
+        self.action_space_converter = IdToAct(full_action_space)
+        self.action_space_converter.init_converter(all_actions=agent_actions)
+        self.action_space_converter.seed(seed)
+
         # Initialize Torch device
         if device is None:
             self.device: th.device = th.device(
                 "cuda:0" if th.cuda.is_available() else "cpu"
             )
         else:
-            self.device: th.device = th.device("cpu")
+            self.device: th.device = th.device(device)
 
-        print("Selected device: " + str(self.device))
-
-        if str(self.device) == "cpu":
-            print("Number of cpu threads: {}".format(th.get_num_threads()))
-
-        # Name Agent for Grid2Op compatibility
-        self.name = "gcn_agent"
+        self.name = name
 
         # Initialize deep networks
-        self.q_network: DuelingGCN = q_network
-        self.target_network: DuelingGCN = target_network
-        q_network.to(self.device)
-        target_network.to(self.device)
+        self.q_network: GCN = get_gcn(
+            is_dueling=True,
+            node_features=node_features,
+            edge_features=edge_features,
+            architecture=self.architecture["network"],
+            name=name + "_q_network",
+            action_space_size=len(agent_actions),
+        )
+        self.target_network: GCN = get_gcn(
+            is_dueling=True,
+            node_features=node_features,
+            edge_features=edge_features,
+            architecture=self.architecture["network"],
+            name=name + "_target_network",
+            action_space_size=len(agent_actions),
+        )
+        self.q_network.to(self.device)
+        self.target_network.to(self.device)
 
-        print(self.q_network)
-        DuelingGCN.count_parameters(self.q_network)
+        # Optimizer
+        self.optimizer: th.optim.Optimizer = th.optim.Adam(
+            self.q_network.parameters(), lr=self.architecture["learning_rate"]
+        )
 
-        # Dueling
-        self.replace: int = replace
+        # Replay Buffer
+        self.memory: ReplayMemory = ReplayMemory(int(1e5), self.architecture["alpha"])
 
         # Reporting
         self.trainsteps: int = 0
@@ -168,54 +117,19 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
         self.reward_incremental_mean: float = 0
         self.cumulative_reward: float = 0
 
-        # Problem charachteristics
-        self.gamma: float = gamma
-
-        # Agent Parameters
-        self.max_epsilon: float = max_epsilon
-        self.min_epsilon: float = min_epsilon
-        self.epsilon_decay: int = epsilon_decay
-        self.learning_frequency: int = learning_frequency
-
-        # Optimizer
-        self.learning_rate = learning_rate
-        self.optimizer: th.optim.Optimizer = th.optim.Adam(
-            self.q_network.parameters(), lr=learning_rate
-        )
-
-        # Action Converter
-        self.action_space_converter = action_space_converter
-        action_space_converter.seed(0)  # for reproducibility
-        action_space_converter.init_converter(**kwargs_converter)
-
-        # Replay Buffer
-        self.memory: ReplayMemory = ReplayMemory(int(1e5), alpha)
-        self.max_beta: float = max_beta
-        self.min_beta: float = min_beta
-        self.beta_decay: int = beta_decay
-
-        # Batch Size
-        self.batch_size: int = batch_size
-
         # Logging
-        ## Model Checkpoints
         self.log_dir: str = log_dir
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
         self.log_file: str = str(Path(self.log_dir, name + ".pt"))
 
         # Huber Loss initialization with delta
-        self.loss_func: nn.HuberLoss = nn.HuberLoss(delta=delta)
+        self.loss_func: nn.HuberLoss = nn.HuberLoss(delta=self.architecture["delta"])
 
         # Training or Evaluation
         self.training: bool = training
         if training:
-            print(
-                "\n\nCare training defaults to True, exploration is included in action selection\n\n"
-            )
-            ## Tensorboard
-            # Care SummaryWriter does not support pickling
-            # During evaluation pickling is needed for multiprocessing thus this is disabled
-            # during evaluation
+
+            # Tensorboard
             Path(tensorboard_log_dir).mkdir(parents=True, exist_ok=True)
             self.writer: Optional[SummaryWriter]
             if tensorboard_log_dir is not None:
@@ -237,23 +151,13 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
 
         sampling_weights: :class:`th.Tensor`
             Sampling weights are associated to each transition sampled from the prioritized experience replay buffer
-
-        Return
-        ------
-        loss: :class:`th.Tensor`
-            Current loss computed as Huber Loss with sampling weights to q_values and td_errors
-        td_errors: :class:`th.Tensor`
-            Temporal difference errors computed with the Double Q Learning approach, returned to be eventually used for
-            priorities inside the prioritized experience replay buffer
         """
 
         # Unwrap batch
         # Get observation start and end
 
-        observation_batch = self.batch_observations(transitions_batch.observation)
-        next_observation_batch = self.batch_observations(
-            transitions_batch.next_observation
-        )
+        observation_batch = batch_observations(transitions_batch.observation)
+        next_observation_batch = batch_observations(transitions_batch.next_observation)
         # Get 1 action per batch and restructure as an index for gather()
         actions = (
             th.Tensor(transitions_batch.action)
@@ -279,9 +183,9 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
             .unsqueeze(1)
             .type(th.int64)
         ).to(self.device)
-        td_errors: Tensor = rewards + self.gamma * target_q_values.gather(
-            1, best_actions
-        ).to(self.device)
+        td_errors: Tensor = rewards + self.architecture[
+            "gamma"
+        ] * target_q_values.gather(1, best_actions).to(self.device)
 
         # deltas = weights (q_values - td_errors)
         # to keep interfaces general we distribute weights
@@ -293,14 +197,14 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
 
     def exponential_decay(self, max_val: float, min_val: float, decay: int) -> float:
         """
-        Exponential decay schedule, value evolves with trainsteps stored in the agent's state
+        Exponential decay schedule, value evolves with trainsteps stored in the node_agents's state
 
         Parameters
         ----------
         max_val: ``float``
             upperbound of the returned value, starting point of the decay
         min_val: ``float``
-            lowebound of the returned value, ending point of the decay
+            lowerbound of the returned value, ending point of the decay
         decay: ``int``
             decay parameter, the higher the faster the decay
         Return
@@ -313,7 +217,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
     def my_act(
         self,
         transformed_observation: dgl.DGLHeteroGraph,
-        reward: float,
+        reward=None,
         done=False,
     ) -> int:
         """
@@ -340,7 +244,9 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
         if self.training:
             # epsilon-greedy Exploration
             if np.random.rand() <= self.exponential_decay(
-                self.max_epsilon, self.min_epsilon, self.epsilon_decay
+                self.architecture["max_epsilon"],
+                self.architecture["min_epsilon"],
+                self.architecture["epsilon_decay"],
             ):
                 return self.action_space.sample()
 
@@ -394,29 +300,13 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
             observation converted to a Deep Graph Library graph
         """
 
-        return self.to_dgl(observation)
+        return to_dgl(observation)
 
     def save_to_tensorboard(
         self,
         loss: float,
         reward: float,
-        observation_batch: th.Tensor,
-        next_observation_batch: th.Tensor,
     ) -> None:
-        """
-        Save to tensorboard:
-        - loss
-        - reward
-        - beta
-        - epsilon
-
-        Parameters
-        ----------
-        loss: ``float``
-            current agent loss
-        reward: ``float``
-            last reward obtained by the agent as a mean over the batch
-        """
         if self.writer is None:
             print("Warning: trying to save to tensorboard but its deactivated")
             return
@@ -442,34 +332,44 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
         self.writer.add_scalar(
             "Epsilon/train",
             self.exponential_decay(
-                self.max_epsilon, self.min_epsilon, self.epsilon_decay
+                self.architecture["max_epsilon"],
+                self.architecture["min_epsilon"],
+                self.architecture["epsilon_decay"],
             ),
             self.trainsteps,
         )
         self.writer.add_scalar(
             "Beta/train",
-            self.exponential_decay(self.max_beta, self.min_beta, self.beta_decay),
+            self.exponential_decay(
+                self.architecture["max_beta"],
+                self.architecture["min_beta"],
+                self.architecture["beta_decay"],
+            ),
             self.trainsteps,
         )
 
     def learn(self) -> None:
         """
-        Learning step for the agent.
+        Learning step for the node_agents.
         Learing starts after we have at least 'batch' transitions in memory.
         Every 'replace' steps update the target network.
         Experiences are sampled through prioritized experience replay dependent on exponentially decaying beta.
         Loss is computed through Double Dueling Q learning.
 
         """
-        if len(self.memory) < self.batch_size:
+        if len(self.memory) < self.architecture["batch_size"]:
             return
-        if self.trainsteps % self.replace == 0:
+        if self.trainsteps % self.architecture["replace"] == 0:
             self.target_network.parameters = self.q_network.parameters
 
         # Sample from Replay Memory and unpack
         idxs, transitions, sampling_weights = self.memory.sample(
-            self.batch_size,
-            self.exponential_decay(self.max_beta, self.min_beta, self.beta_decay),
+            self.architecture["batch_size"],
+            self.exponential_decay(
+                self.architecture["max_beta"],
+                self.architecture["min_beta"],
+                self.architecture["beta_decay"],
+            ),
         )
         transitions = Transition(*zip(*transitions))
 
@@ -489,56 +389,24 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
         self.save(
             float(loss.mean().item()),
             transitions.reward,
-            observation_batch,
-            next_observation_batch,
         )
 
     def save(
         self,
         loss: float,
         rewards: List[float],
-        observation_batch: th.Tensor,
-        next_observation_batch: th.Tensor,
     ) -> None:
-        """
-        Save a checkpoint of networks and optimizer.
-        Save all the hyperparameters.
-        Save Reward, Loss, Epsilon and Beta to Tensorboard.
-
-        Parameters
-        ----------
-        loss: ``float``
-            current agent loss
-
-        rewards: ``List[float]``
-            rewards obtained from the last batch
-        """
         checkpoint = {
             "optimizer_state": self.optimizer.state_dict(),
             "trainsteps": self.trainsteps,
             "episodes": self.episodes,
             "name": self.name,
-            "agent_hyperparameters": {
-                "alpha": self.memory.alpha,
-                "batch_size": self.batch_size,
-                "memory_size": self.memory.buffer_length,
-                "gamma": self.gamma,
-                "replace_rate": self.replace,
-                "max_epsilon": self.max_epsilon,
-                "min_epsilon": self.min_epsilon,
-                "epsilon_decay": self.epsilon_decay,
-                "max_beta": self.max_beta,
-                "min_beta": self.min_beta,
-                "beta_decay": self.beta_decay,
-                "learning_rate": self.learning_rate,
-            },
+            "architecture": self.architecture,
         }
         self.q_network.save()
         self.target_network.save()
         th.save(checkpoint, self.log_file)
-        self.save_to_tensorboard(
-            loss, np.mean(rewards), observation_batch, next_observation_batch
-        )
+        self.save_to_tensorboard(loss, np.mean(rewards))
 
     def load(self, load_dir: str, networks_loaded: bool = True) -> None:
         """
@@ -550,7 +418,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
         load_dir: ``str``
             Directory of the checkpoint
         networks_loaded: ``bool``
-            set it to False if network parameters are included in agent's checkpoint
+            set it to False if network parameters are included in node_agents's checkpoint
         """
 
         checkpoint = th.load(load_dir)
@@ -561,84 +429,9 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
 
         self.optimizer.load_state_dict(checkpoint["optimizer_state"])
         self.episodes = checkpoint["episodes"]
-        self.checkpoint = checkpoint["trainsteps"]
-        self.alpha = checkpoint["agent_hyperparameters"]["alpha"]
-        self.batch_size = checkpoint["agent_hyperparameters"]["batch_size"]
-        self.gamma = checkpoint["agent_hyperparameters"]["gamma"]
-        self.replace_rate = checkpoint["agent_hyperparameters"]["replace_rate"]
-        self.max_epsilon = checkpoint["agent_hyperparameters"]["max_epsilon"]
-        self.min_epsilon = checkpoint["agent_hyperparameters"]["min_epsilon"]
-        self.epsilon_decay = checkpoint["agent_hyperparameters"]["epsilon_decay"]
-        self.max_beta = checkpoint["agent_hyperparameters"]["max_beta"]
-        self.min_beta = checkpoint["agent_hyperparameters"]["min_beta"]
-        self.beta_decay = checkpoint["agent_hyperparameters"]["beta_decay"]
-        self.learning_rate = checkpoint["agent_hyperparameters"]["learning_rate"]
+        self.architecture = checkpoint["architecture"]
 
         print("Agent Succesfully Loaded!")
-
-    def batch_observations(
-        self, observations: Tuple[BaseObservation]
-    ) -> dgl.DGLHeteroGraph:
-        """
-        Convert a list (or tuple) of observations to a Deep Graph Library graph batch.
-        A graph batch is represented as a normal graph with nodes and edges added (together with features).
-
-        Parameters
-        ----------
-        observations: ``Tuple[BaseObservation]``
-            tuple of BaseObservation usually stored inside of a :class:`Transition`
-
-        Return
-        ------
-        graph_batch: :class:`dgl.DGLHeteroGraph`
-            a batch of graphs represented as a single augmented graph for Deep Graph Library compatibility
-        """
-        graphs = []
-        for o in observations:
-            graph = self.convert_obs(o)
-            graphs.append(graph)
-        graph_batch = dgl.batch(graphs)
-        return graph_batch
-
-    @staticmethod
-    def to_dgl(obs: BaseObservation) -> dgl.DGLHeteroGraph:
-        """
-        convert a :class:BaseObservation to a :class:`dgl.DGLHeteroGraph`.
-
-        Parameters
-        ----------
-        obs: :class:`BaseObservation`
-            BaseObservation taken from a grid2Op environment
-
-        Return
-        ------
-        dgl_obs: :class:`dgl.DGLHeteroGraph`
-            graph compatible with the Deep Graph Library
-        """
-
-        # Convert Grid2op graph to a directed (for compatibility reasons) networkx graph
-        net = obs.as_networkx()
-        net = net.to_directed()  # Typing error from networkx, ignore it
-
-        # Convert from networkx to dgl graph
-        dgl_net = dgl.from_networkx(
-            net,
-            node_attrs=["p", "q", "v", "cooldown"],
-            edge_attrs=[
-                "rho",
-                "cooldown",
-                "status",
-                "thermal_limit",
-                "timestep_overflow",
-                "p_or",
-                "p_ex",
-                "q_or",
-                "q_ex",
-                "a_or",
-                "a_ex",
-            ],
-        )
-        return dgl_net
 
     def step(
         self,
@@ -649,14 +442,14 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
         done: bool,
     ) -> None:
         """
-        Updates the agent's state based on feedback received from the environment.
+        Updates the node_agents's state based on feedback received from the environment.
 
         Parameters:
         -----------
         observation: :class:`BaseObservation`
             previous observation from the environment
         action: ``int``
-            the action taken by the agent in the previous state.
+            the action taken by the node_agents in the previous state.
         reward: ``float``
             the reward received from the environment.
         next_observation: :class:`BaseObservation`
@@ -692,8 +485,8 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
             self.trainsteps += 1
             self.alive_steps += 1
 
-            # every so often the agent should learn from experiences
-            if self.trainsteps % self.learning_frequency == 0:
+            # every so often the node_agents should learn from experiences
+            if self.trainsteps % self.architecture["learning_frequency"] == 0:
                 self.learn()
                 self.learning_steps += 1
 
