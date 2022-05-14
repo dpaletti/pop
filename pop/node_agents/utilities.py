@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Union
 from random import choice, sample
 
 import dgl
@@ -6,12 +6,15 @@ import networkx as nx
 from grid2op.Observation import BaseObservation
 
 
-def from_networkx_to_dgl(graph: nx.graph):
-    return dgl.from_networkx(
-        graph.to_directed(),
-        node_attrs=list(graph.nodes[choice(list(graph.nodes))].keys()),
-        edge_attrs=list(graph.edges[choice(list(graph.edges))].keys()),
-    )
+def from_networkx_to_dgl(graph):
+    try:
+        return dgl.from_networkx(
+            graph.to_directed(),
+            node_attrs=list(graph.nodes[choice(list(graph.nodes))].keys()),
+            edge_attrs=list(graph.edges[choice(list(graph.edges))].keys()),
+        )
+    except:
+        return graph
 
 
 def to_dgl(obs: BaseObservation) -> dgl.DGLHeteroGraph:
@@ -37,7 +40,9 @@ def to_dgl(obs: BaseObservation) -> dgl.DGLHeteroGraph:
     return from_networkx_to_dgl(net)
 
 
-def batch_observations(observations: Tuple[BaseObservation]) -> dgl.DGLHeteroGraph:
+def batch_observations(
+    observations: Union[Tuple[BaseObservation], Tuple[nx.Graph]]
+) -> dgl.DGLHeteroGraph:
     """
     Convert a list (or tuple) of observations to a Deep Graph Library graph batch.
     A graph batch is represented as a normal graph with nodes and edges added (together with features).
@@ -54,7 +59,7 @@ def batch_observations(observations: Tuple[BaseObservation]) -> dgl.DGLHeteroGra
     """
     graphs = []
     for o in observations:
-        graph = to_dgl(o)
+        graph = to_dgl(o) if type(o) is BaseObservation else from_networkx_to_dgl(o)
         graphs.append(graph)
     graph_batch = dgl.batch(graphs)
     return graph_batch

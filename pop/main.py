@@ -108,6 +108,7 @@ def main():
         tensorboard_dir="../test_data/tensorboard/dpop_rte_1e4",
         checkpoint_dir="../test_data/checkpoint/dpop_rte_1e4",
         seed=0,
+        device="cpu",
     )
 
     train(env=env_train, agent=agent, iterations=int(1e4))

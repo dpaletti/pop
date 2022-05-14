@@ -17,6 +17,7 @@ scipy = "^1.8.0"
 matplotlib = "^3.5.1"
 tensorboard = "^2.8.0"
 joblib = "^1.1.0"
+pathos = "^0.2.8"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

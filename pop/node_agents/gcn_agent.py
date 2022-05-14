@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import networkx as nx
 
 from dgl import DGLHeteroGraph
 from tqdm import tqdm
@@ -483,10 +484,10 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
 
     def step(
         self,
-        observation: BaseObservation,
+        observation: Union[BaseObservation, nx.Graph],
         action: int,
         reward: float,
-        next_observation: BaseObservation,
+        next_observation: Union[BaseObservation, nx.Graph],
         done: bool,
     ) -> None:
         """

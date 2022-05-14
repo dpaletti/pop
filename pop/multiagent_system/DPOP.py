@@ -4,6 +4,7 @@ import json
 from random import choice
 import torch as th
 
+
 import dgl
 import networkx as nx
 from torch.utils.tensorboard import SummaryWriter
@@ -24,6 +25,7 @@ from node_agents.gcn_agent import DoubleDuelingGCNAgent
 from community_detection.community_detector import CommunityDetector
 from managers.community_manager import CommunityManager
 import multiprocessing
+from pathos.multiprocessing import ProcessingPool as Pool
 
 
 # TODO: tracking communities in dynamic graphs
@@ -46,6 +48,12 @@ class DPOP(AgentWithConverter):
         # Reproducibility
         self.seed = seed
         self.name = name
+        if device is None:
+            self.device: th.device = th.device(
+                "cuda:0" if th.cuda.is_available() else "cpu"
+            )
+        else:
+            self.device: th.device = th.device(device)
         if n_jobs is None:
             self.n_jobs = multiprocessing.cpu_count()
         else:
@@ -96,6 +104,7 @@ class DPOP(AgentWithConverter):
             for idx, action_space in enumerate(action_spaces)
         ]
         self.local_actions = []
+        self.factored_observation = []
 
         # Community Detector Initialization
         self.community_detector = CommunityDetector(seed)
@@ -112,7 +121,7 @@ class DPOP(AgentWithConverter):
                 architecture=self.architecture["manager"],
                 log_dir=self.checkpoint_dir,
                 name="manager_" + str(idx) + "_" + name,
-            )
+            ).to(device)
             for idx, _ in enumerate(self.communities)
         ]
 
@@ -122,7 +131,7 @@ class DPOP(AgentWithConverter):
             architecture=self.architecture["head_manager"],
             name="head_manager_" + "_" + name,
             log_dir=self.checkpoint_dir,
-        )
+        ).to(device)
         self.manager_optimizers: List[th.optim.Optimizer] = [
             th.optim.Adam(
                 manager.parameters(), lr=self.architecture["manager"]["learning_rate"]
@@ -149,14 +158,14 @@ class DPOP(AgentWithConverter):
     ) -> int:
         graph: nx.Graph = transformed_observation[1]
 
-        factored_observation = transformed_observation[0]
+        self.factored_observation = transformed_observation[0]
 
         if self.communities and not self.fixed_communities:
             raise Exception("\nDynamic Communities are not implemented yet\n")
 
         self.local_actions = [
             agent.my_act(observation)
-            for agent, observation in tqdm(zip(self.agents, factored_observation))
+            for agent, observation in zip(self.agents, self.factored_observation)
         ]
 
         # Action Encoding is converted from local to global
@@ -195,8 +204,6 @@ class DPOP(AgentWithConverter):
 
         # The head manager chooses the best action from every community
         best_action = self.head_manager(summarized_graph)
-
-        print("Chosen Best Action: " + str(best_action))
 
         return best_action
 
@@ -301,8 +308,6 @@ class DPOP(AgentWithConverter):
         next_observation: BaseObservation,
         done: bool,
     ):
-        for agent, agent_action in zip(self.agents, self.local_actions):
-            agent.step(observation, agent_action, reward, next_observation, done)
         if done:
             if self.writer is not None:
                 self.writer.add_scalar(
@@ -312,6 +317,25 @@ class DPOP(AgentWithConverter):
             self.alive_steps = 0
             self.trainsteps += 1
         else:
+            for (
+                agent,
+                agent_action,
+                agent_observation,
+                agent_next_observation,
+                _,
+            ) in zip(
+                self.agents,
+                self.local_actions,
+                self.factored_observation,
+                *factor_observation(next_observation),
+            ):
+                agent.step(
+                    agent_observation,
+                    agent_action,
+                    reward,
+                    agent_next_observation,
+                    done,
+                )
             self.trainsteps += 1
             self.alive_steps += 1
             if (
