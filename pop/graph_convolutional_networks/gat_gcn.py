@@ -2,7 +2,7 @@ from typing import Union
 
 from torch import Tensor
 
-from graph_convolutional_networks.gcn import GCN
+from pop.graph_convolutional_networks.gcn import GCN
 from dgl.nn.pytorch import GATv2Conv
 import torch.nn as nn
 import torch as th

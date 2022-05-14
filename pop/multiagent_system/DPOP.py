@@ -14,18 +14,17 @@ from grid2op.Converter import IdToAct
 from grid2op.Environment import BaseEnv
 from grid2op.Observation import BaseObservation
 
-from managers.head_manager import HeadManager
+from pop.managers.head_manager import HeadManager
 from pop.multiagent_system.space_factorization import (
     factor_action_space,
     factor_observation,
     HashableAction,
 )
-from node_agents.utilities import from_networkx_to_dgl
-from node_agents.gcn_agent import DoubleDuelingGCNAgent
-from community_detection.community_detector import CommunityDetector
-from managers.community_manager import CommunityManager
+from pop.node_agents.utilities import from_networkx_to_dgl
+from pop.node_agents.gcn_agent import DoubleDuelingGCNAgent
+from pop.community_detection.community_detector import CommunityDetector
+from pop.managers.community_manager import CommunityManager
 import multiprocessing
-from pathos.multiprocessing import ProcessingPool as Pool
 
 
 # TODO: tracking communities in dynamic graphs

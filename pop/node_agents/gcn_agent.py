@@ -16,13 +16,13 @@ from torch.utils.tensorboard.writer import SummaryWriter
 import dgl
 import numpy as np
 
-from dueling_networks.dueling_net import DuelingNet
-from dueling_networks.dueling_net_factory import get_dueling_net
-from node_agents.replay_buffer import ReplayMemory, Transition
+from pop.dueling_networks.dueling_net import DuelingNet
+from pop.dueling_networks.dueling_net_factory import get_dueling_net
+from pop.node_agents.replay_buffer import ReplayMemory, Transition
 
 from typing import List, Optional, Union
 
-from node_agents.utilities import to_dgl, batch_observations
+from pop.node_agents.utilities import to_dgl, batch_observations
 
 
 class DoubleDuelingGCNAgent(AgentWithConverter):

@@ -4,7 +4,7 @@ from typing import List
 
 import networkx as nx
 from networkx.algorithms.community import modularity
-from community_detection.power_supply_modularity import power_supply_modularity
+from pop.community_detection.power_supply_modularity import power_supply_modularity
 
 
 def louvain_communities(

@@ -3,8 +3,8 @@ from typing import Union
 from dgl.heterograph import DGLHeteroGraph
 from torch import Tensor
 
-from dueling_networks.dueling_net import DuelingNet
-from graph_convolutional_networks.gat_gcn import GatGCN
+from pop.dueling_networks.dueling_net import DuelingNet
+from pop.graph_convolutional_networks.gat_gcn import GatGCN
 
 
 class GatDuelingGCN(DuelingNet):

@@ -3,11 +3,11 @@ from typing import Union
 from dgl import DGLHeteroGraph
 from torch import Tensor
 
-from graph_convolutional_networks.gat_gcn import GatGCN
+from pop.graph_convolutional_networks.gat_gcn import GatGCN
 import json
 
-from managers.manager import Manager
-from managers.node_attention import NodeAttention
+from pop.managers.manager import Manager
+from pop.managers.node_attention import NodeAttention
 
 
 class HeadManager(Manager):

@@ -11,7 +11,7 @@ import networkx as nx
 
 # TODO: The (head) manager should first try to combine the actions
 # TODO: Then it should choose which one is better
-from node_agents.utilities import from_networkx_to_dgl
+from pop.node_agents.utilities import from_networkx_to_dgl
 
 
 class HashableAction:

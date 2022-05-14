@@ -1,17 +1,16 @@
 from typing import Union, Tuple
-import torch.nn as nn
 import json
 
 from dgl import DGLHeteroGraph
 from torch import Tensor
-from graph_convolutional_networks.egat_gcn import EgatGCN
+from pop.graph_convolutional_networks.egat_gcn import EgatGCN
 
 # TODO: for pointer nets https://ychai.uk/notes/2019/07/21/RL/DRL/Decipher-AlphaStar-on-StarCraft-II/
 # Alternating Learning: chi gioca ha un learning rate più alto
 # Schedule a Turni
 # Fissare le comunità
-from managers.manager import Manager
-from managers.node_attention import NodeAttention
+from pop.managers.manager import Manager
+from pop.managers.node_attention import NodeAttention
 
 
 class CommunityManager(Manager):

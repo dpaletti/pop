@@ -15,7 +15,7 @@ import random
 import numpy as np
 import dgl
 
-from multiagent_system.DPOP import DPOP, train
+from pop.multiagent_system.DPOP import DPOP, train
 
 
 def combine_rewards(env, alarm: bool = True):
@@ -103,10 +103,10 @@ def main():
     agent = DPOP(
         env=env_train,
         name="dpop_rte_1e4",
-        architecture_path="../architectures/dpop_agent_xxs.json",
+        architecture_path="./architectures/dpop_agent_xxs.json",
         training=True,
-        tensorboard_dir="../test_data/tensorboard/dpop_rte_1e4",
-        checkpoint_dir="../test_data/checkpoint/dpop_rte_1e4",
+        tensorboard_dir="./test_data/tensorboard/dpop_rte_1e4",
+        checkpoint_dir="./test_data/checkpoint/dpop_rte_1e4",
         seed=0,
         device="cpu",
     )

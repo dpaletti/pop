@@ -4,7 +4,7 @@ from dgl import DGLHeteroGraph
 from dgl.nn.pytorch import EGATConv, GraphConv
 from torch import Tensor
 
-from graph_convolutional_networks.gcn import GCN
+from pop.graph_convolutional_networks.gcn import GCN
 import torch as th
 
 

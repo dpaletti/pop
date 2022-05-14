@@ -4,8 +4,8 @@ from typing import List, Set, Tuple, Optional
 import networkx as nx
 import networkx.linalg as nx_linalg
 import numpy as np
-from community_detection.louvain import louvain_communities
-from community_detection.power_supply_modularity import belong_to_same_community
+from pop.community_detection.louvain import louvain_communities
+from pop.community_detection.power_supply_modularity import belong_to_same_community
 
 
 class CommunityDetector:

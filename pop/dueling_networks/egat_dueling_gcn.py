@@ -4,8 +4,8 @@ import torch as th
 from dgl.heterograph import DGLHeteroGraph
 from torch import Tensor
 
-from dueling_networks.dueling_net import DuelingNet
-from graph_convolutional_networks.egat_gcn import EgatGCN
+from pop.dueling_networks.dueling_net import DuelingNet
+from pop.graph_convolutional_networks.egat_gcn import EgatGCN
 
 
 class EgatDuelingGCN(DuelingNet):

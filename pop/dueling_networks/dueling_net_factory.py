@@ -1,9 +1,9 @@
 import json
 from typing import Union, Optional
 
-from dueling_networks.dueling_net import DuelingNet
-from dueling_networks.egat_dueling_gcn import EgatDuelingGCN
-from dueling_networks.gat_dueling_gcn import GatDuelingGCN
+from pop.dueling_networks.dueling_net import DuelingNet
+from pop.dueling_networks.egat_dueling_gcn import EgatDuelingGCN
+from pop.dueling_networks.gat_dueling_gcn import GatDuelingGCN
 
 
 def get_dueling_net(
