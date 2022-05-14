@@ -1,6 +1,5 @@
 import json
-from abc import abstractmethod
-from typing import Any, Union
+from typing import Any, Union, Optional
 import dgl
 
 import torch as th
@@ -16,8 +15,8 @@ class GCN(nn.Module):
     def __init__(
         self,
         node_features: int,
-        edge_features: int,
-        architecture_path: str,
+        edge_features: Optional[int],
+        architecture: Union[str, dict],
         name: str,
         log_dir: str = "./",
         **kwargs,
@@ -26,7 +25,7 @@ class GCN(nn.Module):
 
         # Retrieving architecture from JSON
         self.name: str = name
-        self.architecture: dict[str, Any] = self.load_architecture(architecture_path)
+        self.architecture: dict[str, Any] = self.load_architecture(architecture)
 
         # Logging path
         self.log_dir: str = log_dir
@@ -53,13 +52,11 @@ class GCN(nn.Module):
         checkpoint = checkpoint | self.architecture
         th.save(checkpoint, self.log_file)
 
-    def load(self, log_dir: str):
-        checkpoint = th.load(log_dir)
-        self.name = checkpoint["name"]
-        self.load_state_dict(checkpoint["network_state"])
-        self.node_features = checkpoint["node_features"]
-        self.edge_features = checkpoint["edge_features"]
-        self.architecture = {
+    @classmethod
+    def load(cls, log_file: str):
+        checkpoint = th.load(log_file)
+
+        architecture = {
             i: j
             for i, j in checkpoint.items()
             if i
@@ -70,7 +67,17 @@ class GCN(nn.Module):
                 "name",
             }
         }
-        print("Network Succesfully Loaded!")
+
+        gcn = cls(
+            node_features=checkpoint["node_features"],
+            edge_features=checkpoint["edge_features"],
+            architecture=architecture,
+            name=checkpoint["name"],
+            log_dir=Path(log_file).parents[0],
+        )
+
+        gcn.load_state_dict(checkpoint["network_state"])
+        return gcn
 
     def load_architecture(self, architecture: Union[str, dict]) -> dict:
         try:

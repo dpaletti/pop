@@ -1,33 +1,27 @@
-from dgl.heterograph import DGLHeteroGraph
-from dgl.nn.pytorch import GATv2Conv
+from typing import Union
+
 from torch import Tensor
+
+from graph_convolutional_networks.gcn import GCN
+from dgl.nn.pytorch import GATv2Conv
 import torch.nn as nn
 import torch as th
+import dgl
 
-from GNN.dueling_gcn import DuelingGCN
 
-
-class GATDuelingGCN(DuelingGCN):
+class GatGCN(GCN):
     def __init__(
         self,
         node_features: int,
-        edge_features: int,
-        action_space_size: int,
-        architecture_path: str,
+        architecture: Union[str, dict],
         name: str,
-        log_dir: str = "./",
+        log_dir: str,
+        **kwargs  # Compliance with GCN signature
     ):
-        super(GATDuelingGCN, self).__init__(
-            node_features,
-            edge_features,
-            action_space_size,
-            architecture_path,
-            name,
-            log_dir,
-        )
+        super(GatGCN, self).__init__(node_features, None, architecture, name, log_dir)
 
         self.attention1 = GATv2Conv(
-            self.architecture["node_features"],
+            node_features,
             self.architecture["hidden_node_feat_size"][0],
             num_heads=self.architecture["heads"][0],
             residual=True,
@@ -37,9 +31,8 @@ class GATDuelingGCN(DuelingGCN):
             share_weights=True,
         )
 
-        # Here we concatenate edge features with node features
         self.attention2 = GATv2Conv(
-            self.architecture["hidden_node_feat_size"][1]
+            self.architecture["hidden_node_feat_size"][0]
             * self.architecture["heads"][0],
             self.architecture["hidden_output_size"],
             num_heads=self.architecture["heads"][1],
@@ -50,15 +43,20 @@ class GATDuelingGCN(DuelingGCN):
             share_weights=True,
         )
 
-    def extract_features(self, g: DGLHeteroGraph) -> Tensor:
-        g = self.preprocess_graph(g)
+    def forward(self, g: dgl.DGLHeteroGraph, return_mean_over_heads=False) -> Tensor:
+        self.preprocess_graph(g)
 
-        node_embeddings: Tensor = self.attention1(g, self.dict_to_tensor(dict(g.ndata)))
+        node_embeddings: Tensor = self.attention1(
+            g, th.flatten(self.dict_to_tensor(dict(g.ndata)), start_dim=1)
+        )
 
         node_embeddings = th.flatten(node_embeddings, 1)
 
         node_embeddings: Tensor = self.attention2(g, node_embeddings)
 
-        graph_embedding: Tensor = self.compute_graph_embedding(g, node_embeddings)
+        if return_mean_over_heads:
+            return th.mean(node_embeddings, dim=1)
+        return node_embeddings
 
-        return graph_embedding
+    def get_embedding_dimension(self):
+        return self.architecture["hidden_output_size"]

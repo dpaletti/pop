@@ -1,0 +1,57 @@
+from typing import Union
+
+from dgl import DGLHeteroGraph
+from torch import Tensor
+
+from graph_convolutional_networks.gat_gcn import GatGCN
+import json
+
+from managers.manager import Manager
+from managers.node_attention import NodeAttention
+
+
+class HeadManager(Manager):
+    def __init__(
+        self,
+        node_features: int,
+        architecture: Union[str, dict],
+        name: str,
+        log_dir: str,
+        **kwargs  # Compliance with Manager signature
+    ):
+        super(HeadManager, self).__init__(
+            node_features=node_features,
+            edge_features=None,
+            architecture=architecture,
+            name=name,
+            log_dir=log_dir,
+        )
+
+        self.architecture = (
+            json.load(open(architecture)) if type(architecture) is str else architecture
+        )
+
+        self._embedding = GatGCN(
+            node_features,
+            architecture["embedding_architecture"],
+            name + "_embedding",
+            log_dir,
+        )
+
+        self._node_attention = NodeAttention(
+            architecture, self.embedding.get_embedding_dimension()
+        )
+
+    @property
+    def embedding(self):
+        return self._embedding
+
+    @property
+    def node_attention(self):
+        return self._node_attention
+
+    def forward(self, g: DGLHeteroGraph) -> int:
+        node_embeddings: Tensor = self.embedding(g, return_mean_over_heads=True)
+        best_node: int = self.node_attention(node_embeddings)
+
+        return int(g.nodes[best_node].data["action"].squeeze()[-1].item())

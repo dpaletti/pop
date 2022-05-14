@@ -1,29 +1,16 @@
 from typing import Tuple
+from random import choice, sample
 
 import dgl
 import networkx as nx
 from grid2op.Observation import BaseObservation
 
 
-def from_networkx_to_dgl(graph: nx.graph, has_action=False):
+def from_networkx_to_dgl(graph: nx.graph):
     return dgl.from_networkx(
         graph.to_directed(),
-        node_attrs=["p", "q", "v", "cooldown"]
-        if not has_action
-        else ["p", "q", "v", "cooldown", "action"],
-        edge_attrs=[
-            "rho",
-            "cooldown",
-            "status",
-            "thermal_limit",
-            "timestep_overflow",
-            "p_or",
-            "p_ex",
-            "q_or",
-            "q_ex",
-            "a_or",
-            "a_ex",
-        ],
+        node_attrs=list(graph.nodes[choice(list(graph.nodes))].keys()),
+        edge_attrs=list(graph.edges[choice(list(graph.edges))].keys()),
     )
 
 
@@ -47,24 +34,7 @@ def to_dgl(obs: BaseObservation) -> dgl.DGLHeteroGraph:
     net = net.to_directed()  # Typing error from networkx, ignore it
 
     # Convert from networkx to dgl graph
-    dgl_net = dgl.from_networkx(
-        net,
-        node_attrs=["p", "q", "v", "cooldown"],
-        edge_attrs=[
-            "rho",
-            "cooldown",
-            "status",
-            "thermal_limit",
-            "timestep_overflow",
-            "p_or",
-            "p_ex",
-            "q_or",
-            "q_ex",
-            "a_or",
-            "a_ex",
-        ],
-    )
-    return dgl_net
+    return from_networkx_to_dgl(net)
 
 
 def batch_observations(observations: Tuple[BaseObservation]) -> dgl.DGLHeteroGraph:

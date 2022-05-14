@@ -1,36 +1,51 @@
 from abc import abstractmethod
+from typing import Union
 
 import torch as th
 import torch.nn as nn
 import dgl
 from dgl.heterograph import DGLHeteroGraph
 from torch import Tensor, FloatTensor
+import json
+from pathlib import Path
 
-from GNN.gcn import GCN
 
-
-class DuelingGCN(GCN):
+class DuelingNet(nn.Module):
     def __init__(
         self,
-        node_features: int,
-        edge_features: int,
         action_space_size: int,
-        architecture_path: str,
+        architecture: Union[dict, str],
         name: str,
         log_dir: str = "./",
     ):
-        super(DuelingGCN, self).__init__(
-            node_features, edge_features, architecture_path, name, log_dir
+        super(DuelingNet, self).__init__()
+        self.name = name
+
+        self.log_dir = log_dir
+        Path(self.log_dir).mkdir(parents=True, exist_ok=True)
+        self.log_file = str(Path(self.log_dir, self.name + ".pt"))
+
+        self.architecture = (
+            json.load(open(architecture))
+            if type(architecture) is not dict
+            else architecture
         )
 
         # Parameters
-        self.node_features = node_features
-        self.edge_features = edge_features
         self.action_space_size = action_space_size
 
         # Network Paths
         self.advantage_stream: nn.Module = self.init_advantage_stream(action_space_size)
         self.value_stream: nn.Module = self.init_value_stream()
+
+    @property
+    @abstractmethod
+    def embedding(self):
+        ...
+
+    @abstractmethod
+    def extract_features(self, g: DGLHeteroGraph):
+        ...
 
     def init_advantage_stream(self, action_space_size: int) -> nn.Module:
         return nn.Sequential(
@@ -53,23 +68,6 @@ class DuelingGCN(GCN):
             nn.ReLU(),
             nn.Linear(self.architecture["value_stream_size"], 1),
         )
-
-    @abstractmethod
-    def extract_features(self, g: DGLHeteroGraph) -> Tensor:
-        """
-        Embed graph by graph convolutions
-
-        Parameters
-        ----------
-        g: :class:`DGLHeteroGraph`
-            input graph with node and edge features
-
-        Return
-        ------
-        graph_embedding: :class:`Tensor`
-            graph embedding computed from node embeddings
-        """
-        ...
 
     @staticmethod
     def compute_graph_embedding(
@@ -121,11 +119,11 @@ class DuelingGCN(GCN):
         Save a checkpoint of the network.
         Save all the hyperparameters.
         """
+        self.embedding.save()
+
         checkpoint = {
             "name": self.name,
             "network_state": self.state_dict(),
-            "node_features": self.node_features,
-            "edge_features": self.edge_features,
             "action_space_size": self.action_space_size,
         }
         checkpoint = checkpoint | self.architecture
@@ -138,8 +136,6 @@ class DuelingGCN(GCN):
         checkpoint = th.load(log_dir)
         self.name = checkpoint["name"]
         self.load_state_dict(checkpoint["network_state"])
-        self.node_features = checkpoint["node_features"]
-        self.edge_features = checkpoint["edge_features"]
         self.action_space_size = checkpoint["action_space_size"]
         self.architecture = {
             i: j

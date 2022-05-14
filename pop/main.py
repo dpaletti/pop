@@ -14,8 +14,8 @@ import torch as th
 import random
 import numpy as np
 import dgl
-from multiagent_system.space_factorization import factor_action_space
-from node_agents import DoubleDuelingGCNAgent
+
+from multiagent_system.DPOP import DPOP, train
 
 
 def combine_rewards(env, alarm: bool = True):
@@ -24,10 +24,13 @@ def combine_rewards(env, alarm: bool = True):
     combined_reward.addReward("Redispatching", RedispReward(), 0.7)
     if alarm:
         combined_reward.addReward("Alarm", AlarmReward(), 0.3)
+    else:
+        print("\nWARNING: Alarm Reward deactivated\n")
     combined_reward.initialize(env)
 
 
 def strip_1_step_episodes(path: str):
+    # This method is used to avoid grid2viz crashing on 1 step episodes
     # Copy directory in order not to lose information
     evaluation_path = Path(path)
     shutil.copytree(evaluation_path, Path(path + "_full"))
@@ -94,29 +97,20 @@ def main():
     print("Running with seed: " + str(seed))
     fix_seed(env_train, env_val, seed=seed)
 
-    combine_rewards(env_val)
-    combine_rewards(env_train)
+    combine_rewards(env_val, alarm=False)
+    combine_rewards(env_train, alarm=False)
 
-    # TODO the return type changed
-    action_spaces = factor_action_space(env_train, n_jobs=8)
+    agent = DPOP(
+        env=env_train,
+        name="dpop_rte_1e4",
+        architecture_path="../architectures/dpop_agent_xxs.json",
+        training=True,
+        tensorboard_dir="../test_data/tensorboard/dpop_rte_1e4",
+        checkpoint_dir="../test_data/checkpoint/dpop_rte_1e4",
+        seed=0,
+    )
 
-    agents = []
-    for idx, action_space in enumerate(action_spaces):
-        agents.append(
-            DoubleDuelingGCNAgent(
-                agent_actions=action_space,
-                full_action_space=env_train.action_space,
-                architecture_path="resources/ddgcn_agent_xxs.json",
-                node_features=4,
-                edge_features=11,
-                name="agent_xxs",
-                seed=seed,
-                training=True,
-                tensorboard_log_dir="/data/training",
-                log_dir="/data/training",  # TODO: check
-                device="cpu",
-            )
-        )
+    train(env=env_train, agent=agent, iterations=int(1e4))
 
 
 if __name__ == "__main__":

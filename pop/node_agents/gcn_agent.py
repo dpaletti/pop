@@ -15,8 +15,8 @@ from torch.utils.tensorboard.writer import SummaryWriter
 import dgl
 import numpy as np
 
-from GNN.gcn import GCN
-from GNN.gnn_factory import get_gcn
+from dueling_networks.dueling_net import DuelingNet
+from dueling_networks.dueling_net_factory import get_dueling_net
 from node_agents.replay_buffer import ReplayMemory, Transition
 
 from typing import List, Optional, Union
@@ -40,6 +40,12 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
     - the Target Network is updated every :attribute:`replace` steps to avoid bias issues.
 
     """
+
+    # This names are used to find files in the load directory
+    # When loading an agent
+    target_network_name_suffix: str = "_target_network"
+    q_network_name_suffix: str = "_q_network"
+    optimizer_class: str = "th.optim.Adam"
 
     def __init__(
         self,
@@ -69,6 +75,12 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
         self.action_space_converter = IdToAct(full_action_space)
         self.action_space_converter.init_converter(all_actions=agent_actions)
         self.action_space_converter.seed(seed)
+        self.node_features = node_features
+        self.edge_features = edge_features
+        self.seed = seed
+        self.tensorboard_log_dir = tensorboard_log_dir
+        self.log_dir = log_dir
+        self.loss: Tensor = th.Tensor()
 
         # Initialize Torch device
         if device is None:
@@ -81,21 +93,21 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
         self.name = name
 
         # Initialize deep networks
-        self.q_network: GCN = get_gcn(
-            is_dueling=True,
+        self.q_network: DuelingNet = get_dueling_net(
             node_features=node_features,
             edge_features=edge_features,
-            architecture=self.architecture["network"],
-            name=name + "_q_network",
             action_space_size=len(agent_actions),
+            architecture=self.architecture["network"],
+            name=name + self.q_network_name_suffix,
+            log_dir=log_dir,
         )
-        self.target_network: GCN = get_gcn(
-            is_dueling=True,
+        self.target_network: DuelingNet = get_dueling_net(
             node_features=node_features,
             edge_features=edge_features,
-            architecture=self.architecture["network"],
-            name=name + "_target_network",
             action_space_size=len(agent_actions),
+            architecture=self.architecture["network"],
+            name=name + self.target_network_name_suffix,
+            log_dir=log_dir,
         )
         self.q_network.to(self.device)
         self.target_network.to(self.device)
@@ -373,13 +385,16 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
         )
         transitions = Transition(*zip(*transitions))
 
-        loss, td_error, observation_batch, next_observation_batch = self.compute_loss(
-            transitions, th.Tensor(sampling_weights)
-        )
+        (
+            self.loss,
+            td_error,
+            observation_batch,
+            next_observation_batch,
+        ) = self.compute_loss(transitions, th.Tensor(sampling_weights))
 
         # Backward propagation
         self.optimizer.zero_grad()
-        loss.backward()
+        self.loss.backward()
         self.optimizer.step()
 
         # Update priorities for sampling
@@ -387,7 +402,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
 
         # Save current information to Tensorboard and Checkpoint optimizer and models
         self.save(
-            float(loss.mean().item()),
+            float(self.loss.mean().item()),
             transitions.reward,
         )
 
@@ -402,36 +417,69 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
             "episodes": self.episodes,
             "name": self.name,
             "architecture": self.architecture,
+            "tensorboard_log_dir": self.tensorboard_log_dir,
+            "log_dir": self.log_dir,
+            "seed": self.seed,
+            "node_features": self.node_features,
+            "edge_features": self.edge_features,
         }
         self.q_network.save()
         self.target_network.save()
         th.save(checkpoint, self.log_file)
         self.save_to_tensorboard(loss, np.mean(rewards))
 
-    def load(self, load_dir: str, networks_loaded: bool = True) -> None:
+    @classmethod
+    def load(
+        cls,
+        load_file: str,
+        agent_actions: List[BaseAction],
+        full_action_space: ActionSpace,
+        training: bool,
+    ):
         """
         Load model from checkpoint
 
-        Parameters
-        ----------
-
-        load_dir: ``str``
-            Directory of the checkpoint
-        networks_loaded: ``bool``
-            set it to False if network parameters are included in node_agents's checkpoint
         """
 
-        checkpoint = th.load(load_dir)
+        checkpoint = th.load(load_file)
 
-        if not networks_loaded:
-            self.q_network.load_state_dict(checkpoint["q_network_state"])
-            self.target_network.load_state_dict(checkpoint["target_network_state"])
+        target_checkpoint = th.load(Path(load_file, cls.target_network_name_suffix))
+        q_checkpoint = th.load(Path(load_file, cls.q_network_name_suffix))
 
-        self.optimizer.load_state_dict(checkpoint["optimizer_state"])
-        self.episodes = checkpoint["episodes"]
-        self.architecture = checkpoint["architecture"]
+        q_net = get_dueling_net(
+            name=q_checkpoint["name"],
+            architecture=q_checkpoint["architecture"],
+            node_features=q_checkpoint["node_features"],
+            edge_features=q_checkpoint["edge_features"],
+            action_space_size=q_checkpoint["action_space_size"],
+            log_dir=Path(q_checkpoint).parent[0],
+        )
 
-        print("Agent Succesfully Loaded!")
+        target_net = get_dueling_net(
+            name=target_checkpoint["name"],
+            architecture=target_checkpoint["architecture"],
+            node_features=target_checkpoint["node_features"],
+            edge_features=target_checkpoint["edge_features"],
+            action_space_size=target_checkpoint["action_space_size"],
+            log_dir=Path(target_checkpoint).parent[0],
+        )
+
+        agent = DoubleDuelingGCNAgent(
+            agent_actions=agent_actions,
+            full_action_space=full_action_space,
+            node_features=checkpoint["node_features"],
+            edge_features=checkpoint["edge_features"],
+            architecture=checkpoint["architecture"],
+            name=checkpoint["name"],
+            seed=checkpoint["seed"],
+            training=training,
+            tensorboard_log_dir=checkpoint["tensorboard_log_dir"],
+            log_dir=checkpoint["log_dir"],
+        )
+
+        agent.q_network = q_net
+        agent.target_network = target_net
+        return agent
 
     def step(
         self,

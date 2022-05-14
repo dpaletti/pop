@@ -1,12 +1,13 @@
 {
   "radius": 1,
-  "decentralized": true,
+  "decentralized": false,
+  "fixed_communities": true,
   "agent":
     {
         "network": {
             "embedding": "egat",
             "pooling": "avg",
-            "hidden_output_size": 32,
+            "hidden_output_size": 128,
             "value_stream_size": 64,
             "advantage_stream_size": 128,
             "hidden_node_feat_size": [16, 32, 64],
@@ -26,7 +27,8 @@
         "min_beta": 0.0,
         "beta_decay": 200,
         "batch_size": 288,
-        "replay_memory_size": 100000
+        "replay_memory_size": 100000,
+        "converter_kwargs": {}
     },
   "manager":
     {
@@ -34,8 +36,6 @@
         "embedding": "egat",
         "pooling": "avg",
         "hidden_output_size": 32,
-        "value_stream_size": 32,
-        "advantage_stream_size": 128,
         "hidden_node_feat_size": [8, 16, 32],
         "hidden_edge_feat_size": [8, 16, 32],
         "heads": [2, 4, 8]
@@ -43,23 +43,24 @@
       "heads": 4,
       "dropout": 0.0,
       "embedding_dimension": 128,
-      "batch_size": 288
+      "batch_size": 1,
+      "learning_rate": 1e-2
     },
   "head_manager":
   {
     "embedding_architecture": {
-      "embedding": "egat",
+      "embedding": "gat",
       "pooling": "avg",
-      "hidden_output_size": 128,
+      "hidden_output_size": 1024,
       "value_stream_size": 256,
       "advantage_stream_size": 512,
-      "hidden_node_feat_size": [8, 16, 32],
-      "hidden_edge_feat_size": [8, 16, 32],
-      "heads": [2, 4, 8]
+      "hidden_node_feat_size": [128, 256],
+      "heads": [2, 4]
     },
     "heads": 4,
     "dropout": 0.0,
     "embedding_dimension": 256,
-    "batch_size": 288
+    "batch_size": 1,
+    "learning_rate": 1e-2
   }
 }
