@@ -50,7 +50,9 @@ class Manager(nn.Module):
             "node_features": self.node_features,
             "edge_features": self.edge_features,
         }
-        checkpoint = checkpoint | self.architecture
+        checkpoint = dict(
+            list(checkpoint.items()) + list(self.architecture.items())
+        )  # Support for Python < 3.9
         print("Saving checkpoint to: " + str(self.log_file))
         th.save(checkpoint, self.log_file)
 

@@ -126,7 +126,7 @@ class DuelingNet(nn.Module):
             "network_state": self.state_dict(),
             "action_space_size": self.action_space_size,
         }
-        checkpoint = checkpoint | self.architecture
+        checkpoint = dict(list(checkpoint.items()) + list(self.architecture.items()))
         th.save(checkpoint, self.log_file)
 
     def load(
