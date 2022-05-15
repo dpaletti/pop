@@ -6,8 +6,8 @@ from pathlib import Path
 import torch.nn as nn
 import torch as th
 
-from graph_convolutional_networks.gcn import GCN
-from managers.node_attention import NodeAttention
+from pop.graph_convolutional_networks.gcn import GCN
+from pop.managers.node_attention import NodeAttention
 
 
 class Manager(nn.Module):

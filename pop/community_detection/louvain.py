@@ -1,6 +1,6 @@
 # Adapted from networkx implementation
-from collections import deque, defaultdict, Set
-from typing import List
+from collections import deque, defaultdict
+from typing import List, Set
 
 import networkx as nx
 from networkx.algorithms.community import modularity

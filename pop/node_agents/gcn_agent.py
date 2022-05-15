@@ -20,7 +20,7 @@ from pop.dueling_networks.dueling_net import DuelingNet
 from pop.dueling_networks.dueling_net_factory import get_dueling_net
 from pop.node_agents.replay_buffer import ReplayMemory, Transition
 
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Tuple
 
 from pop.node_agents.utilities import to_dgl, batch_observations
 
@@ -150,7 +150,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
 
     def compute_loss(
         self, transitions_batch: Transition, sampling_weights: th.Tensor
-    ) -> tuple[Tensor, Tensor, DGLHeteroGraph, DGLHeteroGraph]:
+    ) -> Tuple[Tensor, Tensor, DGLHeteroGraph, DGLHeteroGraph]:
         """
         Computes the current loss given a batch of transitions and the sampling weights from
         the prioritized experience replay buffer.

@@ -103,6 +103,8 @@ def main():
     # nm_env = "l2rpn_icaps_2021_small"
     nm_env = "rte_case14_realistic"
 
+    print("Running with env: " + "rte_case14_realistic")
+
     env_train = grid2op.make(
         nm_env + "_train80",
         reward_class=CombinedScaledReward,
@@ -123,10 +125,10 @@ def main():
     agent = DPOP(
         env=env_train,
         name="dpop_rte_1e4",
-        architecture_path="../architectures/dpop_agent_xxs.json",
+        architecture_path="./architectures/dpop_agent_xxs.json",
         training=True,
-        tensorboard_dir="../test_data/tensorboard/dpop_rte_1e4",
-        checkpoint_dir="../test_data/checkpoint/dpop_rte_1e4",
+        tensorboard_dir="../data/pop_runs/tensorboard/dpop_rte_1e4",
+        checkpoint_dir="../data/pop_runs/checkpoint/dpop_rte_1e4",
         seed=0,
         device="cpu",
     )

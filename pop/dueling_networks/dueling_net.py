@@ -9,7 +9,7 @@ from torch import Tensor, FloatTensor
 import json
 from pathlib import Path
 
-from graph_convolutional_networks.gcn import GCN
+from pop.graph_convolutional_networks.gcn import GCN
 
 
 class DuelingNet(nn.Module):
