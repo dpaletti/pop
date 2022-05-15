@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Optional
 
 from dgl import DGLHeteroGraph
 from torch import Tensor
@@ -8,6 +8,8 @@ import json
 
 from pop.managers.manager import Manager
 from pop.managers.node_attention import NodeAttention
+
+import torch as th
 
 
 class HeadManager(Manager):

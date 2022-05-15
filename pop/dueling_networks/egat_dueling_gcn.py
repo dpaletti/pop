@@ -16,13 +16,10 @@ class EgatDuelingGCN(DuelingNet):
         action_space_size: int,
         architecture: Union[str, dict],
         name: str,
-        log_dir: str = "./",
+        log_dir: str,
     ):
         super(EgatDuelingGCN, self).__init__(
-            action_space_size,
-            architecture,
-            name,
-            log_dir,
+            action_space_size, architecture, name, log_dir=log_dir
         )
 
         self._embedding: EgatGCN = EgatGCN(

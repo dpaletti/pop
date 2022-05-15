@@ -1,3 +1,5 @@
+from typing import Optional, Union
+
 import torch.nn as nn
 from torch import Tensor
 import torch as th
@@ -5,7 +7,9 @@ import torch as th
 
 class NodeAttention(nn.Module):
     def __init__(
-        self, architecture: dict, embedding_dimension: int, device: str = "cpu"
+        self,
+        architecture: dict,
+        embedding_dimension: int,
     ):
         super(NodeAttention, self).__init__()
         self.architecture = architecture
@@ -23,7 +27,6 @@ class NodeAttention(nn.Module):
             self.architecture["heads"],
             self.architecture["dropout"],
             bias=True,
-            device=device,
             dtype=float,
             batch_first=False,
         ).float()

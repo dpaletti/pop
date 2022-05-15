@@ -157,7 +157,9 @@ class DPOP(AgentWithConverter):
     ) -> int:
         graph: nx.Graph = transformed_observation[1]
 
-        self.factored_observation = transformed_observation[0]
+        self.factored_observation: List[dgl.DGLHeteroGraph] = [
+            obs for obs in transformed_observation[0]
+        ]
 
         if self.communities and not self.fixed_communities:
             raise Exception("\nDynamic Communities are not implemented yet\n")
@@ -182,7 +184,7 @@ class DPOP(AgentWithConverter):
 
         # Graph is split into one subgraph per community
         subgraphs: List[dgl.DGLHeteroGraph] = [
-            from_networkx_to_dgl(graph.subgraph(community))
+            from_networkx_to_dgl(graph.subgraph(community), self.device)
             for community in self.communities
         ]
 
@@ -199,7 +201,9 @@ class DPOP(AgentWithConverter):
         ]
 
         # The graph is summarized by contracting every community in 1 supernode
-        summarized_graph = self.summarize_graph(graph, embedded_graphs, managed_actions)
+        summarized_graph = self.summarize_graph(
+            graph, embedded_graphs, managed_actions
+        ).to(self.device)
 
         # The head manager chooses the best action from every community
         best_action = self.head_manager(summarized_graph)
@@ -258,12 +262,17 @@ class DPOP(AgentWithConverter):
         return dgl.from_networkx(
             summarized_graph.to_directed(),
             node_attrs=["action", "embedding"],
+            device=self.device,
         )
 
     def convert_obs(
         self, observation: BaseObservation
     ) -> Tuple[List[dgl.DGLHeteroGraph], nx.Graph]:
-        return factor_observation(observation, self.architecture["radius"])
+        return factor_observation(
+            observation,
+            self.device,
+            self.architecture["radius"],
+        )
 
     @staticmethod
     def get_graph(observation: BaseObservation) -> nx.Graph:
@@ -326,7 +335,7 @@ class DPOP(AgentWithConverter):
                 self.agents,
                 self.local_actions,
                 self.factored_observation,
-                *factor_observation(next_observation),
+                *factor_observation(next_observation, self.device),
             ):
                 agent.step(
                     agent_observation,

@@ -101,7 +101,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
             architecture=self.architecture["network"],
             name=name + self.q_network_name_suffix,
             log_dir=log_dir,
-        )
+        ).to(self.device)
         self.target_network: DuelingNet = get_dueling_net(
             node_features=node_features,
             edge_features=edge_features,
@@ -109,9 +109,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
             architecture=self.architecture["network"],
             name=name + self.target_network_name_suffix,
             log_dir=log_dir,
-        )
-        self.q_network.to(self.device)
-        self.target_network.to(self.device)
+        ).to(self.device)
 
         # Optimizer
         self.optimizer: th.optim.Optimizer = th.optim.Adam(
@@ -169,8 +167,12 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
         # Unwrap batch
         # Get observation start and end
 
-        observation_batch = batch_observations(transitions_batch.observation)
-        next_observation_batch = batch_observations(transitions_batch.next_observation)
+        observation_batch = batch_observations(
+            transitions_batch.observation, self.device
+        )
+        next_observation_batch = batch_observations(
+            transitions_batch.next_observation, self.device
+        )
         # Get 1 action per batch and restructure as an index for gather()
         actions = (
             th.Tensor(transitions_batch.action)
@@ -313,7 +315,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
             observation converted to a Deep Graph Library graph
         """
 
-        return to_dgl(observation)
+        return to_dgl(observation, self.device)
 
     def save_to_tensorboard(
         self,
@@ -435,6 +437,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
         load_file: str,
         agent_actions: List[BaseAction],
         full_action_space: ActionSpace,
+        device: Union[str, th.device],
         training: bool,
     ):
         """
@@ -454,7 +457,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
             edge_features=q_checkpoint["edge_features"],
             action_space_size=q_checkpoint["action_space_size"],
             log_dir=Path(q_checkpoint).parent[0],
-        )
+        ).to(device)
 
         target_net = get_dueling_net(
             name=target_checkpoint["name"],
@@ -463,7 +466,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
             edge_features=target_checkpoint["edge_features"],
             action_space_size=target_checkpoint["action_space_size"],
             log_dir=Path(target_checkpoint).parent[0],
-        )
+        ).to(device)
 
         agent = DoubleDuelingGCNAgent(
             agent_actions=agent_actions,

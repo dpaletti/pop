@@ -6,7 +6,6 @@ import grid2op
 from grid2op.Chronics import MultifolderWithCache
 from typing import Union
 import grid2op.Environment
-import os
 from grid2op.Runner import Runner
 from grid2op.Episode import EpisodeData
 import shutil
@@ -14,6 +13,8 @@ import torch as th
 import random
 import numpy as np
 import dgl
+import os
+import multiprocessing
 
 from pop.multiagent_system.DPOP import DPOP, train
 
@@ -79,7 +80,26 @@ def fix_seed(env_train: BaseEnv, env_val: BaseEnv, seed: int = 0):
     dgl.seed(seed)
 
 
+def set_environment_variables(disable_gpu: bool):
+    if disable_gpu:
+        # Removing all GPUs from visible devices
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
+    # Set the number of threads used by Open MPI (OMP)
+    os.environ["OMP_NUM_THREADS"] = str(multiprocessing.cpu_count())
+
+    # How OMP Threads are scheduled
+    os.environ["OMP_SCHEDULE"] = "STATIC"
+
+    # Whether thread may be moved between processors
+    os.environ["OMP_PROC_BIND"] = "CLOSE"
+
+    # CPU Affinity is not set, you need to call with taskset -c to set cpu affinity
+
+
 def main():
+    set_environment_variables(disable_gpu=True)
+
     # nm_env = "l2rpn_icaps_2021_small"
     nm_env = "rte_case14_realistic"
 
@@ -103,10 +123,10 @@ def main():
     agent = DPOP(
         env=env_train,
         name="dpop_rte_1e4",
-        architecture_path="./architectures/dpop_agent_xxs.json",
+        architecture_path="../architectures/dpop_agent_xxs.json",
         training=True,
-        tensorboard_dir="./test_data/tensorboard/dpop_rte_1e4",
-        checkpoint_dir="./test_data/checkpoint/dpop_rte_1e4",
+        tensorboard_dir="../test_data/tensorboard/dpop_rte_1e4",
+        checkpoint_dir="../test_data/checkpoint/dpop_rte_1e4",
         seed=0,
         device="cpu",
     )

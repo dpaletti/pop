@@ -5,6 +5,7 @@ from torch import Tensor
 
 from pop.dueling_networks.dueling_net import DuelingNet
 from pop.graph_convolutional_networks.gat_gcn import GatGCN
+import torch as th
 
 
 class GatDuelingGCN(DuelingNet):
@@ -14,7 +15,7 @@ class GatDuelingGCN(DuelingNet):
         action_space_size: int,
         architecture: Union[str, dict],
         name: str,
-        log_dir: str = "./",
+        log_dir: str,
     ):
         super(GatDuelingGCN, self).__init__(
             action_space_size,
@@ -24,7 +25,7 @@ class GatDuelingGCN(DuelingNet):
         )
 
         self._embedding = GatGCN(
-            node_features, architecture, name + "_embedding", log_dir
+            node_features, architecture, name + "_embedding", log_dir, device=device
         )
 
     @property

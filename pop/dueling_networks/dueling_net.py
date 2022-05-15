@@ -9,6 +9,8 @@ from torch import Tensor, FloatTensor
 import json
 from pathlib import Path
 
+from graph_convolutional_networks.gcn import GCN
+
 
 class DuelingNet(nn.Module):
     def __init__(
@@ -16,7 +18,7 @@ class DuelingNet(nn.Module):
         action_space_size: int,
         architecture: Union[dict, str],
         name: str,
-        log_dir: str = "./",
+        log_dir: str,
     ):
         super(DuelingNet, self).__init__()
         self.name = name
@@ -40,7 +42,7 @@ class DuelingNet(nn.Module):
 
     @property
     @abstractmethod
-    def embedding(self):
+    def embedding(self) -> GCN:
         ...
 
     @abstractmethod
@@ -119,8 +121,6 @@ class DuelingNet(nn.Module):
         Save a checkpoint of the network.
         Save all the hyperparameters.
         """
-        self.embedding.save()
-
         checkpoint = {
             "name": self.name,
             "network_state": self.state_dict(),

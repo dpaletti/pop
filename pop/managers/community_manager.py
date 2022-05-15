@@ -1,4 +1,4 @@
-from typing import Union, Tuple
+from typing import Union, Tuple, Optional
 import json
 
 from dgl import DGLHeteroGraph
@@ -11,6 +11,7 @@ from pop.graph_convolutional_networks.egat_gcn import EgatGCN
 # Fissare le comunità
 from pop.managers.manager import Manager
 from pop.managers.node_attention import NodeAttention
+import torch as th
 
 
 class CommunityManager(Manager):
@@ -36,7 +37,7 @@ class CommunityManager(Manager):
             node_features,
             edge_features,
             self.architecture["embedding_architecture"],
-            name,
+            name + "_embedding",
             log_dir,
         ).float()
 

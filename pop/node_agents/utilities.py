@@ -6,18 +6,19 @@ import networkx as nx
 from grid2op.Observation import BaseObservation
 
 
-def from_networkx_to_dgl(graph):
+def from_networkx_to_dgl(graph, device) -> dgl.DGLHeteroGraph:
     try:
         return dgl.from_networkx(
             graph.to_directed(),
             node_attrs=list(graph.nodes[choice(list(graph.nodes))].keys()),
             edge_attrs=list(graph.edges[choice(list(graph.edges))].keys()),
+            device=device,
         )
     except:
         return graph
 
 
-def to_dgl(obs: BaseObservation) -> dgl.DGLHeteroGraph:
+def to_dgl(obs: BaseObservation, device) -> dgl.DGLHeteroGraph:
     """
     convert a :class:BaseObservation to a :class:`dgl.DGLHeteroGraph`.
 
@@ -37,11 +38,11 @@ def to_dgl(obs: BaseObservation) -> dgl.DGLHeteroGraph:
     net = net.to_directed()  # Typing error from networkx, ignore it
 
     # Convert from networkx to dgl graph
-    return from_networkx_to_dgl(net)
+    return from_networkx_to_dgl(net, device)
 
 
 def batch_observations(
-    observations: Union[Tuple[BaseObservation], Tuple[nx.Graph]]
+    observations: Union[Tuple[BaseObservation], Tuple[nx.Graph]], device
 ) -> dgl.DGLHeteroGraph:
     """
     Convert a list (or tuple) of observations to a Deep Graph Library graph batch.
@@ -59,7 +60,11 @@ def batch_observations(
     """
     graphs = []
     for o in observations:
-        graph = to_dgl(o) if type(o) is BaseObservation else from_networkx_to_dgl(o)
+        graph = (
+            to_dgl(o, device)
+            if type(o) is BaseObservation
+            else from_networkx_to_dgl(o, device)
+        )
         graphs.append(graph)
     graph_batch = dgl.batch(graphs)
     return graph_batch

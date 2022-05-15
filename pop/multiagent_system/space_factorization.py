@@ -137,10 +137,14 @@ def factor_action_space(env: BaseEnv, n_jobs: int = 6):
 
 
 def factor_observation(
-    obs: BaseObservation, radius: int = 1
+    obs: BaseObservation,
+    device,
+    radius: int = 1,
 ) -> Tuple[List[dgl.DGLHeteroGraph], nx.Graph]:
     graph: nx.Graph = obs.as_networkx()
     sub_graphs: List[dgl.DGLHeteroGraph] = []
     for node in graph.nodes:
-        sub_graphs.append(from_networkx_to_dgl(nx.ego_graph(graph, node, radius)))
+        sub_graphs.append(
+            from_networkx_to_dgl(nx.ego_graph(graph, node, radius), device)
+        )
     return sub_graphs, graph

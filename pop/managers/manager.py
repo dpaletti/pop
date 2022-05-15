@@ -6,6 +6,9 @@ from pathlib import Path
 import torch.nn as nn
 import torch as th
 
+from graph_convolutional_networks.gcn import GCN
+from managers.node_attention import NodeAttention
+
 
 class Manager(nn.Module):
     def __init__(
@@ -32,12 +35,12 @@ class Manager(nn.Module):
 
     @property
     @abstractmethod
-    def node_attention(self):
+    def node_attention(self) -> NodeAttention:
         ...
 
     @property
     @abstractmethod
-    def embedding(self):
+    def embedding(self) -> GCN:
         ...
 
     def save(self):
@@ -48,6 +51,7 @@ class Manager(nn.Module):
             "edge_features": self.edge_features,
         }
         checkpoint = checkpoint | self.architecture
+        print("Saving checkpoint to: " + str(self.log_file))
         th.save(checkpoint, self.log_file)
 
     @classmethod
