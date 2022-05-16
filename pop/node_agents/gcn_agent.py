@@ -16,6 +16,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 import dgl
 import numpy as np
 
+from multiagent_system.agent_task import AgentTask, TaskType
 from pop.dueling_networks.dueling_net import DuelingNet
 from pop.dueling_networks.dueling_net_factory import get_dueling_net
 from pop.node_agents.replay_buffer import ReplayMemory, Transition
@@ -23,9 +24,10 @@ from pop.node_agents.replay_buffer import ReplayMemory, Transition
 from typing import List, Optional, Union, Tuple
 
 from pop.node_agents.utilities import to_dgl, batch_observations
+from multiprocessing import Process, JoinableQueue
 
 
-class DoubleDuelingGCNAgent(AgentWithConverter):
+class DoubleDuelingGCNAgent(AgentWithConverter, Process):
     """
     Double Dueling Graph Convolutional Neural (GCN) Network Agent.
     GCN is used to embed the graph.
@@ -61,16 +63,30 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
         tensorboard_log_dir: str,
         log_dir,
         device: Optional[str] = None,
+        task_queue: Optional[JoinableQueue] = None,
+        result_queue: Optional[JoinableQueue] = None,
     ):
+        Process.__init__(self)
+
         self.architecture: dict = (
             json.load(open(architecture)) if type(architecture) is str else architecture
         )
-        super().__init__(
+
+        AgentWithConverter.__init__(
+            self,
             full_action_space,
             IdToAct,
             all_actions=agent_actions,
             **self.architecture["converter_kwargs"]
         )
+
+        # Multiprocessing
+        self.task_queue: Optional[JoinableQueue] = task_queue
+        self.result_queue: Optional[JoinableQueue] = result_queue
+
+        # Values Held for Multiprocessing
+        self.chosen_action_encoded: int = -1
+        self.chosen_action: Optional[BaseAction] = None
 
         self.name = name
         self.action_space_converter = IdToAct(full_action_space)
@@ -147,6 +163,30 @@ class DoubleDuelingGCNAgent(AgentWithConverter):
                 self.writer = SummaryWriter(log_dir=tensorboard_log_dir)
             else:
                 self.writer = None
+
+    def run(self):
+        while True:
+            task: AgentTask = self.task_queue.get()
+            if task.task_type is TaskType.POISON:
+                print("Agent: " + str(self.name) + " shutdown")
+                self.task_queue.task_done()
+                break
+            if task.task_type is TaskType.ACT:
+                encoded_action = self.my_act(**task.kwargs)
+                result = self.action_space_converter.all_actions[encoded_action]
+
+            elif task.task_type is TaskType.STEP:
+                self.step(**task.kwargs)
+                result = "One Step More"
+            else:
+                raise Exception(
+                    "Could not recognise task_type: "
+                    + str(task.task_type)
+                    + " at agent: "
+                    + str(self.name)
+                )
+            self.result_queue.put((self.name, result))
+            self.task_queue.task_done()
 
     def compute_loss(
         self, transitions_batch: Transition, sampling_weights: th.Tensor

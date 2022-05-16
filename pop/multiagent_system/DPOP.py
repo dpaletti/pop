@@ -7,6 +7,7 @@ import torch as th
 
 import dgl
 import networkx as nx
+from grid2op.Action import BaseAction
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from grid2op.Agent import AgentWithConverter
@@ -14,6 +15,7 @@ from grid2op.Converter import IdToAct
 from grid2op.Environment import BaseEnv
 from grid2op.Observation import BaseObservation
 
+from multiagent_system.agent_task import AgentTask, TaskType
 from pop.managers.head_manager import HeadManager
 from pop.multiagent_system.space_factorization import (
     factor_action_space,
@@ -24,11 +26,12 @@ from pop.node_agents.utilities import from_networkx_to_dgl
 from pop.node_agents.gcn_agent import DoubleDuelingGCNAgent
 from pop.community_detection.community_detector import CommunityDetector
 from pop.managers.community_manager import CommunityManager
-import multiprocessing
-
+from multiprocessing import cpu_count, JoinableQueue
 
 # TODO: tracking communities in dynamic graphs
 # TODO: https://www.researchgate.net/publication/221273637_Tracking_the_Evolution_of_Communities_in_Dynamic_Social_Networks
+
+
 class DPOP(AgentWithConverter):
     def __init__(
         self,
@@ -54,7 +57,7 @@ class DPOP(AgentWithConverter):
         else:
             self.device: th.device = th.device(device)
         if n_jobs is None:
-            self.n_jobs = multiprocessing.cpu_count()
+            self.n_jobs = cpu_count() - 1
         else:
             self.n_jobs = n_jobs
 
@@ -85,7 +88,10 @@ class DPOP(AgentWithConverter):
                 self.writer = None
 
         # Agents Initialization
-        action_spaces, self.action_lookup_table = factor_action_space(env, self.n_jobs)
+        action_spaces, self.action_lookup_table = factor_action_space(env)
+
+        # Multiprocessing
+        self.result_queue: JoinableQueue = JoinableQueue()
         self.agents: List[DoubleDuelingGCNAgent] = [
             DoubleDuelingGCNAgent(
                 agent_actions=action_space,
@@ -99,9 +105,16 @@ class DPOP(AgentWithConverter):
                 tensorboard_log_dir=tensorboard_dir,
                 log_dir=self.checkpoint_dir,
                 device=device,
+                task_queue=JoinableQueue(),
+                result_queue=self.result_queue,
             )
             for idx, action_space in enumerate(action_spaces)
         ]
+
+        # Start agent process
+        for agent in self.agents:
+            agent.start()
+
         self.local_actions = []
         self.factored_observation = []
 
@@ -149,6 +162,29 @@ class DPOP(AgentWithConverter):
         communities = self.community_detector.dynamo(graph_t=graph)
         return communities
 
+    def get_agent_actions(self, factored_observation):
+        for observation, agent in zip(factored_observation, self.agents):
+            agent.task_queue.put(
+                AgentTask(TaskType.ACT, transformed_observation=observation)
+            )
+        return self.harvest_results()
+
+    def lookup_local_action(self, action: BaseAction):
+        return self.action_lookup_table[HashableAction(action)]
+
+    def harvest_results(self):
+        for agent in self.agents:
+            agent.task_queue.join()
+        result_list = []
+        while not self.result_queue.empty():
+            result_list.append(self.result_queue.get())
+        result_list = [
+            (int(agent.split("_")[1]), action) for (agent, action) in result_list
+        ]
+        result_list = sorted(result_list, key=lambda tup: tup[0])
+        print("SORTED LIST" + str(result_list))
+        return [result for (_, result) in result_list]
+
     def my_act(
         self,
         transformed_observation: Tuple[List[dgl.DGLHeteroGraph], nx.Graph],
@@ -164,22 +200,16 @@ class DPOP(AgentWithConverter):
         if self.communities and not self.fixed_communities:
             raise Exception("\nDynamic Communities are not implemented yet\n")
 
-        self.local_actions = [
-            agent.my_act(observation)
-            for agent, observation in zip(self.agents, self.factored_observation)
-        ]
+        local_actions = self.get_agent_actions(self.factored_observation)
 
-        # Action Encoding is converted from local to global
-        global_actions = [
-            self.action_lookup_table[
-                HashableAction(agent.action_space_converter.all_actions[action])
-            ]
-            for action, agent in zip(self.local_actions, self.agents)
-        ]
-
-        # Each agent is assigned to its chosen action
+        # Each agent is assigned to its chosen (global) action
         nx.set_node_attributes(
-            graph, {node: global_actions[node] for node in graph.nodes}, "action"
+            graph,
+            {
+                node: self.lookup_local_action(action)
+                for node, action in zip(graph.nodes, local_actions)
+            },
+            "action",
         )
 
         # Graph is split into one subgraph per community
@@ -207,6 +237,8 @@ class DPOP(AgentWithConverter):
 
         # The head manager chooses the best action from every community
         best_action = self.head_manager(summarized_graph)
+        print("CHOSEN BEST ACTION")
+        print(best_action)
 
         return best_action
 
@@ -381,7 +413,7 @@ class DPOP(AgentWithConverter):
         self.save_to_tensorboard(head_manager_loss, reward)
 
 
-def train(env: BaseEnv, iterations: int, agent: DPOP):
+def train(env: BaseEnv, iterations: int, dpop: DPOP):
 
     training_step: int = 0
     obs: BaseObservation = (
@@ -392,14 +424,14 @@ def train(env: BaseEnv, iterations: int, agent: DPOP):
     total_episodes = len(env.chronics_handler.subpaths)
     with tqdm(total=iterations - training_step) as pbar:
         while training_step < iterations:
-            if agent.episodes % total_episodes == 0:
+            if dpop.episodes % total_episodes == 0:
                 env.chronics_handler.shuffle()
             if done:
                 obs = env.reset()
-            encoded_action = agent.my_act(agent.convert_obs(obs), reward, done)
-            action = agent.convert_act(encoded_action)
+            encoded_action = dpop.my_act(dpop.convert_obs(obs), reward, done)
+            action = dpop.convert_act(encoded_action)
             next_obs, reward, done, _ = env.step(action)
-            agent.step(
+            dpop.step(
                 observation=obs,
                 action=encoded_action,
                 reward=reward,

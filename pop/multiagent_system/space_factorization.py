@@ -1,16 +1,14 @@
 import hashlib
+from multiprocessing import Pool
+
 import dgl
 from grid2op.Action import BaseAction
 from grid2op.Converter import IdToAct
 from grid2op.Environment import BaseEnv
 from grid2op.Observation import BaseObservation
-from joblib import Parallel, delayed
-from tqdm import tqdm
 from typing import List, Tuple, Optional
 import networkx as nx
 
-# TODO: The (head) manager should first try to combine the actions
-# TODO: Then it should choose which one is better
 from pop.node_agents.utilities import from_networkx_to_dgl
 
 
@@ -103,23 +101,23 @@ def assign_action(
         return None, action, idx
 
 
-def factor_action_space(env: BaseEnv, n_jobs: int = 6):
+def factor_action_space(env: BaseEnv):
     full_converter: IdToAct = IdToAct(env.action_space)
     full_converter.init_converter()
     obs = env.reset()
     graph = obs.as_networkx()
     mat, (load, prod, _, ind_lor, ind_lex) = obs.flow_bus_matrix()
 
-    print("\nFactoring action space")
-    print("Injection, Voltage and Storage actions are ignored.")
-    print("Could not find any in the L2RPN action space.")
-    print("If using a different environment please check availability of such actions")
+    # ("Injection, Voltage and Storage actions are ignored.")
+    # ("Could not find any in the L2RPN action space.")
+    # ("If using a different environment please check availability of such actions")
 
+    # Factoring Action Lookup Table
     owner, actions, idx = zip(
-        *Parallel(n_jobs=n_jobs)(
-            delayed(assign_action)(action, load, prod, ind_lor, ind_lex, idx)
-            for idx, action in tqdm(enumerate(full_converter.all_actions[1:]))
-        )
+        *[
+            assign_action(action, load, prod, ind_lor, ind_lex, idx)
+            for idx, action in enumerate(full_converter.all_actions[1:])
+        ]
     )
 
     action_spaces = []
@@ -128,12 +126,17 @@ def factor_action_space(env: BaseEnv, n_jobs: int = 6):
             [full_converter.all_actions[0]]
             + [action for owner, action in zip(owner, actions) if owner == bus]
         )
-    print("Building action lookup table")
+
+    print("Building Action Lookup Table")
 
     return action_spaces, {
         HashableAction(action): idx
-        for idx, action in tqdm(enumerate(full_converter.all_actions))
+        for idx, action in enumerate(full_converter.all_actions)
     }
+
+
+def __factor_observation_helper_ego_graph(graph, node, radius, device):
+    return from_networkx_to_dgl(nx.ego_graph(graph, node, radius), device)
 
 
 def factor_observation(

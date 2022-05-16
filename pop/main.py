@@ -16,6 +16,7 @@ import dgl
 import os
 import multiprocessing
 
+import dill as pickle  # Needed for multiprocessing
 from pop.multiagent_system.DPOP import DPOP, train
 
 
@@ -125,15 +126,15 @@ def main():
     agent = DPOP(
         env=env_train,
         name="dpop_rte_1e4",
-        architecture_path="./architectures/dpop_agent_xxs.json",
+        architecture_path="../architectures/dpop_agent_xxs.json",
         training=True,
-        tensorboard_dir="../data/pop_runs/tensorboard/dpop_rte_1e4",
-        checkpoint_dir="../data/pop_runs/checkpoint/dpop_rte_1e4",
+        tensorboard_dir="../test_data/pop_runs/tensorboard/dpop_rte_1e4",
+        checkpoint_dir="../test_data/pop_runs/checkpoint/dpop_rte_1e4",
         seed=0,
         device="cpu",
     )
 
-    train(env=env_train, agent=agent, iterations=int(1e4))
+    train(env=env_train, dpop=agent, iterations=int(1e4))
 
 
 if __name__ == "__main__":

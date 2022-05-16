@@ -14,8 +14,11 @@ def from_networkx_to_dgl(graph, device) -> dgl.DGLHeteroGraph:
             edge_attrs=list(graph.edges[choice(list(graph.edges))].keys()),
             device=device,
         )
-    except:
-        return graph
+    except Exception as e:
+        if type(graph) is dgl.DGLHeteroGraph:
+            return graph
+        else:
+            raise (e)
 
 
 def to_dgl(obs: BaseObservation, device) -> dgl.DGLHeteroGraph:
