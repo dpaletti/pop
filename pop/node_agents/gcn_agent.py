@@ -16,7 +16,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 import dgl
 import numpy as np
 
-from multiagent_system.agent_task import AgentTask, TaskType
+from pop.multiagent_system.agent_task import AgentTask, TaskType
 from pop.dueling_networks.dueling_net import DuelingNet
 from pop.dueling_networks.dueling_net_factory import get_dueling_net
 from pop.node_agents.replay_buffer import ReplayMemory, Transition
@@ -24,7 +24,7 @@ from pop.node_agents.replay_buffer import ReplayMemory, Transition
 from typing import List, Optional, Union, Tuple
 
 from pop.node_agents.utilities import to_dgl, batch_observations
-from multiprocessing import Process, JoinableQueue
+from torch.multiprocessing import Process, JoinableQueue
 
 
 class DoubleDuelingGCNAgent(AgentWithConverter, Process):
@@ -60,7 +60,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter, Process):
         name: str,
         seed: int,
         training: bool,
-        tensorboard_log_dir: str,
+        tensorboard_log_dir: Optional[str],
         log_dir,
         device: Optional[str] = None,
         task_queue: Optional[JoinableQueue] = None,
@@ -157,9 +157,9 @@ class DoubleDuelingGCNAgent(AgentWithConverter, Process):
         if training:
 
             # Tensorboard
-            Path(tensorboard_log_dir).mkdir(parents=True, exist_ok=True)
             self.writer: Optional[SummaryWriter]
             if tensorboard_log_dir is not None:
+                Path(tensorboard_log_dir).mkdir(parents=True, exist_ok=True)
                 self.writer = SummaryWriter(log_dir=tensorboard_log_dir)
             else:
                 self.writer = None
@@ -172,6 +172,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter, Process):
                 self.task_queue.task_done()
                 break
             if task.task_type is TaskType.ACT:
+                print("Agent " + str(self.name) + "consuming observation")
                 encoded_action = self.my_act(**task.kwargs)
                 result = self.action_space_converter.all_actions[encoded_action]
 
@@ -402,7 +403,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter, Process):
             self.trainsteps,
         )
 
-    def learn(self) -> float:
+    def learn(self) -> Optional[Tensor]:
         """
         Learning step for the node_agents.
         Learing starts after we have at least 'batch' transitions in memory.
@@ -412,7 +413,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter, Process):
 
         """
         if len(self.memory) < self.architecture["batch_size"]:
-            return -1
+            return None
         if self.trainsteps % self.architecture["replace"] == 0:
             self.target_network.parameters = self.q_network.parameters
 
@@ -447,7 +448,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter, Process):
             float(self.loss.mean().item()),
             transitions.reward,
         )
-        return self.loss.data
+        return self.loss
 
     def save(
         self,
@@ -469,7 +470,8 @@ class DoubleDuelingGCNAgent(AgentWithConverter, Process):
         self.q_network.save()
         self.target_network.save()
         th.save(checkpoint, self.log_file)
-        self.save_to_tensorboard(loss, np.mean(rewards))
+        if self.writer is not None:
+            self.save_to_tensorboard(loss, np.mean(rewards))
 
     @classmethod
     def load(
@@ -532,7 +534,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter, Process):
         reward: float,
         next_observation: Union[BaseObservation, nx.Graph],
         done: bool,
-    ) -> bool:
+    ) -> Optional[Tensor]:
         """
         Updates the node_agents's state based on feedback received from the environment.
 
@@ -579,10 +581,10 @@ class DoubleDuelingGCNAgent(AgentWithConverter, Process):
 
             # every so often the node_agents should learn from experiences
             if self.trainsteps % self.architecture["learning_frequency"] == 0:
-                self.learn()
+                loss = self.learn()
                 self.learning_steps += 1
-                return True
-            return False
+                return loss
+            return None
 
 
 def train(

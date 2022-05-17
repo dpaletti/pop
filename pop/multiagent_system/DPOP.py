@@ -15,7 +15,7 @@ from grid2op.Converter import IdToAct
 from grid2op.Environment import BaseEnv
 from grid2op.Observation import BaseObservation
 
-from multiagent_system.agent_task import AgentTask, TaskType
+from pop.multiagent_system.agent_task import AgentTask, TaskType
 from pop.managers.head_manager import HeadManager
 from pop.multiagent_system.space_factorization import (
     factor_action_space,
@@ -26,7 +26,7 @@ from pop.node_agents.utilities import from_networkx_to_dgl
 from pop.node_agents.gcn_agent import DoubleDuelingGCNAgent
 from pop.community_detection.community_detector import CommunityDetector
 from pop.managers.community_manager import CommunityManager
-from multiprocessing import cpu_count, JoinableQueue
+from torch.multiprocessing import cpu_count, JoinableQueue
 
 # TODO: tracking communities in dynamic graphs
 # TODO: https://www.researchgate.net/publication/221273637_Tracking_the_Evolution_of_Communities_in_Dynamic_Social_Networks
@@ -102,7 +102,7 @@ class DPOP(AgentWithConverter):
                 name="agent_" + str(idx) + "_" + name,
                 seed=seed,
                 training=training,
-                tensorboard_log_dir=tensorboard_dir,
+                tensorboard_log_dir=None,
                 log_dir=self.checkpoint_dir,
                 device=device,
                 task_queue=JoinableQueue(),
@@ -163,7 +163,9 @@ class DPOP(AgentWithConverter):
         return communities
 
     def get_agent_actions(self, factored_observation):
+        print("Sending Factored Observations")
         for observation, agent in zip(factored_observation, self.agents):
+            print(observation)
             agent.task_queue.put(
                 AgentTask(TaskType.ACT, transformed_observation=observation)
             )
@@ -182,7 +184,6 @@ class DPOP(AgentWithConverter):
             (int(agent.split("_")[1]), action) for (agent, action) in result_list
         ]
         result_list = sorted(result_list, key=lambda tup: tup[0])
-        print("SORTED LIST" + str(result_list))
         return [result for (_, result) in result_list]
 
     def my_act(
@@ -237,8 +238,6 @@ class DPOP(AgentWithConverter):
 
         # The head manager chooses the best action from every community
         best_action = self.head_manager(summarized_graph)
-        print("CHOSEN BEST ACTION")
-        print(best_action)
 
         return best_action
 
@@ -317,14 +316,14 @@ class DPOP(AgentWithConverter):
         self.writer.add_scalar("Loss/train", loss, self.trainsteps)
         self.writer.add_scalar("Reward/train", reward, self.trainsteps)
 
-    def learn(self, reward: float):
+    def learn(self, reward: float, losses: List[th.Tensor]):
         if not self.fixed_communities:
             raise Exception("In Learn() we assume fixed communities")
         manager_losses = []
         for optimizer, community in zip(self.manager_optimizers, self.communities):
             community_losses = [
-                agent.loss
-                for idx, agent in enumerate(self.agents)
+                agent_loss
+                for idx, agent_loss in enumerate(losses)
                 if idx in community  # !! HERE we are assuming fixed communities
             ]
             loss = sum(community_losses) / len(community_losses)
@@ -340,7 +339,9 @@ class DPOP(AgentWithConverter):
         self.head_manager_optimizer.zero_grad()
         self.save(head_manager_loss.mean().item(), reward)
 
-    def step_agents(self, next_observation, reward, done) -> List[bool]:
+    def step_agents(
+        self, next_observation, reward, done
+    ) -> Tuple[List[th.Tensor], List[bool]]:
 
         for (agent, agent_action, agent_observation, agent_next_observation, _,) in zip(
             self.agents,
@@ -361,7 +362,9 @@ class DPOP(AgentWithConverter):
         for agent in self.agents:
             agent.task_queue.join()
 
-        return list(map(lambda x: x >= 0, self.harvest_results()))
+        losses = self.harvest_results()
+
+        return losses, list(map(lambda x: not x is None, losses))
 
     def step(
         self,
@@ -380,11 +383,11 @@ class DPOP(AgentWithConverter):
             self.alive_steps = 0
             self.trainsteps += 1
         else:
-            have_learnt: List[bool] = self.step_agents(next_observation, reward, done)
+            losses, have_learnt = self.step_agents(next_observation, reward, done)
             self.trainsteps += 1
             self.alive_steps += 1
             if all(have_learnt):
-                self.learn(reward)
+                self.learn(reward, losses)
                 self.learning_steps += 1
 
     def save(self, head_manager_loss: float, reward: float):

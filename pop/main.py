@@ -14,7 +14,7 @@ import random
 import numpy as np
 import dgl
 import os
-import multiprocessing
+import torch.multiprocessing as multiprocessing
 
 import dill as pickle  # Needed for multiprocessing
 from pop.multiagent_system.DPOP import DPOP, train
@@ -100,6 +100,8 @@ def set_environment_variables(disable_gpu: bool):
 
 def main():
     set_environment_variables(disable_gpu=True)
+    th.multiprocessing.set_sharing_strategy("file_system")
+    th.multiprocessing.set_start_method("fork")
 
     # nm_env = "l2rpn_icaps_2021_small"
     nm_env = "rte_case14_realistic"
@@ -126,10 +128,10 @@ def main():
     agent = DPOP(
         env=env_train,
         name="dpop_rte_1e4",
-        architecture_path="../architectures/dpop_agent_xxs.json",
+        architecture_path="./architectures/dpop_agent_xxs.json",
         training=True,
-        tensorboard_dir="../test_data/pop_runs/tensorboard/dpop_rte_1e4",
-        checkpoint_dir="../test_data/pop_runs/checkpoint/dpop_rte_1e4",
+        tensorboard_dir="../data/pop_runs/tensorboard/dpop_rte_1e4",
+        checkpoint_dir="../data/pop_runs/checkpoint/dpop_rte_1e4",
         seed=0,
         device="cpu",
     )
