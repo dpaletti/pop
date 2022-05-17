@@ -200,14 +200,14 @@ class DPOP(AgentWithConverter):
         if self.communities and not self.fixed_communities:
             raise Exception("\nDynamic Communities are not implemented yet\n")
 
-        local_actions = self.get_agent_actions(self.factored_observation)
+        self.local_actions = self.get_agent_actions(self.factored_observation)
 
         # Each agent is assigned to its chosen (global) action
         nx.set_node_attributes(
             graph,
             {
                 node: self.lookup_local_action(action)
-                for node, action in zip(graph.nodes, local_actions)
+                for node, action in zip(graph.nodes, self.local_actions)
             },
             "action",
         )
@@ -340,6 +340,29 @@ class DPOP(AgentWithConverter):
         self.head_manager_optimizer.zero_grad()
         self.save(head_manager_loss.mean().item(), reward)
 
+    def step_agents(self, next_observation, reward, done) -> List[bool]:
+
+        for (agent, agent_action, agent_observation, agent_next_observation, _,) in zip(
+            self.agents,
+            self.local_actions,
+            self.factored_observation,
+            *factor_observation(next_observation, self.device),
+        ):
+            agent.task_queue.put(
+                AgentTask(
+                    TaskType.STEP,
+                    observation=agent_observation,
+                    action=agent_action,
+                    reward=reward,
+                    next_observation=agent_next_observation,
+                    done=done,
+                )
+            )
+        for agent in self.agents:
+            agent.task_queue.join()
+
+        return list(map(lambda x: x >= 0, self.harvest_results()))
+
     def step(
         self,
         observation: BaseObservation,
@@ -357,33 +380,10 @@ class DPOP(AgentWithConverter):
             self.alive_steps = 0
             self.trainsteps += 1
         else:
-            for (
-                agent,
-                agent_action,
-                agent_observation,
-                agent_next_observation,
-                _,
-            ) in zip(
-                self.agents,
-                self.local_actions,
-                self.factored_observation,
-                *factor_observation(next_observation, self.device),
-            ):
-                agent.step(
-                    agent_observation,
-                    agent_action,
-                    reward,
-                    agent_next_observation,
-                    done,
-                )
+            have_learnt: List[bool] = self.step_agents(next_observation, reward, done)
             self.trainsteps += 1
             self.alive_steps += 1
-            if (
-                self.trainsteps % self.architecture["agent"]["learning_frequency"]
-                and len(self.agents[0].memory)
-                < self.architecture["agent"]["batch_size"]
-                == 0
-            ):
+            if all(have_learnt):
                 self.learn(reward)
                 self.learning_steps += 1
 

@@ -176,8 +176,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter, Process):
                 result = self.action_space_converter.all_actions[encoded_action]
 
             elif task.task_type is TaskType.STEP:
-                self.step(**task.kwargs)
-                result = "One Step More"
+                result = self.step(**task.kwargs)
             else:
                 raise Exception(
                     "Could not recognise task_type: "
@@ -403,7 +402,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter, Process):
             self.trainsteps,
         )
 
-    def learn(self) -> None:
+    def learn(self) -> float:
         """
         Learning step for the node_agents.
         Learing starts after we have at least 'batch' transitions in memory.
@@ -413,7 +412,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter, Process):
 
         """
         if len(self.memory) < self.architecture["batch_size"]:
-            return
+            return -1
         if self.trainsteps % self.architecture["replace"] == 0:
             self.target_network.parameters = self.q_network.parameters
 
@@ -448,6 +447,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter, Process):
             float(self.loss.mean().item()),
             transitions.reward,
         )
+        return self.loss.data
 
     def save(
         self,
@@ -532,7 +532,7 @@ class DoubleDuelingGCNAgent(AgentWithConverter, Process):
         reward: float,
         next_observation: Union[BaseObservation, nx.Graph],
         done: bool,
-    ) -> None:
+    ) -> bool:
         """
         Updates the node_agents's state based on feedback received from the environment.
 
@@ -581,6 +581,8 @@ class DoubleDuelingGCNAgent(AgentWithConverter, Process):
             if self.trainsteps % self.architecture["learning_frequency"] == 0:
                 self.learn()
                 self.learning_steps += 1
+                return True
+            return False
 
 
 def train(
