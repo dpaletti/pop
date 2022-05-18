@@ -23,6 +23,7 @@ if __name__ == "__main__":
     import numpy as np
     import dgl
     import os
+    import resource
 
     from pop.multiagent_system.DPOP import DPOP, train
 
@@ -89,7 +90,7 @@ if __name__ == "__main__":
             os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
         # Set the number of threads used by Open MPI (OMP)
-        os.environ["OMP_NUM_THREADS"] = str(th.multiprocessing.cpu_count())
+        os.environ["OMP_NUM_THREADS"] = "1"
 
         # How OMP Threads are scheduled
         os.environ["OMP_SCHEDULE"] = "STATIC"
@@ -103,9 +104,12 @@ if __name__ == "__main__":
         set_environment_variables(disable_gpu=True)
 
         # If virtual memory runs out
+        # ulimit -n 10000 is another solution on top of the sharing_stratecy
         th.multiprocessing.set_sharing_strategy("file_system")
+        rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
+        resource.setrlimit(resource.RLIMIT_NOFILE, (8192, rlimit[1]))
 
-        th.multiprocessing.set_start_method("forkserver", force=True)
+        th.multiprocessing.set_start_method("spawn", force=True)
 
         # nm_env = "l2rpn_icaps_2021_small"
         nm_env = "rte_case14_realistic"
@@ -132,7 +136,7 @@ if __name__ == "__main__":
         agent = DPOP(
             env=env_train,
             name="dpop_rte_1e4",
-            architecture="../architectures/dpop_agent_xxs.json",
+            architecture="./architectures/dpop_agent_xxs.json",
             training=True,
             tensorboard_dir="../test_data/pop_runs/tensorboard/dpop_rte_1e4",
             checkpoint_dir="../test_data/pop_runs/checkpoint/dpop_rte_1e4",

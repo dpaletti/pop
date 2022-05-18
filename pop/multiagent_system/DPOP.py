@@ -433,6 +433,7 @@ class DPOP(AgentWithConverter):
             self.alive_steps = 0
             self.trainsteps += 1
         else:
+
             losses, have_learnt = self.step_agents(next_observation, reward, done)
             self.trainsteps += 1
             self.alive_steps += 1
