@@ -18,7 +18,7 @@ class GCN(nn.Module):
         edge_features: Optional[int],
         architecture: Union[str, dict],
         name: str,
-        log_dir: str = "./",
+        log_dir: Optional[str],
         **kwargs,
     ) -> None:
         super(GCN, self).__init__()
@@ -27,16 +27,12 @@ class GCN(nn.Module):
         self.name: str = name
         self.architecture: dict[str, Any] = self.load_architecture(architecture)
 
-        # Logging path
-        self.log_dir: str = log_dir
-        Path(self.log_dir).mkdir(parents=True, exist_ok=True)
-        self.log_file = str(Path(self.log_dir, self.name + ".pt"))
-
         # Logging
-        self.log_file: str = log_dir
+        self.log_file: Optional[str] = log_dir
         self.name: str = name
-        Path(self.log_file).mkdir(parents=True, exist_ok=True)
-        self.log_file = str(Path(self.log_file, name + ".pt"))
+        if log_dir is not None:
+            Path(self.log_file).mkdir(parents=True, exist_ok=True)
+            self.log_file = str(Path(self.log_file, name + ".pt"))
 
         # Parameters
         self.node_features = node_features

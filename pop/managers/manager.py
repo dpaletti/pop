@@ -17,7 +17,8 @@ class Manager(nn.Module):
         edge_features: Optional[int],
         architecture: Union[str, dict],
         name: str,
-        log_dir: str,
+        log_dir: Optional[str],
+        **kwargs
     ):
         super(Manager, self).__init__()
 
@@ -29,9 +30,11 @@ class Manager(nn.Module):
             else architecture
         )
         self.name = name
+
         self.log_dir = log_dir
-        Path(self.log_dir).mkdir(parents=True, exist_ok=True)
-        self.log_file = str(Path(self.log_dir, name + ".pt"))
+        if log_dir:
+            Path(self.log_dir).mkdir(parents=True, exist_ok=True)
+            self.log_file = str(Path(self.log_dir, name + ".pt"))
 
     @property
     @abstractmethod
@@ -44,6 +47,8 @@ class Manager(nn.Module):
         ...
 
     def save(self):
+        if not self.log_dir:
+            raise Exception("Calling save() with None log directory from: " + self.name)
         checkpoint = {
             "name": self.name,
             "manager_state": self.state_dict(),

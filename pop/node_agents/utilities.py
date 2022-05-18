@@ -22,19 +22,6 @@ def from_networkx_to_dgl(graph, device) -> dgl.DGLHeteroGraph:
 
 
 def to_dgl(obs: BaseObservation, device) -> dgl.DGLHeteroGraph:
-    """
-    convert a :class:BaseObservation to a :class:`dgl.DGLHeteroGraph`.
-
-    Parameters
-    ----------
-    obs: :class:`BaseObservation`
-        BaseObservation taken from a grid2Op environment
-
-    Return
-    ------
-    dgl_obs: :class:`dgl.DGLHeteroGraph`
-        graph compatible with the Deep Graph Library
-    """
 
     # Convert Grid2op graph to a directed (for compatibility reasons) networkx graph
     net = obs.as_networkx()
@@ -47,20 +34,7 @@ def to_dgl(obs: BaseObservation, device) -> dgl.DGLHeteroGraph:
 def batch_observations(
     observations: Union[Tuple[BaseObservation], Tuple[nx.Graph]], device
 ) -> dgl.DGLHeteroGraph:
-    """
-    Convert a list (or tuple) of observations to a Deep Graph Library graph batch.
-    A graph batch is represented as a normal graph with nodes and edges added (together with features).
 
-    Parameters
-    ----------
-    observations: ``Tuple[BaseObservation]``
-        tuple of BaseObservation usually stored inside of a :class:`Transition`
-
-    Return
-    ------
-    graph_batch: :class:`dgl.DGLHeteroGraph`
-        a batch of graphs represented as a single augmented graph for Deep Graph Library compatibility
-    """
     graphs = []
     for o in observations:
         graph = (

@@ -4,16 +4,14 @@ import json
 from dgl import DGLHeteroGraph
 from torch import Tensor
 from pop.graph_convolutional_networks.egat_gcn import EgatGCN
+from pop.managers.manager import Manager
+from pop.managers.node_attention import NodeAttention
+
 
 # TODO: for pointer nets https://ychai.uk/notes/2019/07/21/RL/DRL/Decipher-AlphaStar-on-StarCraft-II/
 # Alternating Learning: chi gioca ha un learning rate più alto
 # Schedule a Turni
 # Fissare le comunità
-from pop.managers.manager import Manager
-from pop.managers.node_attention import NodeAttention
-import torch as th
-
-
 class CommunityManager(Manager):
     def __init__(
         self,
@@ -21,7 +19,8 @@ class CommunityManager(Manager):
         edge_features: int,
         architecture: Union[str, dict],
         name: str,
-        log_dir: str,
+        log_dir: Optional[str],
+        **kwargs
     ):
         super(CommunityManager, self).__init__(
             node_features=node_features,

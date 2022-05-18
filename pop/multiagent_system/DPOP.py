@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Optional, Set, Tuple
+from typing import List, Optional, Set, Tuple, Union
 import json
 from random import choice
 import torch as th
@@ -10,12 +10,15 @@ import networkx as nx
 from grid2op.Action import BaseAction
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+import grid2op
 from grid2op.Agent import AgentWithConverter
 from grid2op.Converter import IdToAct
 from grid2op.Environment import BaseEnv
 from grid2op.Observation import BaseObservation
 
-from pop.multiagent_system.agent_task import AgentTask, TaskType
+from managers.async_community_manager import AsyncCommunityManager
+from node_agents.serializable_gcn_agent import SerializableGCNAgent
+from pop.multiagent_system.task import Task, TaskType
 from pop.managers.head_manager import HeadManager
 from pop.multiagent_system.space_factorization import (
     factor_action_space,
@@ -23,21 +26,22 @@ from pop.multiagent_system.space_factorization import (
     HashableAction,
 )
 from pop.node_agents.utilities import from_networkx_to_dgl
-from pop.node_agents.gcn_agent import DoubleDuelingGCNAgent
 from pop.community_detection.community_detector import CommunityDetector
-from pop.managers.community_manager import CommunityManager
-from torch.multiprocessing import cpu_count, JoinableQueue
+from torch.multiprocessing import cpu_count, Manager, Queue
+
 
 # TODO: tracking communities in dynamic graphs
 # TODO: https://www.researchgate.net/publication/221273637_Tracking_the_Evolution_of_Communities_in_Dynamic_Social_Networks
 
 
 class DPOP(AgentWithConverter):
+    queue_manager: Manager = Manager()
+
     def __init__(
         self,
         env: BaseEnv,
         name: str,
-        architecture_path: str,
+        architecture: Union[str, dict],
         training: bool,
         tensorboard_dir: Optional[str],
         checkpoint_dir: Optional[str],
@@ -46,6 +50,11 @@ class DPOP(AgentWithConverter):
         n_jobs: Optional[int] = None,
     ):
         super(DPOP, self).__init__(env.action_space, IdToAct)
+
+        # Converter
+        self.converter = IdToAct(env.action_space)
+        self.converter.init_converter()
+        self.converter.seed(seed)
 
         # Reproducibility
         self.seed = seed
@@ -61,13 +70,16 @@ class DPOP(AgentWithConverter):
         else:
             self.n_jobs = n_jobs
 
-        self.architecture = json.load(open(architecture_path))
+        self.architecture: dict = (
+            json.load(open(architecture)) if type(architecture) is str else architecture
+        )
 
         # Environment Properties
         self.env = env
         graph = env.reset().as_networkx()
         self.node_features = len(graph.nodes[choice(list(graph.nodes))].keys())
         self.edge_features = len(graph.edges[choice(list(graph.edges))].keys())
+        self.training = training
 
         # Checkpointing
         self.checkpoint_dir = checkpoint_dir
@@ -91,25 +103,28 @@ class DPOP(AgentWithConverter):
         action_spaces, self.action_lookup_table = factor_action_space(env)
 
         # Multiprocessing
-        self.result_queue: JoinableQueue = JoinableQueue()
-        self.agents: List[DoubleDuelingGCNAgent] = [
-            DoubleDuelingGCNAgent(
-                agent_actions=action_space,
-                full_action_space=env.action_space,
+        self.result_queue: Queue = self.queue_manager.Queue()
+
+        self.agents: List[SerializableGCNAgent] = [
+            SerializableGCNAgent(
+                agent_actions=len(action_space),
                 architecture=self.architecture["agent"],
                 node_features=self.node_features,
                 edge_features=self.edge_features,
                 name="agent_" + str(idx) + "_" + name,
-                seed=seed,
                 training=training,
-                tensorboard_log_dir=None,
-                log_dir=self.checkpoint_dir,
                 device=device,
-                task_queue=JoinableQueue(),
+                task_queue=self.queue_manager.Queue(),
                 result_queue=self.result_queue,
             )
             for idx, action_space in enumerate(action_spaces)
         ]
+        self.agent_converters: List[IdToAct] = []
+        for action_space in action_spaces:
+            conv = IdToAct(env.action_space)
+            conv.init_converter(action_space)
+            conv.seed(seed)
+            self.agent_converters.append(conv)
 
         # Start agent process
         for agent in self.agents:
@@ -126,13 +141,14 @@ class DPOP(AgentWithConverter):
             raise Exception("\nDynamic Communities are not implemented yet\n")
 
         # Managers Initialization
-        self.managers: List[CommunityManager] = [
-            CommunityManager(
+        self.managers: List[AsyncCommunityManager] = [
+            AsyncCommunityManager(
                 node_features=self.node_features + 1,  # Node Features + Action
                 edge_features=self.edge_features,
                 architecture=self.architecture["manager"],
-                log_dir=self.checkpoint_dir,
                 name="manager_" + str(idx) + "_" + name,
+                task_queue=self.queue_manager.Queue(),
+                result_queue=self.result_queue,
             ).to(device)
             for idx, _ in enumerate(self.communities)
         ]
@@ -144,12 +160,13 @@ class DPOP(AgentWithConverter):
             name="head_manager_" + "_" + name,
             log_dir=self.checkpoint_dir,
         ).to(device)
-        self.manager_optimizers: List[th.optim.Optimizer] = [
-            th.optim.Adam(
-                manager.parameters(), lr=self.architecture["manager"]["learning_rate"]
-            )
-            for manager in self.managers
-        ]
+
+        # self.manager_optimizers: List[th.optim.Optimizer] = [
+        #     th.optim.Adam(
+        #         manager.parameters(), lr=self.architecture["manager"]["learning_rate"]
+        #     )
+        #     for manager in self.managers
+        # ]
 
         self.head_manager_optimizer: th.optim.Optimizer = th.optim.Adam(
             self.head_manager.parameters(),
@@ -163,28 +180,50 @@ class DPOP(AgentWithConverter):
         return communities
 
     def get_agent_actions(self, factored_observation):
-        print("Sending Factored Observations")
         for observation, agent in zip(factored_observation, self.agents):
-            print(observation)
             agent.task_queue.put(
-                AgentTask(TaskType.ACT, transformed_observation=observation)
+                Task(TaskType.ACT, transformed_observation=observation)
             )
-        return self.harvest_results()
+
+        return [
+            converter.all_actions[encoded_action]
+            for encoded_action, converter in zip(
+                self.harvest_agent_results(), self.agent_converters
+            )
+        ]
 
     def lookup_local_action(self, action: BaseAction):
         return self.action_lookup_table[HashableAction(action)]
 
-    def harvest_results(self):
-        for agent in self.agents:
-            agent.task_queue.join()
+    def harvest_agent_results(self):
         result_list = []
-        while not self.result_queue.empty():
+        for _ in self.agents:
             result_list.append(self.result_queue.get())
+
         result_list = [
-            (int(agent.split("_")[1]), action) for (agent, action) in result_list
+            (int(agent.split("_")[1]), result) for (agent, result) in result_list
         ]
         result_list = sorted(result_list, key=lambda tup: tup[0])
+
         return [result for (_, result) in result_list]
+
+    def harvest_manager_results(self):
+        result_list = []
+        for _ in self.managers:
+            result_list.append(self.result_queue.get())
+
+        result_list = [
+            (int(manager.split("_")[1]), result) for (manager, result) in result_list
+        ]
+        result_list = sorted(result_list, key=lambda tup: tup[0])
+
+        return [result for (_, result) in result_list]
+
+    def get_manager_actions(self, subgraphs: List[dgl.DGLHeteroGraph]):
+        for mangager, subgraph in zip(self.managers, subgraphs):
+            mangager.task_queue.put(Task(TaskType.CHOOSE_ACTION, g=subgraph))
+
+        return zip(*self.harvest_manager_results())
 
     def my_act(
         self,
@@ -219,17 +258,19 @@ class DPOP(AgentWithConverter):
             for community in self.communities
         ]
 
-        # Each Community Manager chooses one action from its community
-        manager_decisions = [
-            manager(subgraph) for manager, subgraph in zip(self.managers, subgraphs)
-        ]
-        managed_actions = [
-            int(manager_decision[0]) for manager_decision in manager_decisions
-        ]
+        managed_actions, embedded_graphs = self.get_manager_actions(subgraphs)
 
-        embedded_graphs = [
-            manager_decision[1] for manager_decision in manager_decisions
-        ]
+        # Each Community Manager chooses one action from its community
+        # manager_decisions = [
+        #     manager(subgraph) for manager, subgraph in zip(self.managers, subgraphs)
+        # ]
+        # managed_actions = [
+        #     int(manager_decision[0]) for manager_decision in manager_decisions
+        # ]
+
+        # embedded_graphs = [
+        #     manager_decision[1] for manager_decision in manager_decisions
+        # ]
 
         # The graph is summarized by contracting every community in 1 supernode
         summarized_graph = self.summarize_graph(
@@ -238,6 +279,15 @@ class DPOP(AgentWithConverter):
 
         # The head manager chooses the best action from every community
         best_action = self.head_manager(summarized_graph)
+
+        if self.training:
+            # Tensorboard Logging
+            self.writer.add_scalar("Encoded Action/train", best_action, self.trainsteps)
+            self.writer.add_text(
+                "Action/train",
+                str(self.converter.all_actions[best_action]),
+                self.trainsteps,
+            )
 
         return best_action
 
@@ -309,18 +359,16 @@ class DPOP(AgentWithConverter):
     def get_graph(observation: BaseObservation) -> nx.Graph:
         return observation.as_networkx()
 
-    def save_to_tensorboard(self, loss: float, reward: float) -> None:
-        if self.writer is None:
-            print("Warning: trying to save to tensorboard but it's deactivated")
-
-        self.writer.add_scalar("Loss/train", loss, self.trainsteps)
-        self.writer.add_scalar("Reward/train", reward, self.trainsteps)
+    def teach_managers(self, manager_losses):
+        for manager, manager_loss in zip(self.managers, manager_losses):
+            manager.task_queue.put(Task(TaskType.LEARN, loss=manager_loss))
+        self.harvest_manager_results()
 
     def learn(self, reward: float, losses: List[th.Tensor]):
         if not self.fixed_communities:
             raise Exception("In Learn() we assume fixed communities")
         manager_losses = []
-        for optimizer, community in zip(self.manager_optimizers, self.communities):
+        for community in self.communities:
             community_losses = [
                 agent_loss
                 for idx, agent_loss in enumerate(losses)
@@ -329,20 +377,21 @@ class DPOP(AgentWithConverter):
             loss = sum(community_losses) / len(community_losses)
 
             manager_losses.append(loss)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            # optimizer.zero_grad()
+            # loss.backward()
+            # optimizer.step()
 
         self.head_manager_optimizer.zero_grad()
         head_manager_loss = th.mean(th.stack(manager_losses))
         head_manager_loss.backward()
         self.head_manager_optimizer.zero_grad()
-        self.save(head_manager_loss.mean().item(), reward)
+
+        # Summary Writer is supposed to not slow down training
+        self.save_to_tensorboard(head_manager_loss.mean().item(), reward)
 
     def step_agents(
         self, next_observation, reward, done
     ) -> Tuple[List[th.Tensor], List[bool]]:
-
         for (agent, agent_action, agent_observation, agent_next_observation, _,) in zip(
             self.agents,
             self.local_actions,
@@ -350,7 +399,7 @@ class DPOP(AgentWithConverter):
             *factor_observation(next_observation, self.device),
         ):
             agent.task_queue.put(
-                AgentTask(
+                Task(
                     TaskType.STEP,
                     observation=agent_observation,
                     action=agent_action,
@@ -359,17 +408,13 @@ class DPOP(AgentWithConverter):
                     done=done,
                 )
             )
-        for agent in self.agents:
-            agent.task_queue.join()
 
-        losses = self.harvest_results()
+        losses = self.harvest_agent_results()
 
-        return losses, list(map(lambda x: not x is None, losses))
+        return losses, list(map(lambda x: not (x is None), losses))
 
     def step(
         self,
-        observation: BaseObservation,
-        action: int,
         reward: float,
         next_observation: BaseObservation,
         done: bool,
@@ -390,30 +435,98 @@ class DPOP(AgentWithConverter):
                 self.learn(reward, losses)
                 self.learning_steps += 1
 
-    def save(self, head_manager_loss: float, reward: float):
+    def save(self):
+        for agent in self.agents:
+            agent.task_queue.put(Task(TaskType.SAVE))
+        agents_state = dict(self.harvest_agent_results())
+
+        for manager in self.managers:
+            manager.task_queue.put(Task(TaskType.SAVE))
+        managers_state = dict(self.harvest_manager_results())
+
         checkpoint = {
-            "manager_optimizers_states": [
-                optimizer.state_dict() for optimizer in self.manager_optimizers
-            ],
-            "head_manager_optimizer_states": self.head_manager_optimizer.state_dict(),
+            "agents_state": agents_state,
+            "managers_state": managers_state,
+            "head_manager_state": self.head_manager.state_dict(),
+            "head_manager_optimizer_state": self.head_manager_optimizer.state_dict(),
             "trainsteps": self.trainsteps,
             "episodes": self.episodes,
             "name": self.name,
+            "env_name": self.env.env_name,
             "architecture": self.architecture,
-            "tensorboard_dir": self.tensorboard_dir,
-            "checkpoint_dir": self.checkpoint_dir,
             "seed": self.seed,
-            "node_features": self.node_features,
-            "edge_features": self.edge_features,
         }
-
-        for manager in self.managers:
-            manager.save()
-
-        self.head_manager.save()
-
         th.save(checkpoint, self.checkpoint_dir)
-        self.save_to_tensorboard(head_manager_loss, reward)
+
+    def save_to_tensorboard(self, loss: float, reward: float) -> None:
+        self.writer.add_scalar("Loss/train", loss, self.trainsteps)
+        self.writer.add_scalar("Reward/train", reward, self.trainsteps)
+
+    @staticmethod
+    def load(
+        checkpoint_file: str,
+        training: bool,
+        device: str,
+        tensorboard_dir: Optional[str] = None,
+    ):
+        checkpoint = th.load(checkpoint_file)
+
+        dpop = DPOP(
+            env=grid2op.make(checkpoint["env_name"]),
+            architecture=checkpoint["architecture"],
+            name=checkpoint["name"],
+            training=training,
+            tensorboard_dir=tensorboard_dir,
+            checkpoint_dir=Path(checkpoint_file).parents[0],
+            seed=checkpoint["seed"],
+            device=device,
+        )
+
+        dpop.trainsteps = checkpoint["trainsteps"]
+        dpop.episodes = checkpoint["episodes"]
+
+        for idx, agent in enumerate(dpop.agents):
+            agent.task_queue.put(
+                Task(
+                    TaskType.LOAD,
+                    optimizer_state=checkpoint["agents_state"][
+                        "agent_" + str(idx) + "_" + dpop.name
+                    ]["optimizer_state"],
+                    q_network_state=checkpoint["agents_state"][
+                        "agent_" + str(idx) + "_" + dpop.name
+                    ]["q_network_state"],
+                    target_network_state=checkpoint["agents_state"][
+                        "agent_" + str(idx) + "_" + dpop.name
+                    ]["target_network_state"],
+                    losses=checkpoint["agents_state"][
+                        "agent_" + str(idx) + "_" + dpop.name
+                    ]["losses"],
+                    actions=checkpoint["agents_state"][
+                        "agent_" + str(idx) + "_" + dpop.name
+                    ]["actions"],
+                )
+            )
+        dpop.harvest_agent_results()
+
+        for idx, manager in enumerate(dpop.managers):
+            manager.task_queue.put(
+                Task(
+                    TaskType.LOAD,
+                    state_dict=checkpoint["managers_state"][
+                        "manager_" + str(idx) + "_" + dpop.name
+                    ]["state"],
+                    optimizer_state_dict=checkpoint["managers_state"][
+                        "manager_" + str(idx) + "_" + dpop.name
+                    ]["optimizer_state"],
+                    action=checkpoint["managers_state"][
+                        "manager_" + str(idx) + "_" + dpop.name
+                    ]["chosen_actions"],
+                    losses=checkpoint["managers_state"][
+                        "manager_" + str(idx) + "_" + dpop.name
+                    ]["losses"],
+                )
+            )
+        dpop.harvest_manager_results()
 
 
 def train(env: BaseEnv, iterations: int, dpop: DPOP):
@@ -435,8 +548,6 @@ def train(env: BaseEnv, iterations: int, dpop: DPOP):
             action = dpop.convert_act(encoded_action)
             next_obs, reward, done, _ = env.step(action)
             dpop.step(
-                observation=obs,
-                action=encoded_action,
                 reward=reward,
                 next_observation=next_obs,
                 done=done,
@@ -444,3 +555,7 @@ def train(env: BaseEnv, iterations: int, dpop: DPOP):
             obs = next_obs
             training_step += 1
             pbar.update(1)
+
+    print("\nSaving...\n")
+
+    dpop.save()

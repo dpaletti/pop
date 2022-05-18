@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Tuple, Union, Optional
 
 from dgl import DGLHeteroGraph
 from dgl.nn.pytorch import EGATConv, GraphConv
@@ -15,7 +15,7 @@ class EgatGCN(GCN):
         edge_features: int,
         architecture: Union[str, dict],
         name: str,
-        log_dir: str,
+        log_dir: Optional[str],
     ):
         super(EgatGCN, self).__init__(
             node_features, edge_features, architecture, name, log_dir
