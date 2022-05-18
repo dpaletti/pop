@@ -53,7 +53,7 @@ class SerializableGCNAgent(Process, BaseGCNAgent):
             elif task.task_type == TaskType.STEP:
                 loss = self.step(**task.kwargs)
                 self.losses.append(loss)
-                result = loss
+                result = loss.detach() if loss is not None else None
             elif task.task_type == TaskType.SAVE:
                 result = self.save()
             elif task.task_type == TaskType.LOAD:

@@ -62,6 +62,7 @@ class CommunityManager(Manager):
 
         best_node: int = self.node_attention(node_embedding)
 
-        g.ndata["embedding"] = node_embedding
+        g.ndata["embedding"] = node_embedding.detach()
+        best_node: int = g.nodes[best_node].data["action"].item()
 
-        return g.nodes[best_node].data["action"], g
+        return best_node, g

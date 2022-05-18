@@ -153,6 +153,9 @@ class DPOP(AgentWithConverter):
             for idx, _ in enumerate(self.communities)
         ]
 
+        for manager in self.managers:
+            manager.start()
+
         self.head_manager = HeadManager(
             node_features=self.managers[0].get_embedding_dimension()
             * 2,  # Manager Embedding + Action (padded)
@@ -380,6 +383,8 @@ class DPOP(AgentWithConverter):
             # optimizer.zero_grad()
             # loss.backward()
             # optimizer.step()
+
+        self.teach_managers(manager_losses)
 
         self.head_manager_optimizer.zero_grad()
         head_manager_loss = th.mean(th.stack(manager_losses))

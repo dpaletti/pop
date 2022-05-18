@@ -63,7 +63,9 @@ class AsyncCommunityManager(CommunityManager, Process):
                 )
             self.result_queue.put((self.name, result))
 
-    def learn(self, loss: th.Tensor):
+    def learn(self, loss: float):
+        loss = th.Tensor(loss)
+
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
