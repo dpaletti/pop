@@ -103,7 +103,7 @@ if __name__ == "__main__":
         set_environment_variables(disable_gpu=True)
 
         # If virtual memory runs out
-        # th.multiprocessing.set_sharing_strategy("file_system")
+        th.multiprocessing.set_sharing_strategy("file_system")
 
         th.multiprocessing.set_start_method("forkserver", force=True)
 
