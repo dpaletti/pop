@@ -147,7 +147,10 @@ def factor_observation(
     graph: nx.Graph = obs.as_networkx()
     sub_graphs: List[dgl.DGLHeteroGraph] = []
     for node in graph.nodes:
-        sub_graphs.append(
-            from_networkx_to_dgl(nx.ego_graph(graph, node, radius), device)
-        )
+        subgraph = from_networkx_to_dgl(nx.ego_graph(graph, node, radius), device)
+        if subgraph.num_edges == 0:
+            # Adding self loops to subgraphs with no edges
+            dgl.add_self_loop(subgraph)
+        sub_graphs.append(subgraph)
+
     return sub_graphs, graph

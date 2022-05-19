@@ -11,7 +11,9 @@ def from_networkx_to_dgl(graph, device) -> dgl.DGLHeteroGraph:
         return dgl.from_networkx(
             graph.to_directed(),
             node_attrs=list(graph.nodes[choice(list(graph.nodes))].keys()),
-            edge_attrs=list(graph.edges[choice(list(graph.edges))].keys()),
+            edge_attrs=list(graph.edges[choice(list(graph.edges))].keys())
+            if len(graph.edges) > 0
+            else [],
             device=device,
         )
     except Exception as e:
@@ -20,6 +22,8 @@ def from_networkx_to_dgl(graph, device) -> dgl.DGLHeteroGraph:
         else:
             print("Hit Exception in from_networkx_to_dgl")
             print(graph)
+            print(graph.nodes)
+            print(graph.edges)
             raise e
 
 
