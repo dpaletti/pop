@@ -18,7 +18,9 @@ def from_networkx_to_dgl(graph, device) -> dgl.DGLHeteroGraph:
         if type(graph) is dgl.DGLHeteroGraph:
             return graph
         else:
-            raise (e)
+            print("Hit Exception in from_networkx_to_dgl")
+            print(graph)
+            raise e
 
 
 def to_dgl(obs: BaseObservation, device) -> dgl.DGLHeteroGraph:

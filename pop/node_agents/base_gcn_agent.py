@@ -179,7 +179,7 @@ class BaseGCNAgent(ABC):
             return None
         if self.trainsteps % self.architecture["replace"] == 0:
             self.target_network.parameters = self.q_network.parameters
-
+        print("LEARNING")
         # Sample from Replay Memory and unpack
         idxs, transitions, sampling_weights = self.memory.sample(
             self.architecture["batch_size"],

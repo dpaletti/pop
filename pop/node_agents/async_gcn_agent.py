@@ -5,7 +5,7 @@ from multiagent_system.task import Task, TaskType
 from node_agents.base_gcn_agent import BaseGCNAgent
 
 
-class SerializableGCNAgent(Process, BaseGCNAgent):
+class AsyncGCNAgent(Process, BaseGCNAgent):
     def __init__(
         self,
         agent_actions: int,

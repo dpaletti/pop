@@ -1,4 +1,5 @@
 # Needed for process spawning
+from multiagent_system.ray_dpop import RayDPOP
 
 if __name__ == "__main__":
 
@@ -25,7 +26,8 @@ if __name__ == "__main__":
     import os
     import resource
 
-    from pop.multiagent_system.DPOP import DPOP, train
+    from pop.multiagent_system.ray_dpop import RayDPOP
+    from pop.multiagent_system.base_pop import train
 
     def combine_rewards(env, alarm: bool = True):
         combined_reward: CombinedScaledReward = env.get_reward_instance()
@@ -93,10 +95,10 @@ if __name__ == "__main__":
         os.environ["OMP_NUM_THREADS"] = "1"
 
         # How OMP Threads are scheduled
-        os.environ["OMP_SCHEDULE"] = "STATIC"
+        # os.environ["OMP_SCHEDULE"] = "STATIC"
 
         # Whether thread may be moved between processors
-        os.environ["OMP_PROC_BIND"] = "CLOSE"
+        # os.environ["OMP_PROC_BIND"] = "CLOSE"
 
         # CPU Affinity is not set, you need to call with taskset -c to set cpu affinity
 
@@ -107,7 +109,7 @@ if __name__ == "__main__":
         # ulimit -n 10000 is another solution on top of the sharing_stratecy
         th.multiprocessing.set_sharing_strategy("file_system")
         rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
-        resource.setrlimit(resource.RLIMIT_NOFILE, (8192, rlimit[1]))
+        resource.setrlimit(resource.RLIMIT_NOFILE, (4096, rlimit[1]))
 
         th.multiprocessing.set_start_method("spawn", force=True)
 
@@ -133,10 +135,10 @@ if __name__ == "__main__":
         combine_rewards(env_val, alarm=False)
         combine_rewards(env_train, alarm=False)
 
-        agent = DPOP(
+        agent = RayDPOP(
             env=env_train,
             name="dpop_rte_1e4",
-            architecture="./architectures/dpop_agent_xxs.json",
+            architecture="../architectures/dpop_agent_xxs.json",
             training=True,
             tensorboard_dir="../test_data/pop_runs/tensorboard/dpop_rte_1e4",
             checkpoint_dir="../test_data/pop_runs/checkpoint/dpop_rte_1e4",
