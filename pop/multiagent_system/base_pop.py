@@ -266,12 +266,7 @@ class BasePOP(AgentWithConverter):
     def convert_obs(
         self, observation: BaseObservation
     ) -> Tuple[List[dgl.DGLHeteroGraph], nx.Graph]:
-        return factor_observation(
-            observation,
-            self.edge_features,
-            self.device,
-            self.architecture["radius"],
-        )
+        return factor_observation(observation, self.device, self.architecture["radius"])
 
     def initialize_communities(self) -> List[Set[int]]:
         obs = self.env.reset()

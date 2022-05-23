@@ -173,7 +173,7 @@ class AsyncDPOP(BasePOP):
             self.agents,
             self.encoded_actions,
             self.factored_observation,
-            *factor_observation(next_observation, self.edge_features, self.device),
+            *factor_observation(next_observation, self.device),
         ):
             agent.task_queue.put(
                 Task(

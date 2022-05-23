@@ -140,27 +140,37 @@ def __factor_observation_helper_ego_graph(graph, node, radius, device):
 
 
 def factor_observation(
-    obs: BaseObservation,
-    edge_features: int,
-    device,
-    radius: int = 1,
+    obs: BaseObservation, device, radius: int = 1
 ) -> Tuple[List[dgl.DGLHeteroGraph], nx.Graph]:
     graph: nx.Graph = obs.as_networkx()
     sub_graphs: List[dgl.DGLHeteroGraph] = []
+    zero_edges_ego_graphs: List[nx.Graph] = []
     for node in graph.nodes:
         ego_graph: nx.Graph = nx.ego_graph(graph, node, radius)
         if ego_graph.number_of_nodes() == 1 and ego_graph.number_of_edges() == 0:
-            # Dealing with single-node ego-graphs
-            print("Warning: found a ego-graph with one single node")
-            print("Adding a self-loop with zeroed out features")
+            zero_edges_ego_graphs.append(ego_graph)
+
+        subgraph = from_networkx_to_dgl(ego_graph, device)
+        sub_graphs.append(subgraph)
+    if not sub_graphs:
+        for ego_graph in zero_edges_ego_graphs:
+            print(ego_graph)
+        raise Exception("Found only egographs with zero features")
+    if zero_edges_ego_graphs:
+        print(
+            "Warning: found zero edges ego graphs, adding self-loop with zeroed out features"
+        )
+        feature_schema = sub_graphs[0].edata()
+        for ego_graph in zero_edges_ego_graphs:
             lone_node = list(ego_graph.nodes)[0]
             ego_graph.add_edge(
                 lone_node,
                 lone_node,
-                **{"feature_" + str(idx): 0 for idx in range(edge_features)}
+                **{
+                    feature_name: 0 if feature_value.dtype != th.bool else False
+                    for feature_name, feature_value in feature_schema.items()
+                }
             )
-
-        subgraph = from_networkx_to_dgl(ego_graph, device)
-        sub_graphs.append(subgraph)
-
+            subgraph = from_networkx_to_dgl(ego_graph, device)
+            sub_graphs.append(subgraph)
     return sub_graphs, graph
