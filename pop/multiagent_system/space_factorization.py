@@ -1,7 +1,7 @@
 import hashlib
-from multiprocessing import Pool
 
 import dgl
+import torch as th
 from grid2op.Action import BaseAction
 from grid2op.Converter import IdToAct
 from grid2op.Environment import BaseEnv
@@ -141,16 +141,26 @@ def __factor_observation_helper_ego_graph(graph, node, radius, device):
 
 def factor_observation(
     obs: BaseObservation,
+    edge_features: int,
     device,
     radius: int = 1,
 ) -> Tuple[List[dgl.DGLHeteroGraph], nx.Graph]:
     graph: nx.Graph = obs.as_networkx()
     sub_graphs: List[dgl.DGLHeteroGraph] = []
     for node in graph.nodes:
-        subgraph = from_networkx_to_dgl(nx.ego_graph(graph, node, radius), device)
-        if subgraph.num_edges == 0:
-            # Adding self loops to subgraphs with no edges
-            dgl.add_self_loop(subgraph)
+        ego_graph: nx.Graph = nx.ego_graph(graph, node, radius)
+        if ego_graph.number_of_nodes() == 1 and ego_graph.number_of_edges() == 0:
+            # Dealing with single-node ego-graphs
+            print("Warning: found a ego-graph with one single node")
+            print("Adding a self-loop with zeroed out features")
+            lone_node = list(ego_graph.nodes)[0]
+            ego_graph.add_edge(
+                lone_node,
+                lone_node,
+                **{"feature_" + str(idx): 0 for idx in range(edge_features)}
+            )
+
+        subgraph = from_networkx_to_dgl(ego_graph, device)
         sub_graphs.append(subgraph)
 
     return sub_graphs, graph

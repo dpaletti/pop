@@ -9,9 +9,8 @@ from pop.managers.node_attention import NodeAttention
 
 
 # TODO: for pointer nets https://ychai.uk/notes/2019/07/21/RL/DRL/Decipher-AlphaStar-on-StarCraft-II/
-# Alternating Learning: chi gioca ha un learning rate più alto
-# Schedule a Turni
-# Fissare le comunità
+# Alternating Learning: actor playing has a higher learning rate
+# Turn-Based Schedule
 class CommunityManager(Manager):
     def __init__(
         self,

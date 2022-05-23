@@ -128,7 +128,9 @@ class RayDPOP(BasePOP):
                     self.agents,
                     self.encoded_actions,
                     self.factored_observation,
-                    *factor_observation(next_observation, self.device),
+                    *factor_observation(
+                        next_observation, self.edge_features, self.device
+                    ),
                 )
             ]
         )

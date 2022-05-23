@@ -127,12 +127,10 @@ class GCN(nn.Module):
         d: ``dict``
             input dictionary with keys as feature names and values as feature values
         """
-
-        return (
-            th.stack([column.data for column in list(d.values())])
-            .transpose(0, 1)
-            .float()
-        )
+        values = [column.data for column in list(d.values())]
+        if values:
+            return th.stack(values).transpose(0, 1).float()
+        return th.Tensor().float()
 
     @staticmethod
     def preprocess_graph(g: DGLHeteroGraph) -> DGLHeteroGraph:

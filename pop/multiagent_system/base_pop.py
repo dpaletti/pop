@@ -268,6 +268,7 @@ class BasePOP(AgentWithConverter):
     ) -> Tuple[List[dgl.DGLHeteroGraph], nx.Graph]:
         return factor_observation(
             observation,
+            self.edge_features,
             self.device,
             self.architecture["radius"],
         )

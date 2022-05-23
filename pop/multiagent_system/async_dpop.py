@@ -4,10 +4,8 @@ import torch as th
 
 
 import dgl
-import networkx as nx
 import grid2op
 from grid2op.Environment import BaseEnv
-from grid2op.Observation import BaseObservation
 
 from managers.async_community_manager import AsyncCommunityManager
 from managers.head_manager import HeadManager
@@ -17,12 +15,18 @@ from pop.multiagent_system.task import Task, TaskType
 from pop.multiagent_system.space_factorization import (
     factor_observation,
 )
-from pop.node_agents.utilities import from_networkx_to_dgl
 from torch.multiprocessing import Manager, Queue
 
 
 # TODO: tracking communities in dynamic graphs
 # TODO: https://www.researchgate.net/publication/221273637_Tracking_the_Evolution_of_Communities_in_Dynamic_Social_Networks
+
+# IDEA: Dynamic Communities and Fixed Managers
+# IDEA: At each timestep use the Jaccard Coefficient for binary sets
+# IDEA: quotient between the size of the intersection and the size of the union.
+# IDEA: This allows to do multimapping: 1 manager managing multiple communities
+# IDEA: At this point one simple strategy may be having a fixed number of managers
+# IDEA: Then giving to each manager the communities with the highest Jaccard Coefficient
 
 
 class AsyncDPOP(BasePOP):
@@ -169,7 +173,7 @@ class AsyncDPOP(BasePOP):
             self.agents,
             self.encoded_actions,
             self.factored_observation,
-            *factor_observation(next_observation, self.device),
+            *factor_observation(next_observation, self.edge_features, self.device),
         ):
             agent.task_queue.put(
                 Task(
