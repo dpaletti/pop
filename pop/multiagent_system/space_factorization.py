@@ -8,6 +8,7 @@ from grid2op.Environment import BaseEnv
 from grid2op.Observation import BaseObservation
 from typing import List, Tuple, Optional
 import networkx as nx
+import numpy as np
 
 from pop.node_agents.utilities import from_networkx_to_dgl
 
@@ -147,8 +148,12 @@ def factor_observation(
     zero_edges_ego_graphs: List[nx.Graph] = []
     for node in graph.nodes:
         ego_graph: nx.Graph = nx.ego_graph(graph, node, radius)
-        if ego_graph.number_of_nodes() == 1 and ego_graph.number_of_edges() == 0:
+        if ego_graph.number_of_edges() == 0:
+            print(
+                "WARNING: found zero edges ego graph, adding self-loop and zeroed-out features for consistency"
+            )
             zero_edges_ego_graphs.append(ego_graph)
+            continue
 
         subgraph = from_networkx_to_dgl(ego_graph, device)
         sub_graphs.append(subgraph)
@@ -157,17 +162,18 @@ def factor_observation(
             print(ego_graph)
         raise Exception("Found only egographs with zero features")
     if zero_edges_ego_graphs:
-        print(
-            "Warning: found zero edges ego graphs, adding self-loop with zeroed out features"
-        )
-        feature_schema = sub_graphs[0].edata()
+        feature_schema = sub_graphs[0].edata
         for ego_graph in zero_edges_ego_graphs:
             lone_node = list(ego_graph.nodes)[0]
             ego_graph.add_edge(
                 lone_node,
                 lone_node,
                 **{
-                    feature_name: 0 if feature_value.dtype != th.bool else False
+                    feature_name: np.float32(0)
+                    if feature_value.dtype == th.float
+                    else np.int32(0)
+                    if feature_value.dtype == th.int
+                    else False
                     for feature_name, feature_value in feature_schema.items()
                 }
             )
