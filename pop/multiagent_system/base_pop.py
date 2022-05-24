@@ -81,6 +81,10 @@ class BasePOP(AgentWithConverter):
         self.alive_steps: int = 0
         self.learning_steps: int = 0
 
+        # Logging
+        Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
+        self.checkpoint_file: str = str(Path(checkpoint_dir, name + ".pt"))
+
         self.tensorboard_dir = tensorboard_dir
         if training:
             Path(tensorboard_dir).mkdir(parents=True, exist_ok=True)
@@ -128,6 +132,10 @@ class BasePOP(AgentWithConverter):
     def get_manager_actions(self, subgraphs):
         ...
 
+    @abstractmethod
+    def get_action(self, *args) -> int:
+        ...
+
     def my_act(
         self,
         transformed_observation: Tuple[List[dgl.DGLHeteroGraph], nx.Graph],
@@ -170,7 +178,7 @@ class BasePOP(AgentWithConverter):
         ).to(self.device)
 
         # The head manager chooses the best action from every community
-        best_action = self.head_manager(summarized_graph)
+        best_action = self.get_action(summarized_graph)
 
         if self.training:
             # Tensorboard Logging
@@ -255,7 +263,8 @@ class BasePOP(AgentWithConverter):
         checkpoint_file: str,
         training: bool,
         device: str,
-        tensorboard_dir: Optional[str] = None,
+        tensorboard_dir: Optional[str],
+        checkpoint_dir: Optional[str],
     ):
         ...
 

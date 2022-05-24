@@ -108,6 +108,9 @@ class RayDPOP(BasePOP):
             )
         )
 
+    def get_action(self, summarized_graph: dgl.DGLHeteroGraph):
+        return self.head_manager(summarized_graph)
+
     def step_agents(self, next_observation, reward, done):
         losses = ray.get(
             [
@@ -147,9 +150,99 @@ class RayDPOP(BasePOP):
         checkpoint_file: str,
         training: bool,
         device: str,
-        tensorboard_dir: Optional[str] = None,
+        tensorboard_dir: Optional[str],
+        checkpoint_dir: Optional[str],
+        n_jobs: int = 1,
     ):
-        raise Exception("TO IMPLEMENT")
+        print("Loading Model")
+        checkpoint = th.load(checkpoint_file)
+        rayDPOP = RayDPOP(
+            env=checkpoint["env"],
+            name=checkpoint["name"],
+            architecture=checkpoint["architecture"],
+            training=training,
+            tensorboard_dir=tensorboard_dir,
+            checkpoint_dir=checkpoint_dir,
+            seed=checkpoint["seed"],
+            device=device,
+            n_jobs=n_jobs,
+        )
+
+        for agent, agent_state in zip(rayDPOP.agents, checkpoint["agents"].values()):
+            agent.load_state.remote(**agent_state)
+
+        for manager, manager_state in zip(
+            rayDPOP.managers, checkpoint["managers"].values()
+        ):
+            manager.load_state.remote(**manager_state)
+
+        rayDPOP.head_manager.load_state_dict(checkpoint["head_manager"]["state"])
+        rayDPOP.head_manager_optimizer.load_state_dict(
+            checkpoint["head_manager"]["optimizer_state"]
+        )
+        print("Model Loaded")
+        return rayDPOP
 
     def save(self):
-        raise Exception("TO IMPLEMENT")
+        agents_state = ray.get([agent.get_state.remote() for agent in self.agents])
+        agents_name = ray.get([agent.get_name.remote() for agent in self.agents])
+        agents_dict = {
+            name: {
+                kword: state
+                for state, kword in zip(
+                    state,
+                    [
+                        "optimizer_state",
+                        "q_network_state",
+                        "target_network_state",
+                        "losses",
+                        "actions",
+                    ],
+                )
+            }
+            for name, state in zip(agents_name, agents_state)
+        }
+
+        head_manager_dict = {
+            "state": self.head_manager.state_dict(),
+            "optimizer_state": self.head_manager_optimizer.state_dict(),
+            "name": self.head_manager.name,
+        }
+
+        managers_state = ray.get(
+            [manager.get_state.remote() for manager in self.managers]
+        )
+        managers_name = ray.get(
+            [manager.get_name.remote() for manager in self.managers]
+        )
+
+        managers_dict = {
+            name: {
+                kword: state
+                for state, kword in zip(
+                    state,
+                    [
+                        "embedding_state_dict",
+                        "node_attention_state_dict",
+                        "optimizer_state_dict",
+                        "actions",
+                        "losses",
+                    ],
+                )
+            }
+            for name, state in zip(managers_name, managers_state)
+        }
+
+        checkpoint = {
+            "name": self.name,
+            "env": self.env,
+            "architecture": self.architecture,
+            "seed": self.seed,
+            "agents": agents_dict,
+            "managers": managers_dict,
+            "head_manager": head_manager_dict,
+        }
+        th.save(
+            checkpoint,
+            self.checkpoint_file,
+        )

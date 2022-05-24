@@ -152,6 +152,9 @@ def factor_observation(
             print(
                 "WARNING: found zero edges ego graph, adding self-loop and zeroed-out features for consistency"
             )
+            print(
+                "WARNING: features are assumed to have 32-bit precision and be either int, float or bool"
+            )
             zero_edges_ego_graphs.append(ego_graph)
             continue
 

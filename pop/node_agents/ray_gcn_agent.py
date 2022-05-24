@@ -1,8 +1,9 @@
-from typing import Union
+from typing import Union, Optional
 
 import ray
 
 from node_agents.base_gcn_agent import BaseGCNAgent
+import torch as th
 
 
 @ray.remote
@@ -33,15 +34,16 @@ class RayGCNAgent(BaseGCNAgent):
         self.actions_taken = []
 
     def get_state(self):
-        return {
-            self.name: {
-                "optimizer_state": self.optimizer.state_dict(),
-                "q_network_state": self.q_network.state_dict(),
-                "target_network_state": self.target_network.state_dict(),
-                "losses": self.losses,
-                "actions": self.actions_taken,
-            }
-        }
+        return [
+            self.optimizer.state_dict(),
+            self.q_network.state_dict(),
+            self.target_network.state_dict(),
+            self.losses,
+            self.actions_taken,
+        ]
+
+    def get_name(self):
+        return self.name
 
     def load_state(
         self, optimizer_state, q_network_state, target_network_state, losses, actions

@@ -42,18 +42,28 @@ class RayCommunityManager(CommunityManager):
         self.optimizer.step()
         self.losses.append(loss.data)
 
-    def get_state(self) -> dict:
-        return {
-            self.name: {
-                "state": self.state_dict(),
-                "optimizer_state": self.optimizer.state_dict(),
-                "chosen_actions": self.chosen_actions,
-                "losses": self.losses,
-            }
-        }
+    def get_state(self):
+        return [
+            self.embedding.state_dict(),
+            self.node_attention.state_dict(),
+            self.optimizer.state_dict(),
+            self.chosen_actions,
+            self.losses,
+        ]
 
-    def load_state(self, state_dict, optimizer_state_dict, actions, losses):
-        self.load_state_dict(state_dict)
+    def get_name(self):
+        return self.name
+
+    def load_state(
+        self,
+        embedding_state_dict,
+        node_attention_state_dict,
+        optimizer_state_dict,
+        actions,
+        losses,
+    ):
+        self.embedding.load_state_dict(embedding_state_dict)
+        self.node_attention.state_dict(node_attention_state_dict)
         self.optimizer.load_state_dict(optimizer_state_dict)
         self.chosen_actions = actions
         self.losses = losses
