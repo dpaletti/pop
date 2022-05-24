@@ -1,0 +1,27 @@
+[reproducibility]
+seed = 0
+device = "cpu"
+
+[model]
+name = "dpop_rte_1e4"
+architecture_path = "../architectures/dpop_agent_xxs.json"
+data_dir = "../test_data"
+checkpoint_dir = "{{data_dir}}/pop_runs/checkpoint/{{name}}"
+
+[training]
+steps = 1e1
+train = false
+tensorboard_dir = "{{data_dir}}/pop_runs/tensorboard/{{name}}/"
+
+[evaluation]
+episodes = 10
+evaluation_dir = "{{data_dir}}/evaluation/{{name}}"
+
+[loading]
+load = true
+load_dir = "{{checkpoint_dir}}/{{name}}.pt"
+
+[environment]
+name = "rte_case14_realistic"
+
+
