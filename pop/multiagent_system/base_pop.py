@@ -71,6 +71,7 @@ class BasePOP(AgentWithConverter):
         self.node_features = len(graph.nodes[choice(list(graph.nodes))].keys())
         self.edge_features = len(graph.edges[choice(list(graph.edges))].keys())
         self.training = training
+        self.epsilon_beta_scheduling = self.architecture["epsilon_beta_scheduling"]
 
         # Checkpointing
         self.checkpoint_dir = checkpoint_dir
@@ -80,6 +81,7 @@ class BasePOP(AgentWithConverter):
         self.episodes: int = 0
         self.alive_steps: int = 0
         self.learning_steps: int = 0
+        self.current_chosen_node: int = -1
 
         # Logging
         Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
@@ -170,7 +172,9 @@ class BasePOP(AgentWithConverter):
             for community in self.communities
         ]
 
-        managed_actions, embedded_graphs = self.get_manager_actions(subgraphs)
+        managed_actions, embedded_graphs, chosen_nodes = self.get_manager_actions(
+            subgraphs
+        )
 
         # The graph is summarized by contracting every community in 1 supernode
         summarized_graph = self.summarize_graph(
@@ -178,7 +182,8 @@ class BasePOP(AgentWithConverter):
         ).to(self.device)
 
         # The head manager chooses the best action from every community
-        best_action = self.get_action(summarized_graph)
+        best_action, best_manager = self.get_action(summarized_graph)
+        self.current_chosen_node = chosen_nodes[best_manager]
 
         if self.training:
             # Tensorboard Logging

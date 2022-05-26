@@ -120,15 +120,20 @@ class RayDPOP(BasePOP):
                     reward=reward,
                     next_observation=agent_next_observation,
                     done=done,
+                    stop_decay=False
+                    if (
+                        idx == self.current_chosen_node and self.epsilon_beta_scheduling
+                    )
+                    else True,
                 )
                 for (
-                    agent,
+                    (idx, agent),
                     agent_action,
                     agent_observation,
                     agent_next_observation,
                     _,
                 ) in zip(
-                    self.agents,
+                    enumerate(self.agents),
                     self.encoded_actions,
                     self.factored_observation,
                     *factor_observation(next_observation, self.device),

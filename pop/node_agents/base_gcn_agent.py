@@ -81,6 +81,7 @@ class BaseGCNAgent(ABC):
 
         # Reporting
         self.trainsteps: int = 0
+        self.decay_steps: int = 0
         self.episodes: int = 0
         self.alive_steps: int = 0
         self.learning_steps: int = 0
@@ -140,7 +141,7 @@ class BaseGCNAgent(ABC):
         return loss, td_errors, observation_batch, next_observation_batch
 
     def exponential_decay(self, max_val: float, min_val: float, decay: int) -> float:
-        return min_val + (max_val - min_val) * np.exp(-1.0 * self.trainsteps / decay)
+        return min_val + (max_val - min_val) * np.exp(-1.0 * self.decay_steps / decay)
 
     def take_action(
         self,
@@ -215,6 +216,7 @@ class BaseGCNAgent(ABC):
         reward: float,
         next_observation: nx.Graph,
         done: bool,
+        stop_decay: bool = False,
     ) -> Optional[Tensor]:
 
         if done:
@@ -225,6 +227,8 @@ class BaseGCNAgent(ABC):
             self.memory.push(observation, action, next_observation, reward, done)
             self.trainsteps += 1
             self.alive_steps += 1
+            if not stop_decay:
+                self.decay_steps += 1
 
             # every so often the node_agents should learn from experiences
             if self.trainsteps % self.architecture["learning_frequency"] == 0:

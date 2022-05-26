@@ -2,6 +2,7 @@
   "radius": 1,
   "decentralized": false,
   "fixed_communities": true,
+  "epsilon_beta_scheduling": true,
   "agent":
     {
         "network": {
