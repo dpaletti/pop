@@ -71,7 +71,8 @@ class BasePOP(AgentWithConverter):
         self.node_features = len(graph.nodes[choice(list(graph.nodes))].keys())
         self.edge_features = len(graph.edges[choice(list(graph.edges))].keys())
         self.training = training
-        self.epsilon_beta_scheduling = self.architecture["epsilon_beta_scheduling"]
+        eb_sched = self.architecture.get("epsilon_beta_scheduling")
+        self.epsilon_beta_scheduling = eb_sched if not eb_sched is None else False
 
         # Checkpointing
         self.checkpoint_dir = checkpoint_dir
