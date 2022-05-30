@@ -1,6 +1,5 @@
 from abc import abstractmethod
 from typing import Union
-
 import torch as th
 import torch.nn as nn
 import dgl
@@ -10,6 +9,7 @@ import json
 from pathlib import Path
 
 from pop.graph_convolutional_networks.gcn import GCN
+from ray.rllib.models.torch.modules.noisy_layer import NoisyLayer
 
 
 class DuelingNet(nn.Module):
@@ -50,26 +50,55 @@ class DuelingNet(nn.Module):
         ...
 
     def init_advantage_stream(self, action_space_size: int) -> nn.Module:
-        return nn.Sequential(
-            nn.Linear(
-                self.architecture["hidden_output_size"]
-                * self.architecture["heads"][-1],
-                self.architecture["advantage_stream_size"],
-            ),
-            nn.ReLU(),
-            nn.Linear(self.architecture["advantage_stream_size"], action_space_size),
-        )
+        if not self.architecture.get("noisy_layers"):
+            return nn.Sequential(
+                nn.Linear(
+                    self.architecture["hidden_output_size"]
+                    * self.architecture["heads"][-1],
+                    self.architecture["advantage_stream_size"],
+                ),
+                nn.ReLU(),
+                nn.Linear(
+                    self.architecture["advantage_stream_size"], action_space_size
+                ),
+            )
+        else:
+            # Activation is already inside the noisy layer and it is already ReLU
+            return nn.Sequential(
+                NoisyLayer(
+                    self.architecture["hidden_output_size"]
+                    * self.architecture["heads"][-1],
+                    self.architecture["advantage_stream_size"],
+                    sigma0=0.5,
+                ),
+                NoisyLayer(
+                    self.architecture["advantage_stream_size"],
+                    action_space_size,
+                    sigma0=0.5,
+                ),
+            )
 
     def init_value_stream(self) -> nn.Module:
-        return nn.Sequential(
-            nn.Linear(
-                self.architecture["hidden_output_size"]
-                * self.architecture["heads"][-1],
-                self.architecture["value_stream_size"],
-            ),
-            nn.ReLU(),
-            nn.Linear(self.architecture["value_stream_size"], 1),
-        )
+        if not self.architecture.get("noisy_layers"):
+            return nn.Sequential(
+                nn.Linear(
+                    self.architecture["hidden_output_size"]
+                    * self.architecture["heads"][-1],
+                    self.architecture["value_stream_size"],
+                ),
+                nn.ReLU(),
+                nn.Linear(self.architecture["value_stream_size"], 1),
+            )
+        else:
+            return nn.Sequential(
+                NoisyLayer(
+                    self.architecture["hidden_output_size"]
+                    * self.architecture["heads"][-1],
+                    self.architecture["value_stream_size"],
+                    sigma0=0.5,
+                ),
+                NoisyLayer(self.architecture["value_stream_size"], 1, sigma0=0.5),
+            )
 
     @staticmethod
     def compute_graph_embedding(
