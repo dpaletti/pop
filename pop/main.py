@@ -13,6 +13,7 @@ import grid2op
 from grid2op.Chronics import MultifolderWithCache
 from typing import Union
 import grid2op.Environment
+import grid2op.Reward as R
 from grid2op.Runner import Runner
 from grid2op.Episode import EpisodeData
 import shutil
@@ -28,7 +29,7 @@ from pop.multiagent_system.base_pop import train
 import argparse
 
 
-def combine_rewards(env, alarm: bool = True):
+def set_l2rpn_reward(env, alarm: bool = True):
     combined_reward: CombinedScaledReward = env.get_reward_instance()
     combined_reward.addReward("Flat", FlatReward(), 0.7)
     combined_reward.addReward("Redispatching", RedispReward(), 0.7)
@@ -36,6 +37,22 @@ def combine_rewards(env, alarm: bool = True):
         combined_reward.addReward("Alarm", AlarmReward(), 0.3)
     else:
         print("\nWARNING: Alarm Reward deactivated\n")
+    combined_reward.initialize(env)
+
+
+def set_topological_reward(env, alarm: bool = True):
+    combined_reward: CombinedScaledReward = env.get_reward_instance()
+    combined_reward.addReward("Bridge", R.BridgeReward(), 0.2)
+    combined_reward.addReward("CloseToOverflow", R.CloseToOverflowReward(), 0.2)
+    combined_reward.addReward("EpisodeDuration", R.EpisodeDurationReward(), 0.1)
+    combined_reward.addReward("Gameplay", R.GameplayReward(), 0.1)
+    combined_reward.addReward("LinesCapacity", R.LinesCapacityReward(), 0.1)
+    combined_reward.addReward("LinesReconnected", R.LinesReconnectedReward(), 0.2)
+    combined_reward.addReward("Redispatching", R.RedispReward, 0.1)
+    if alarm:
+        combined_reward.addReward("Alarm", AlarmReward(), 0.3)
+    else:
+        print("\n WARNING: Alarm Reward deactivated\n")
     combined_reward.initialize(env)
 
 
@@ -179,8 +196,12 @@ def main(**kwargs):
     fix_seed(env_train, env_val, seed=seed)
 
     # Set reward
-    combine_rewards(env_val, alarm=False)
-    combine_rewards(env_train, alarm=False)
+    if config["environment"].get("reward") == "topological":
+        set_topological_reward(env_train, alarm=False)
+    else:
+        set_l2rpn_reward(env_train, alarm=False)
+
+    set_l2rpn_reward(env_val, alarm=False)
 
     if config["loading"]["load"]:
         # Load agent

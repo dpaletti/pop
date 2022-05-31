@@ -23,5 +23,6 @@ load_dir = "{{checkpoint_dir}}/{{name}}.pt"
 
 [environment]
 name = "rte_case14_realistic"
+reward = "topological"
 
 
