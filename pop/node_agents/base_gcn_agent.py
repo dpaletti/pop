@@ -148,7 +148,7 @@ class BaseGCNAgent(ABC):
         transformed_observation: DGLHeteroGraph,
     ) -> int:
 
-        if self.training:
+        if self.training and not self.architecture["network"].get("noisy_layers"):
             # epsilon-greedy Exploration
             if np.random.rand() <= self.exponential_decay(
                 self.architecture["max_epsilon"],
@@ -157,7 +157,7 @@ class BaseGCNAgent(ABC):
             ):
                 return np.random.choice(list(range(self.actions)))
 
-        # Exploitation
+        # Exploitation or Noisy Layers Exploration
         graph = transformed_observation  # extract output of converted obs
 
         advantages: Tensor = self.q_network.advantage(graph.to(self.device))
