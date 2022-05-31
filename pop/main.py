@@ -48,7 +48,7 @@ def set_topological_reward(env, alarm: bool = True):
     combined_reward.addReward("Gameplay", R.GameplayReward(), 0.1)
     combined_reward.addReward("LinesCapacity", R.LinesCapacityReward(), 0.1)
     combined_reward.addReward("LinesReconnected", R.LinesReconnectedReward(), 0.2)
-    combined_reward.addReward("Redispatching", R.RedispReward, 0.1)
+    combined_reward.addReward("Redispatching", R.RedispReward(), 0.1)
     if alarm:
         combined_reward.addReward("Alarm", AlarmReward(), 0.3)
     else:
