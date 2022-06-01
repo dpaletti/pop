@@ -9,9 +9,10 @@ data_dir = "../test_data"
 checkpoint_dir = "{{data_dir}}/pop_runs/checkpoint/{{name}}"
 
 [training]
-steps = 1e1
+steps = 1e2
 train = true
 tensorboard_dir = "{{data_dir}}/pop_runs/tensorboard/{{name}}/"
+curriculum = true
 
 [evaluation]
 episodes = 100
@@ -23,6 +24,14 @@ load_dir = "{{checkpoint_dir}}/{{name}}.pt"
 
 [environment]
 name = "rte_case14_realistic"
-reward = "topological"
+
+[environment.reward]
+CloseToOverflow = 0.7
+Bridge = 0.5
+Redisp = 0.5
+LinesCapacity = 0.2
+LinesReconnected = 0.2
+
+
 
 

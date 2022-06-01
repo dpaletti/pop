@@ -27,6 +27,7 @@ import resource
 from pop.multiagent_system.ray_dpop import RayDPOP
 from pop.multiagent_system.base_pop import train
 import argparse
+import importlib
 
 
 def set_l2rpn_reward(env, alarm: bool = True):
@@ -37,6 +38,19 @@ def set_l2rpn_reward(env, alarm: bool = True):
         combined_reward.addReward("Alarm", AlarmReward(), 0.3)
     else:
         print("\nWARNING: Alarm Reward deactivated\n")
+    combined_reward.initialize(env)
+
+
+def set_reward(env, config):
+    combined_reward: CombinedScaledReward = env.get_reward_instance()
+    grid2op_reward_module = importlib.import_module("grid2op.Reward")
+    for reward_name, reward_weight in config["environment"]["reward"].items():
+        combined_reward.addReward(
+            reward_name,
+            getattr(grid2op_reward_module, reward_name + "Reward")(),
+            reward_weight,
+        )
+
     combined_reward.initialize(env)
 
 
@@ -178,17 +192,48 @@ def main(**kwargs):
     # nm_env = "l2rpn_icaps_2021_small"
     nm_env = config["environment"]["name"]
     print("Running with env: " + nm_env)
-
     # Build train and validation environments
     env_train = grid2op.make(
         nm_env + "_train80",
         reward_class=CombinedScaledReward,
         chronics_class=MultifolderWithCache,
+        difficulty="competition",
     )
+    env_train.get_reward_instance()
     env_val = grid2op.make(
         nm_env + "_val10",
         reward_class=CombinedScaledReward,  # CARE Multifolder bugs the runner
     )
+    curriculum_envs = []
+    if config["training"]["train"] and config["training"]["curriculum"]:
+        env_train_0 = grid2op.make(
+            nm_env + "_train80",
+            reward_class=CombinedScaledReward,
+            chronics_class=MultifolderWithCache,
+            difficulty=0,
+        )
+
+        env_train_1 = grid2op.make(
+            nm_env + "_train80",
+            reward_class=CombinedScaledReward,
+            chronics_class=MultifolderWithCache,
+            difficulty=1,
+        )
+
+        env_train_2 = grid2op.make(
+            nm_env + "_train80",
+            reward_class=CombinedScaledReward,
+            chronics_class=MultifolderWithCache,
+            difficulty=2,
+        )
+
+        env_train_competition = grid2op.make(
+            nm_env + "_train80",
+            reward_class=CombinedScaledReward,
+            chronics_class=MultifolderWithCache,
+            difficulty="competition",
+        )
+        curriculum_envs = [env_train_0, env_train_1, env_train_2, env_train_competition]
 
     # Set seed for reproducibility
     seed = config["reproducibility"]["seed"]
@@ -196,11 +241,7 @@ def main(**kwargs):
     fix_seed(env_train, env_val, seed=seed)
 
     # Set reward
-    if config["environment"].get("reward") == "topological":
-        set_topological_reward(env_train, alarm=False)
-    else:
-        set_l2rpn_reward(env_train, alarm=False)
-
+    set_reward(env_train, config)
     set_l2rpn_reward(env_val, alarm=False)
 
     if config["loading"]["load"]:
@@ -225,8 +266,27 @@ def main(**kwargs):
             device=config["reproducibility"]["device"],
         )
 
+    if agent.writer:
+        print("Saving to TB")
+        agent.writer.add_text("Description/train", str(config))
+        agent.writer.add_text("Architecture/train", str(agent.architecture))
+
     if config["training"]["train"]:
-        train(env=env_train, dpop=agent, iterations=int(config["training"]["steps"]))
+        if not config["training"]["curriculum"]:
+            train(
+                env=env_train, dpop=agent, iterations=int(config["training"]["steps"])
+            )
+        else:
+            steps = int(config["training"]["steps"] / 4)
+            for env in curriculum_envs:
+                train(env=env, dpop=agent, iterations=steps)
+                agent = RayDPOP.load(
+                    checkpoint_file=config["loading"]["load_dir"],
+                    training=config["training"]["train"],
+                    device=config["reproducibility"]["device"],
+                    tensorboard_dir=config["training"]["tensorboard_dir"],
+                    checkpoint_dir=config["model"]["checkpoint_dir"],
+                )
     else:
         _evaluate(
             env_val,
