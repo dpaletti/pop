@@ -200,7 +200,6 @@ def main(**kwargs):
         chronics_class=MultifolderWithCache,
         difficulty="competition",
     )
-    env_train.get_reward_instance()
     env_val = grid2op.make(
         nm_env + "_val10",
         reward_class=CombinedScaledReward,  # CARE Multifolder bugs the runner
@@ -235,6 +234,8 @@ def main(**kwargs):
             difficulty="competition",
         )
         curriculum_envs = [env_train_0, env_train_1, env_train_2, env_train_competition]
+        for env in curriculum_envs:
+            set_reward(env, config)
 
     # Set seed for reproducibility
     seed = config["reproducibility"]["seed"]
