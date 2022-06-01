@@ -28,7 +28,7 @@ from pop.multiagent_system.ray_dpop import RayDPOP
 from pop.multiagent_system.base_pop import train
 import argparse
 import importlib
-import json
+import pprint
 
 
 def set_l2rpn_reward(env, alarm: bool = True):
@@ -269,9 +269,8 @@ def main(**kwargs):
         )
 
     if agent.writer:
-        print("Saving to TB")
-        agent.writer.add_text("Description/train", str(toml.dumps(config)))
-        agent.writer.add_text("Architecture/train", str(json.dumps(agent.architecture)))
+        agent.writer.add_text("Description/train", pprint.pformat(config))
+        agent.writer.add_text("Architecture/train", pprint.pformat(agent.architecture))
 
     if config["training"]["train"]:
         if not config["training"]["curriculum"]:
