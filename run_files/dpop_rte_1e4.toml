@@ -11,8 +11,9 @@ checkpoint_dir = "{{data_dir}}/pop_runs/checkpoint/{{name}}"
 [training]
 steps = 1e2
 train = true
-tensorboard_dir = "{{data_dir}}/pop_runs/tensorboard/{{name}}/"
+tensorboard_dir = "{{data_dir}}/pop_runs/tensorboard/{{name}}"
 curriculum = true
+reset_decay = true
 
 [evaluation]
 episodes = 100
@@ -26,12 +27,32 @@ load_dir = "{{checkpoint_dir}}/{{name}}.pt"
 name = "rte_case14_realistic"
 
 [environment.reward]
+
+[environment.reward.curriculum0]
 CloseToOverflow = 0.7
 Bridge = 0.5
 Redisp = 0.5
 LinesCapacity = 0.2
 LinesReconnected = 0.2
 
+[environment.reward.curriculum1]
+CloseToOverflow = 0.7
+Bridge = 0.5
+Redisp = 0.5
+LinesCapacity = 0.2
+LinesReconnected = 0.2
 
+[environment.reward.curriculum2]
+CloseToOverflow = 0.7
+Bridge = 0.5
+Redisp = 0.5
+LinesCapacity = 0.2
+LinesReconnected = 0.2
 
+[environment.reward.curriculum3]
+CloseToOverflow = 0.7
+Bridge = 0.5
+Redisp = 0.5
+LinesCapacity = 0.2
+LinesReconnected = 0.2
 

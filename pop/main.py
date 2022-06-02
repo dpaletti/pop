@@ -11,7 +11,7 @@ from grid2op.Reward import (
 )
 import grid2op
 from grid2op.Chronics import MultifolderWithCache
-from typing import Union
+from typing import Union, Optional
 import grid2op.Environment
 import grid2op.Reward as R
 from grid2op.Runner import Runner
@@ -42,10 +42,15 @@ def set_l2rpn_reward(env, alarm: bool = True):
     combined_reward.initialize(env)
 
 
-def set_reward(env, config):
+def set_reward(env, config, curriculum: Optional[str] = None):
     combined_reward: CombinedScaledReward = env.get_reward_instance()
     grid2op_reward_module = importlib.import_module("grid2op.Reward")
-    for reward_name, reward_weight in config["environment"]["reward"].items():
+    reward_specification = (
+        config["environment"]["reward"]
+        if not curriculum
+        else config["environment"]["reward"][curriculum]
+    )
+    for reward_name, reward_weight in reward_specification.items():
         combined_reward.addReward(
             reward_name,
             getattr(grid2op_reward_module, reward_name + "Reward")(),
@@ -238,16 +243,17 @@ def main(**kwargs):
         # TODO: do so that at easier difficulties we reward having a very well working powernet
         # TODO: while in later stages we reward surviving the longest
         # TODO: do so by moving the importance of reward factors at each difficulty change
-        for env in curriculum_envs:
-            set_reward(env, config)
+        for idx, env in enumerate(curriculum_envs):
+            set_reward(env, config, "curriculum" + str(idx))
+    else:
+        set_reward(env_train, config)
 
     # Set seed for reproducibility
     seed = config["reproducibility"]["seed"]
     print("Running with seed: " + str(seed))
     fix_seed(env_train, env_val, seed=seed)
 
-    # Set reward
-    set_reward(env_train, config)
+    # Set validation reward
     set_l2rpn_reward(env_val, alarm=False)
 
     if config["loading"]["load"]:
@@ -286,9 +292,6 @@ def main(**kwargs):
         else:
             steps = int(config["training"]["steps"] / 4)
             for idx, env in enumerate(curriculum_envs):
-                # TODO: reload, set the timestamps correctly
-                # TODO: avoid overwriting previous data
-
                 train(env=env, dpop=agent, iterations=steps)
                 agent = RayDPOP.load(
                     checkpoint_file=config["loading"]["load_dir"],
@@ -300,6 +303,7 @@ def main(**kwargs):
                     checkpoint_dir=config["model"]["checkpoint_dir"]
                     + "_curr_"
                     + str(idx + 1),
+                    reset_decay=config["training"]["reset_decay"],
                 )
     else:
         _evaluate(

@@ -60,13 +60,14 @@ class RayGCNAgent(BaseGCNAgent):
         alive_steps,
         trainsteps,
         learning_steps,
+        reset_decay=False,
     ):
         self.optimizer.load_state_dict(optimizer_state)
         self.q_network.load_state_dict(q_network_state)
         self.target_network.load_state_dict(target_network_state)
         self.losses = losses
         self.actions_taken = actions
-        self.decay_steps = decay_steps
+        self.decay_steps = decay_steps if not reset_decay else 0
         self.alive_steps = alive_steps
         self.trainsteps = trainsteps
         self.learning_steps = learning_steps

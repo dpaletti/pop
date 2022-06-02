@@ -157,10 +157,12 @@ class RayDPOP(BasePOP):
         device: str,
         tensorboard_dir: Optional[str],
         checkpoint_dir: Optional[str],
-        reset_decaying: bool = True,
+        reset_decay: bool = True,
         n_jobs: int = 1,
     ):
         print("Loading Model")
+        print("tensorboard_dir: " + tensorboard_dir)
+        print("checkpoint_dir: " + checkpoint_dir)
         checkpoint = th.load(checkpoint_file)
         rayDPOP = RayDPOP(
             env=checkpoint["env"],
@@ -175,7 +177,7 @@ class RayDPOP(BasePOP):
         )
 
         for agent, agent_state in zip(rayDPOP.agents, checkpoint["agents"].values()):
-            agent.load_state.remote(**agent_state)
+            agent.load_state.remote(**agent_state, reset_decay=reset_decay)
 
         for manager, manager_state in zip(
             rayDPOP.managers, checkpoint["managers"].values()
