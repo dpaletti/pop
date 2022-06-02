@@ -11,7 +11,7 @@ from grid2op.Reward import (
 )
 import grid2op
 from grid2op.Chronics import MultifolderWithCache
-from typing import Union, Optional
+from typing import Union, Optional, List
 import grid2op.Environment
 import grid2op.Reward as R
 from grid2op.Runner import Runner
@@ -115,9 +115,13 @@ def _evaluate(
     )
 
 
-def fix_seed(env_train: BaseEnv, env_val: BaseEnv, seed: int = 0):
+def fix_seed(
+    env_train: BaseEnv, env_val: BaseEnv, curriculum_envs: List[BaseEnv], seed: int = 0
+):
     env_train.seed(seed)
     env_val.seed(seed)
+    for env in curriculum_envs:
+        env.seed(seed)
     th.manual_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
@@ -217,6 +221,7 @@ def main(**kwargs):
             chronics_class=MultifolderWithCache,
             difficulty=0,
         )
+        env_train_0.seed()
 
         env_train_1 = grid2op.make(
             nm_env + "_train80",
@@ -251,7 +256,7 @@ def main(**kwargs):
     # Set seed for reproducibility
     seed = config["reproducibility"]["seed"]
     print("Running with seed: " + str(seed))
-    fix_seed(env_train, env_val, seed=seed)
+    fix_seed(env_train, env_val, curriculum_envs, seed=seed)
 
     # Set validation reward
     set_l2rpn_reward(env_val, alarm=False)
