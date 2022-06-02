@@ -221,7 +221,6 @@ def main(**kwargs):
             chronics_class=MultifolderWithCache,
             difficulty=0,
         )
-        env_train_0.seed()
 
         env_train_1 = grid2op.make(
             nm_env + "_train80",
