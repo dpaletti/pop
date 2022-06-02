@@ -234,6 +234,10 @@ def main(**kwargs):
             difficulty="competition",
         )
         curriculum_envs = [env_train_0, env_train_1, env_train_2, env_train_competition]
+        # TODO: set different rewards in curriculum learning
+        # TODO: do so that at easier difficulties we reward having a very well working powernet
+        # TODO: while in later stages we reward surviving the longest
+        # TODO: do so by moving the importance of reward factors at each difficulty change
         for env in curriculum_envs:
             set_reward(env, config)
 
@@ -268,9 +272,11 @@ def main(**kwargs):
             device=config["reproducibility"]["device"],
         )
 
-    if agent.writer:
+    try:
         agent.writer.add_text("Description/train", pprint.pformat(config))
         agent.writer.add_text("Architecture/train", pprint.pformat(agent.architecture))
+    except:
+        pass
 
     if config["training"]["train"]:
         if not config["training"]["curriculum"]:
@@ -279,14 +285,21 @@ def main(**kwargs):
             )
         else:
             steps = int(config["training"]["steps"] / 4)
-            for env in curriculum_envs:
+            for idx, env in enumerate(curriculum_envs):
+                # TODO: reload, set the timestamps correctly
+                # TODO: avoid overwriting previous data
+
                 train(env=env, dpop=agent, iterations=steps)
                 agent = RayDPOP.load(
                     checkpoint_file=config["loading"]["load_dir"],
                     training=config["training"]["train"],
                     device=config["reproducibility"]["device"],
-                    tensorboard_dir=config["training"]["tensorboard_dir"],
-                    checkpoint_dir=config["model"]["checkpoint_dir"],
+                    tensorboard_dir=config["training"]["tensorboard_dir"]
+                    + "_curr_"
+                    + str(idx + 1),
+                    checkpoint_dir=config["model"]["checkpoint_dir"]
+                    + "_curr_"
+                    + str(idx + 1),
                 )
     else:
         _evaluate(

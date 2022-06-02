@@ -157,6 +157,7 @@ class RayDPOP(BasePOP):
         device: str,
         tensorboard_dir: Optional[str],
         checkpoint_dir: Optional[str],
+        reset_decaying: bool = True,
         n_jobs: int = 1,
     ):
         print("Loading Model")
@@ -185,6 +186,11 @@ class RayDPOP(BasePOP):
         rayDPOP.head_manager_optimizer.load_state_dict(
             checkpoint["head_manager"]["optimizer_state"]
         )
+
+        rayDPOP.learning_steps = checkpoint["learning_steps"]
+        rayDPOP.alive_steps = checkpoint["alive_steps"]
+        rayDPOP.trainsteps = checkpoint["trainsteps"]
+
         print("Model Loaded")
         return rayDPOP
 
@@ -202,6 +208,10 @@ class RayDPOP(BasePOP):
                         "target_network_state",
                         "losses",
                         "actions",
+                        "decay_steps",
+                        "alive_steps",
+                        "trainsteps",
+                        "learning_steps",
                     ],
                 )
             }
@@ -246,6 +256,9 @@ class RayDPOP(BasePOP):
             "agents": agents_dict,
             "managers": managers_dict,
             "head_manager": head_manager_dict,
+            "learning_steps": self.learning_steps,
+            "trainsteps": self.trainsteps,
+            "alive_steps": self.alive_steps,
         }
         th.save(
             checkpoint,

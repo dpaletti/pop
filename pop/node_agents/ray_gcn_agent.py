@@ -40,16 +40,33 @@ class RayGCNAgent(BaseGCNAgent):
             self.target_network.state_dict(),
             self.losses,
             self.actions_taken,
+            self.decay_steps,
+            self.alive_steps,
+            self.trainsteps,
+            self.learning_steps,
         ]
 
     def get_name(self):
         return self.name
 
     def load_state(
-        self, optimizer_state, q_network_state, target_network_state, losses, actions
+        self,
+        optimizer_state,
+        q_network_state,
+        target_network_state,
+        losses,
+        actions,
+        decay_steps,
+        alive_steps,
+        trainsteps,
+        learning_steps,
     ):
         self.optimizer.load_state_dict(optimizer_state)
         self.q_network.load_state_dict(q_network_state)
         self.target_network.load_state_dict(target_network_state)
         self.losses = losses
         self.actions_taken = actions
+        self.decay_steps = decay_steps
+        self.alive_steps = alive_steps
+        self.trainsteps = trainsteps
+        self.learning_steps = learning_steps
