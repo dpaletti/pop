@@ -255,6 +255,12 @@ class BasePOP(AgentWithConverter):
                 self.trainsteps,
             )
 
+        self.writer.add_scalar(
+            "Chosen Node/train",
+            self.current_chosen_node,
+            self.trainsteps,
+        )
+
     @abstractmethod
     def teach_managers(self, manager_losses):
         ...
