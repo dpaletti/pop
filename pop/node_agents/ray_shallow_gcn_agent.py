@@ -94,5 +94,5 @@ class RayShallowGCNAgent(BaseGCNAgent):
             # every so often the node_agents should learn from experiences
             if self.trainsteps % self.architecture["learning_frequency"] == 0:
                 self.learning_steps += 1
-                return th.tensor([0.0], requires_grad=True)
+                return th.tensor(0.0, requires_grad=True)
             return None
