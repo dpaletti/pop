@@ -24,7 +24,7 @@ class DuelingNet(nn.Module):
         self.name = name
 
         self.log_dir = log_dir
-        Path(self.log_dir).mkdir(parents=True, exist_ok=False)
+        Path(self.log_dir).mkdir(parents=True, exist_ok=True)
         self.log_file = str(Path(self.log_dir, self.name + ".pt"))
 
         self.architecture = (

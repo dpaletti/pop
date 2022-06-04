@@ -31,7 +31,7 @@ class GCN(nn.Module):
         self.log_file: Optional[str] = log_dir
         self.name: str = name
         if log_dir is not None:
-            Path(self.log_file).mkdir(parents=True, exist_ok=False)
+            Path(self.log_file).mkdir(parents=True, exist_ok=True)
             self.log_file = str(Path(self.log_file, name + ".pt"))
 
         # Parameters
