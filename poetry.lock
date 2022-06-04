@@ -1412,6 +1412,14 @@ docs = ["proselint (>=0.10.2)", "sphinx (>=3)", "sphinx-argparse (>=0.2.5)", "sp
 testing = ["coverage (>=4)", "coverage-enable-subprocess (>=1)", "flaky (>=3)", "pytest (>=4)", "pytest-env (>=0.6.2)", "pytest-freezegun (>=0.4.1)", "pytest-mock (>=2)", "pytest-randomly (>=1)", "pytest-timeout (>=1)", "packaging (>=20.0)"]
 
 [[package]]
+name = "vowpalwabbit"
+version = "9.1.0"
+description = "Vowpal Wabbit Python package"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[[package]]
 name = "wcwidth"
 version = "0.2.5"
 description = "Measures the displayed width of unicode strings in a terminal"
@@ -1445,7 +1453,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.8, <3.11"
-content-hash = "99671af1a8d58e3d3f4edb86f2f2b678fccc9024648922934ab15d9746dfac7d"
+content-hash = "52b1c9fcc6354cc26b49d2e89dd7a295215dd67950fb30d960fbc8e9ecb381ff"
 
 [metadata.files]
 absl-py = [
@@ -2574,6 +2582,30 @@ urllib3 = [
 virtualenv = [
     {file = "virtualenv-20.14.1-py2.py3-none-any.whl", hash = "sha256:e617f16e25b42eb4f6e74096b9c9e37713cf10bf30168fb4a739f3fa8f898a3a"},
     {file = "virtualenv-20.14.1.tar.gz", hash = "sha256:ef589a79795589aada0c1c5b319486797c03b67ac3984c48c669c0e4f50df3a5"},
+]
+vowpalwabbit = [
+    {file = "vowpalwabbit-9.1.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:f26d0584fd9dbadbfa923a1ea03d2164d241cc7d830e78150f2b0b07e8acc0e5"},
+    {file = "vowpalwabbit-9.1.0-cp310-cp310-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:69e3e9e9240e855674e3274ee991193730b92d2c57228466518a8cb8f3763677"},
+    {file = "vowpalwabbit-9.1.0-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:fa34544ec31ce83561f878565ab5126e21a31938835d2b90e6babf6f8396c107"},
+    {file = "vowpalwabbit-9.1.0-cp310-cp310-win_amd64.whl", hash = "sha256:9346a0f13e1de90e92038ac4899234568761c5281388016ae80b4b7ddb14f28b"},
+    {file = "vowpalwabbit-9.1.0-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:d8d446f8316a396314e52b70d4b3fe494db139f27df1d232adb6f592058ae8c5"},
+    {file = "vowpalwabbit-9.1.0-cp36-cp36m-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:a7b241b5e244963c3cfb35928ca338376ed2218ca91a1f32f89fcdbe6e085bc9"},
+    {file = "vowpalwabbit-9.1.0-cp36-cp36m-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:9f002f6dbabcfa1bd493ced33c5915fb6f97282da1975677ce7e4ae2200a2d14"},
+    {file = "vowpalwabbit-9.1.0-cp36-cp36m-win_amd64.whl", hash = "sha256:ccf31117dc2a02f0433b0e9adc35dcff2da4f85340b93bee23252d74214f7540"},
+    {file = "vowpalwabbit-9.1.0-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:f971977b913d311aad4b83b595f41890888c45fa0bbccae44c5d73119b8aee36"},
+    {file = "vowpalwabbit-9.1.0-cp37-cp37m-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:ce44e8ec9446180525f062ab8d01a1bda661ba56481fa9617c4e455f70005f7a"},
+    {file = "vowpalwabbit-9.1.0-cp37-cp37m-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:82306dc4deee323c741a5dc2a487bb873c131492025f4383dca05269c26ed3f9"},
+    {file = "vowpalwabbit-9.1.0-cp37-cp37m-win_amd64.whl", hash = "sha256:3d4091fe176e428f328033f3e727e17564c10124ca98f228527a816ba69187f4"},
+    {file = "vowpalwabbit-9.1.0-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:2d53999babd6975e59c863e9997eea56a3bfa90903475bfa49ddc36b7422e81e"},
+    {file = "vowpalwabbit-9.1.0-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:b2187d5857586378256e5e06cd5540a0d0c189807963dcef969e567e0fcd9b88"},
+    {file = "vowpalwabbit-9.1.0-cp38-cp38-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:f5b4150ee9cd415e813fadbf22bb6dbc1cf79b883ad736df3ede380e8582a3b6"},
+    {file = "vowpalwabbit-9.1.0-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:792cfd5ed54f718046ac1b915f157b06d308de12f5453cdd5f21f3835f2f1089"},
+    {file = "vowpalwabbit-9.1.0-cp38-cp38-win_amd64.whl", hash = "sha256:c391b05ded1f1ae3300e096c78442e160776d81c6fea34b14c5327be684d8863"},
+    {file = "vowpalwabbit-9.1.0-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:d0cabb619ee1fdfbfcf9f094a06ec95a1bd69f4df706463cef0618e4661db095"},
+    {file = "vowpalwabbit-9.1.0-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:b48b0fd0cc2ac86643384caa0e9e4f10c638eb6a338eed5e9fb30500bd14ae94"},
+    {file = "vowpalwabbit-9.1.0-cp39-cp39-manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:fffb68691748b4cee7f2096e47fec8cf944de30b46a65150b7181572120fc31d"},
+    {file = "vowpalwabbit-9.1.0-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:456283832516e1b9b27e8445e8f31138bdbce3118e66841a77afb9435dac135f"},
+    {file = "vowpalwabbit-9.1.0-cp39-cp39-win_amd64.whl", hash = "sha256:ca96c10fc191676625318bef2930860ee303869e76c70886faa843a5b5851e42"},
 ]
 wcwidth = [
     {file = "wcwidth-0.2.5-py2.py3-none-any.whl", hash = "sha256:beb4802a9cebb9144e99086eff703a642a13d6a0052920003a230f3294bbe784"},

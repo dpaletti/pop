@@ -33,6 +33,9 @@ class RayGCNAgent(BaseGCNAgent):
         self.losses = []
         self.actions_taken = []
 
+    def get_q_network(self):
+        return self.q_network
+
     def get_state(self):
         return [
             self.optimizer.state_dict(),

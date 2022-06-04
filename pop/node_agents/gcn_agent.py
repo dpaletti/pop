@@ -62,7 +62,7 @@ class GCNAgent(AgentWithConverter, BaseGCNAgent):
 
         # Logging
         self.log_dir: str = log_dir
-        Path(self.log_dir).mkdir(parents=True, exist_ok=True)
+        Path(self.log_dir).mkdir(parents=True, exist_ok=False)
         self.log_file: str = str(Path(self.log_dir, name + ".pt"))
 
         # Training or Evaluation
@@ -73,7 +73,7 @@ class GCNAgent(AgentWithConverter, BaseGCNAgent):
             # Tensorboard
             self.writer: Optional[SummaryWriter]
             if tensorboard_log_dir is not None:
-                Path(tensorboard_log_dir).mkdir(parents=True, exist_ok=True)
+                Path(tensorboard_log_dir).mkdir(parents=True, exist_ok=False)
                 self.writer = SummaryWriter(log_dir=tensorboard_log_dir)
             else:
                 self.writer = None

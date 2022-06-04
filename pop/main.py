@@ -1,5 +1,4 @@
 import toml
-
 from pathlib import Path
 from grid2op.Agent import BaseAgent
 from grid2op.Environment import BaseEnv
@@ -29,6 +28,8 @@ from pop.multiagent_system.base_pop import train
 import argparse
 import importlib
 import pprint
+
+from utility import format_to_md
 
 
 def set_l2rpn_reward(env, alarm: bool = True):
@@ -103,7 +104,7 @@ def _evaluate(
     nb_process: int = 4,
     sequential: bool = False,
 ):
-    Path(path_save).mkdir(parents=True, exist_ok=True)
+    Path(path_save).mkdir(parents=True, exist_ok=False)
     if sequential:
         os.environ[Runner.FORCE_SEQUENTIAL] = "1"
         nb_process = 1
@@ -188,6 +189,14 @@ def parse_config(run_file_path: str) -> dict:
     return config
 
 
+def add_recap_to_tensorboard(agent, config):
+    agent.writer.add_text("Description/train", format_to_md(pprint.pformat(config)))
+    agent.writer.add_text(
+        "Architecture/train",
+        format_to_md(pprint.pformat(agent.architecture)),
+    )
+
+
 def main(**kwargs):
     set_environment_variables(disable_gpu=True)
 
@@ -243,10 +252,6 @@ def main(**kwargs):
             difficulty="competition",
         )
         curriculum_envs = [env_train_0, env_train_1, env_train_2, env_train_competition]
-        # TODO: set different rewards in curriculum learning
-        # TODO: do so that at easier difficulties we reward having a very well working powernet
-        # TODO: while in later stages we reward surviving the longest
-        # TODO: do so by moving the importance of reward factors at each difficulty change
         for idx, env in enumerate(curriculum_envs):
             set_reward(env, config, "curriculum" + str(idx))
     else:
@@ -269,7 +274,7 @@ def main(**kwargs):
             tensorboard_dir=config["training"]["tensorboard_dir"],
             checkpoint_dir=config["model"]["checkpoint_dir"],
         )
-    else:
+    elif not config["training"]["curriculum"]:
         # Instantiate agent ex novo
         agent = RayDPOP(
             env=env_train,
@@ -281,24 +286,40 @@ def main(**kwargs):
             seed=seed,
             device=config["reproducibility"]["device"],
         )
-
-    try:
-        agent.writer.add_text("Description/train", pprint.pformat(config))
-        agent.writer.add_text("Architecture/train", pprint.pformat(agent.architecture))
-    except:
-        pass
+    else:
+        agent = RayDPOP(
+            env=curriculum_envs[0],
+            name=config["model"]["name"] + "_curr_0",
+            architecture=config["model"]["architecture_path"],
+            training=config["training"]["train"],
+            tensorboard_dir=config["training"]["tensorboard_dir"] + "_curr_0",
+            checkpoint_dir=config["model"]["checkpoint_dir"] + "_curr_0",
+            seed=seed,
+            device=config["reproducibility"]["device"],
+        )
 
     if config["training"]["train"]:
         if not config["training"]["curriculum"]:
+            add_recap_to_tensorboard(agent, config)
             train(
                 env=env_train, dpop=agent, iterations=int(config["training"]["steps"])
             )
         else:
             steps = int(config["training"]["steps"] / 4)
-            for idx, env in enumerate(curriculum_envs):
+            add_recap_to_tensorboard(agent, config)
+
+            for idx, env in enumerate(curriculum_envs[:-1]):
                 train(env=env, dpop=agent, iterations=steps)
+
                 agent = RayDPOP.load(
-                    checkpoint_file=config["loading"]["load_dir"],
+                    checkpoint_file=str(Path(config["loading"]["load_dir"]).parents[0])
+                    + "_curr_"
+                    + str(idx)
+                    + "/"
+                    + Path(config["loading"]["load_dir"]).stem
+                    + "_curr_"
+                    + str(idx)
+                    + ".pt",
                     training=config["training"]["train"],
                     device=config["reproducibility"]["device"],
                     tensorboard_dir=config["training"]["tensorboard_dir"]
@@ -308,7 +329,14 @@ def main(**kwargs):
                     + "_curr_"
                     + str(idx + 1),
                     reset_decay=config["training"]["reset_decay"],
+                    new_name=agent.name.replace(
+                        "_curr_" + str(idx), "_curr_" + str(idx + 1)
+                    ),
+                    new_env=env,
                 )
+                add_recap_to_tensorboard(agent, config)
+
+            train(env=curriculum_envs[-1], dpop=agent, iterations=steps)
     else:
         _evaluate(
             env_val,

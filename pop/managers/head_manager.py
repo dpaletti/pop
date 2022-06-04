@@ -49,11 +49,11 @@ class HeadManager(Manager):
         return self._embedding
 
     @property
-    def node_attention(self):
+    def node_choice(self):
         return self._node_attention
 
     def forward(self, g: DGLHeteroGraph) -> Tuple[int, int]:
         node_embeddings: Tensor = self.embedding(g, return_mean_over_heads=True)
-        best_node: int = self.node_attention(node_embeddings)
+        best_node: int = self.node_choice(node_embeddings)
 
         return int(g.nodes[best_node].data["action"].squeeze()[-1].item()), best_node

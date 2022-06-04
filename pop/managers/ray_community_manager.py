@@ -45,11 +45,14 @@ class RayCommunityManager(CommunityManager):
     def get_state(self):
         return [
             self.embedding.state_dict(),
-            self.node_attention.state_dict(),
+            self.node_choice.state_dict(),
             self.optimizer.state_dict(),
             self.chosen_actions,
             self.losses,
         ]
+
+    def get_embedding(self):
+        return self.embedding
 
     def get_name(self):
         return self.name
@@ -63,7 +66,7 @@ class RayCommunityManager(CommunityManager):
         losses,
     ):
         self.embedding.load_state_dict(embedding_state_dict)
-        self.node_attention.state_dict(node_attention_state_dict)
+        self.node_choice.state_dict(node_attention_state_dict)
         self.optimizer.load_state_dict(optimizer_state_dict)
         self.chosen_actions = actions
         self.losses = losses

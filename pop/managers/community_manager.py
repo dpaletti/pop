@@ -51,7 +51,7 @@ class CommunityManager(Manager):
         return self._embedding
 
     @property
-    def node_attention(self):
+    def node_choice(self) -> NodeAttention:
         return self._node_attention
 
     def forward(self, g: DGLHeteroGraph) -> Tuple[int, DGLHeteroGraph, int]:
@@ -59,7 +59,7 @@ class CommunityManager(Manager):
         # -> (Nodes, Embedding Size, (optional) Batch Size)
         node_embedding: Tensor = self.embedding(g)
 
-        best_node: int = self.node_attention(node_embedding)
+        best_node: int = self.node_choice(node_embedding)
 
         g.ndata["embedding"] = node_embedding.detach()
         best_action: int = g.nodes[best_node].data["action"].item()

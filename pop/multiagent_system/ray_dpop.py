@@ -11,6 +11,8 @@ from multiagent_system.space_factorization import factor_observation
 from node_agents.ray_gcn_agent import RayGCNAgent
 import torch as th
 
+from node_agents.ray_shallow_gcn_agent import RayShallowGCNAgent
+
 
 class RayDPOP(BasePOP):
     def __init__(
@@ -41,6 +43,16 @@ class RayDPOP(BasePOP):
         self.encoded_actions: List[int] = []
         self._agents: List[RayGCNAgent] = [
             RayGCNAgent.remote(
+                agent_actions=len(action_space),
+                architecture=self.architecture["agent"],
+                node_features=self.node_features,
+                edge_features=self.edge_features,
+                name="agent_" + str(idx) + "_" + name,
+                training=training,
+                device=device,
+            )
+            if len(action_space) > 1
+            else RayShallowGCNAgent.remote(
                 agent_actions=len(action_space),
                 architecture=self.architecture["agent"],
                 node_features=self.node_features,
@@ -96,7 +108,7 @@ class RayDPOP(BasePOP):
             for encoded_action, converter in zip(
                 self.encoded_actions, self.agent_converters
             )
-        ]
+        ], self.encoded_actions
 
     def get_manager_actions(self, subgraphs: List[dgl.DGLHeteroGraph]):
         return zip(
@@ -158,15 +170,15 @@ class RayDPOP(BasePOP):
         tensorboard_dir: Optional[str],
         checkpoint_dir: Optional[str],
         reset_decay: bool = True,
+        new_name: Optional[str] = None,
+        new_env: Optional[BaseEnv] = None,
         n_jobs: int = 1,
     ):
         print("Loading Model")
-        print("tensorboard_dir: " + tensorboard_dir)
-        print("checkpoint_dir: " + checkpoint_dir)
         checkpoint = th.load(checkpoint_file)
         rayDPOP = RayDPOP(
             env=checkpoint["env"],
-            name=checkpoint["name"],
+            name=checkpoint["name"] if new_name is None else new_name,
             architecture=checkpoint["architecture"],
             training=training,
             tensorboard_dir=tensorboard_dir,
@@ -194,6 +206,7 @@ class RayDPOP(BasePOP):
         rayDPOP.trainsteps = checkpoint["trainsteps"]
 
         print("Model Loaded")
+
         return rayDPOP
 
     def save(self):

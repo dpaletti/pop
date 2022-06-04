@@ -25,6 +25,7 @@ from multiagent_system.space_factorization import (
     factor_observation,
 )
 from node_agents.utilities import from_networkx_to_dgl
+from utility import format_to_md
 
 
 class BasePOP(AgentWithConverter):
@@ -85,12 +86,12 @@ class BasePOP(AgentWithConverter):
         self.current_chosen_node: int = -1
 
         # Logging
-        Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
+        Path(checkpoint_dir).mkdir(parents=True, exist_ok=False)
         self.checkpoint_file: str = str(Path(checkpoint_dir, name + ".pt"))
 
         self.tensorboard_dir = tensorboard_dir
         if training:
-            Path(tensorboard_dir).mkdir(parents=True, exist_ok=True)
+            Path(tensorboard_dir).mkdir(parents=True, exist_ok=False)
             self.writer: Optional[SummaryWriter]
             if tensorboard_dir is not None:
                 self.writer = SummaryWriter(log_dir=tensorboard_dir)
@@ -106,6 +107,22 @@ class BasePOP(AgentWithConverter):
             conv.init_converter(action_space)
             conv.seed(seed)
             self.agent_converters.append(conv)
+
+        to_log = ""
+        for idx, agent_converter in enumerate(self.agent_converters):
+            to_log = (
+                to_log
+                + "Agent "
+                + str(idx)
+                + " has "
+                + str(len(agent_converter.all_actions))
+                + " actions\n"
+            )
+        self.writer.add_text(
+            "Action Spaces/train",
+            format_to_md(to_log),
+            self.trainsteps,
+        )
 
         self.local_actions = []
         self.factored_observation = []
@@ -155,7 +172,9 @@ class BasePOP(AgentWithConverter):
         if self.communities and not self.fixed_communities:
             raise Exception("\nDynamic Communities are not implemented yet\n")
 
-        self.local_actions = self.get_agent_actions(self.factored_observation)
+        self.local_actions, encoded_local_actions = self.get_agent_actions(
+            self.factored_observation
+        )
 
         # Each agent is assigned to its chosen (global) action
         nx.set_node_attributes(
@@ -187,15 +206,54 @@ class BasePOP(AgentWithConverter):
         self.current_chosen_node = chosen_nodes[best_manager]
 
         if self.training:
-            # Tensorboard Logging
-            self.writer.add_scalar("Encoded Action/train", best_action, self.trainsteps)
-            self.writer.add_text(
-                "Action/train",
-                str(self.converter.all_actions[best_action]),
-                self.trainsteps,
+            self.log_to_tensorboard(
+                encoded_local_actions, best_action, managed_actions, chosen_nodes
             )
 
         return best_action
+
+    def log_to_tensorboard(
+        self, encoded_agent_actions, best_action, managed_actions, chosen_nodes
+    ):
+        # Tensorboard Logging
+        self.writer.add_scalar("Encoded Action/train", best_action, self.trainsteps)
+        self.writer.add_text(
+            "Action/train",
+            format_to_md(str(self.converter.all_actions[best_action])),
+            self.trainsteps,
+        )
+        for idx, obs in enumerate(self.factored_observation):
+            self.writer.add_text(
+                "Factored Observation (" + str(idx) + ")/train",
+                format_to_md(str(obs)),
+                self.trainsteps,
+            )
+
+        for (idx, action), converter in zip(
+            enumerate(encoded_agent_actions), self.agent_converters
+        ):
+            self.writer.add_scalar(
+                "Encoded Action (Agent " + str(idx) + ")/train",
+                action,
+                self.trainsteps,
+            )
+            self.writer.add_text(
+                "Action (Agent " + str(idx) + ")/train",
+                format_to_md(str(converter.all_actions[action])),
+                self.trainsteps,
+            )
+
+        for (idx, action), node in zip(enumerate(managed_actions), chosen_nodes):
+            self.writer.add_scalar(
+                "Encoded Action (Manager " + str(idx) + ")/train",
+                action,
+                self.trainsteps,
+            )
+            self.writer.add_scalar(
+                "Chosen Node (Manager " + str(idx) + ")/train",
+                node,
+                self.trainsteps,
+            )
 
     @abstractmethod
     def teach_managers(self, manager_losses):

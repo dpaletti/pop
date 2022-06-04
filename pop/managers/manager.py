@@ -5,11 +5,12 @@ from pathlib import Path
 
 import torch.nn as nn
 import torch as th
-
+import vowpalwabbit as vw
 from pop.graph_convolutional_networks.gcn import GCN
 from pop.managers.node_attention import NodeAttention
 
 
+# TODO: evaluate contextual MABs for node choice
 class Manager(nn.Module):
     def __init__(
         self,
@@ -33,12 +34,12 @@ class Manager(nn.Module):
 
         self.log_dir = log_dir
         if log_dir:
-            Path(self.log_dir).mkdir(parents=True, exist_ok=True)
+            Path(self.log_dir).mkdir(parents=True, exist_ok=False)
             self.log_file = str(Path(self.log_dir, name + ".pt"))
 
     @property
     @abstractmethod
-    def node_attention(self) -> NodeAttention:
+    def node_choice(self) -> Union[NodeAttention, vw.Workspace]:
         ...
 
     @property
