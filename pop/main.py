@@ -254,6 +254,7 @@ def main(**kwargs):
         curriculum_envs = [env_train_0, env_train_1, env_train_2, env_train_competition]
         for idx, env in enumerate(curriculum_envs):
             set_reward(env, config, "curriculum" + str(idx))
+            env.seed(config["reproducibility"]["seed"])
     else:
         set_reward(env_train, config)
 
