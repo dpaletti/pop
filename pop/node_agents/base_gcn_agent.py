@@ -148,13 +148,14 @@ class BaseGCNAgent(ABC):
         transformed_observation: DGLHeteroGraph,
     ) -> Tuple[int, float]:
 
+        epsilon = self.exponential_decay(
+            self.architecture["max_epsilon"],
+            self.architecture["min_epsilon"],
+            self.architecture["epsilon_decay"],
+        )
         if self.training and not self.architecture["network"].get("noisy_layers"):
             # epsilon-greedy Exploration
-            if np.random.rand() <= self.exponential_decay(
-                self.architecture["max_epsilon"],
-                self.architecture["min_epsilon"],
-                self.architecture["epsilon_decay"],
-            ):
+            if np.random.rand() <= epsilon:
                 return np.random.choice(list(range(self.actions)))
 
         # Exploitation or Noisy Layers Exploration
@@ -162,11 +163,7 @@ class BaseGCNAgent(ABC):
 
         advantages: Tensor = self.q_network.advantage(graph.to(self.device))
 
-        return int(th.argmax(advantages).item()), self.exponential_decay(
-            self.architecture["max_epsilon"],
-            self.architecture["min_epsilon"],
-            self.architecture["epsilon_decay"],
-        )
+        return int(th.argmax(advantages).item()), epsilon
 
     def update_mem(
         self,
