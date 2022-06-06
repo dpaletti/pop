@@ -146,7 +146,7 @@ class BaseGCNAgent(ABC):
     def take_action(
         self,
         transformed_observation: DGLHeteroGraph,
-    ) -> int:
+    ) -> Tuple[int, float]:
 
         if self.training and not self.architecture["network"].get("noisy_layers"):
             # epsilon-greedy Exploration
@@ -162,7 +162,11 @@ class BaseGCNAgent(ABC):
 
         advantages: Tensor = self.q_network.advantage(graph.to(self.device))
 
-        return int(th.argmax(advantages).item())
+        return int(th.argmax(advantages).item()), self.exponential_decay(
+            self.architecture["max_epsilon"],
+            self.architecture["min_epsilon"],
+            self.architecture["epsilon_decay"],
+        )
 
     def update_mem(
         self,
@@ -227,7 +231,7 @@ class BaseGCNAgent(ABC):
             self.memory.push(observation, action, next_observation, reward, done)
             self.trainsteps += 1
             self.alive_steps += 1
-            if not stop_decay:
+            if not stop_decay and self.training:
                 self.decay_steps += 1
 
             # every so often the node_agents should learn from experiences

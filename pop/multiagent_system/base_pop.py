@@ -172,24 +172,29 @@ class BasePOP(AgentWithConverter):
         if self.communities and not self.fixed_communities:
             raise Exception("\nDynamic Communities are not implemented yet\n")
 
-        self.local_actions, encoded_local_actions = self.get_agent_actions(
-            self.factored_observation
-        )
+        (
+            self.local_actions,
+            encoded_local_actions,
+            current_epsilons,
+        ) = self.get_agent_actions(self.factored_observation)
 
         # Each agent is assigned to its chosen (global) action
         nx.set_node_attributes(
             graph,
             {
-                node: self.lookup_local_action(action)
+                node: {"action": self.lookup_local_action(action), "global_id": node}
                 for node, action in zip(graph.nodes, self.local_actions)
             },
-            "action",
         )
 
-        # Graph is split into one subgraph per community
+        # Splitting into communities
+        nx_subgraphs: List[nx.Graph] = []
+        for community in self.communities:
+            nx_subgraphs.append(graph.subgraph(community))
+
+        # Graph is split into one subgraph
         subgraphs: List[dgl.DGLHeteroGraph] = [
-            from_networkx_to_dgl(graph.subgraph(community), self.device)
-            for community in self.communities
+            from_networkx_to_dgl(subgraph, self.device) for subgraph in nx_subgraphs
         ]
 
         managed_actions, embedded_graphs, chosen_nodes = self.get_manager_actions(
@@ -203,17 +208,34 @@ class BasePOP(AgentWithConverter):
 
         # The head manager chooses the best action from every community
         best_action, best_manager = self.get_action(summarized_graph)
-        self.current_chosen_node = chosen_nodes[best_manager]
+
+        # Global ID of the current chosen node
+        self.current_chosen_node = (
+            subgraphs[best_manager]
+            .ndata["global_id"][chosen_nodes[best_manager]]
+            .item()
+        )
 
         if self.training:
             self.log_to_tensorboard(
-                encoded_local_actions, best_action, managed_actions, chosen_nodes
+                encoded_local_actions,
+                best_action,
+                managed_actions,
+                chosen_nodes,
+                best_manager,
+                current_epsilons,
             )
 
         return best_action
 
     def log_to_tensorboard(
-        self, encoded_agent_actions, best_action, managed_actions, chosen_nodes
+        self,
+        encoded_agent_actions,
+        best_action,
+        managed_actions,
+        chosen_nodes,
+        best_manager,
+        current_epsilons,
     ):
         # Tensorboard Logging
         self.writer.add_scalar("Encoded Action/train", best_action, self.trainsteps)
@@ -229,8 +251,8 @@ class BasePOP(AgentWithConverter):
                 self.trainsteps,
             )
 
-        for (idx, action), converter in zip(
-            enumerate(encoded_agent_actions), self.agent_converters
+        for (idx, action), converter, current_epsilons in zip(
+            enumerate(encoded_agent_actions), self.agent_converters, current_epsilons
         ):
             self.writer.add_scalar(
                 "Encoded Action (Agent " + str(idx) + ")/train",
@@ -240,6 +262,11 @@ class BasePOP(AgentWithConverter):
             self.writer.add_text(
                 "Action (Agent " + str(idx) + ")/train",
                 format_to_md(str(converter.all_actions[action])),
+                self.trainsteps,
+            )
+            self.writer.add_scalar(
+                "Epsilon (Agent " + str(idx) + ")/train",
+                current_epsilons,
                 self.trainsteps,
             )
 
@@ -256,9 +283,13 @@ class BasePOP(AgentWithConverter):
             )
 
         self.writer.add_scalar(
-            "Chosen Node/train",
-            self.current_chosen_node,
+            "Chosen Manager/train",
+            best_manager,
             self.trainsteps,
+        )
+
+        self.writer.add_scalar(
+            "Chosen Node/ train", self.current_chosen_node, self.trainsteps
         )
 
     @abstractmethod

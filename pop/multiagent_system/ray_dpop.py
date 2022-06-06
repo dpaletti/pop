@@ -70,7 +70,8 @@ class RayDPOP(BasePOP):
         # Managers Initializations
         self._managers: List[RayCommunityManager] = [
             RayCommunityManager.remote(
-                node_features=self.node_features + 1,  # Node Features + Action
+                node_features=self.node_features
+                + 2,  # Node Features + Action + Global Node Id
                 edge_features=self.edge_features,
                 architecture=self.architecture["manager"],
                 name="manager_" + str(idx) + "_" + name,
@@ -100,18 +101,24 @@ class RayDPOP(BasePOP):
         return self._managers
 
     def get_agent_actions(self, factored_observation):
-        self.encoded_actions = ray.get(
-            [
-                agent.take_action.remote(transformed_observation=observation)
-                for observation, agent in zip(factored_observation, self.agents)
-            ]
-        )
-        return [
-            converter.all_actions[encoded_action]
-            for encoded_action, converter in zip(
-                self.encoded_actions, self.agent_converters
+        self.encoded_actions, current_epsilons = zip(
+            *ray.get(
+                [
+                    agent.take_action.remote(transformed_observation=observation)
+                    for observation, agent in zip(factored_observation, self.agents)
+                ]
             )
-        ], self.encoded_actions
+        )
+        return (
+            [
+                converter.all_actions[encoded_action]
+                for encoded_action, converter in zip(
+                    self.encoded_actions, self.agent_converters
+                )
+            ],
+            self.encoded_actions,
+            current_epsilons,
+        )
 
     def get_manager_actions(self, subgraphs: List[dgl.DGLHeteroGraph]):
         return zip(
@@ -207,6 +214,7 @@ class RayDPOP(BasePOP):
         rayDPOP.learning_steps = checkpoint["learning_steps"]
         rayDPOP.alive_steps = checkpoint["alive_steps"]
         rayDPOP.trainsteps = checkpoint["trainsteps"]
+        rayDPOP.episodes = checkpoint["episodes"]
 
         print("Model Loaded")
 
@@ -277,6 +285,7 @@ class RayDPOP(BasePOP):
             "learning_steps": self.learning_steps,
             "trainsteps": self.trainsteps,
             "alive_steps": self.alive_steps,
+            "episodes": self.episodes,
         }
         th.save(
             checkpoint,

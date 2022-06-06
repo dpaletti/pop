@@ -1,4 +1,4 @@
-from typing import Union, Optional
+from typing import Union, Optional, Tuple
 
 import networkx as nx
 import torch as th
@@ -68,8 +68,8 @@ class RayShallowGCNAgent(BaseGCNAgent):
     def take_action(
         self,
         transformed_observation: DGLHeteroGraph,
-    ) -> int:
-        return 0
+    ) -> Tuple[int, float]:
+        return 0, 0  # Action chosen always zero and Epsilon always zero
 
     def step(
         self,
