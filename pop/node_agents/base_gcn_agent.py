@@ -163,7 +163,10 @@ class BaseGCNAgent(ABC):
 
         advantages: Tensor = self.q_network.advantage(graph.to(self.device))
 
-        return int(th.argmax(advantages).item()), epsilon
+        return (
+            int(th.argmax(advantages).item()),
+            epsilon,
+        )
 
     def update_mem(
         self,
