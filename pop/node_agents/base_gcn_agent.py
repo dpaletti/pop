@@ -156,7 +156,7 @@ class BaseGCNAgent(ABC):
         if self.training and not self.architecture["network"].get("noisy_layers"):
             # epsilon-greedy Exploration
             if np.random.rand() <= epsilon:
-                return np.random.choice(list(range(self.actions)))
+                return np.random.choice(list(range(self.actions))), epsilon
 
         # Exploitation or Noisy Layers Exploration
         graph = transformed_observation  # extract output of converted obs

@@ -1,0 +1,34 @@
+[reproducibility]
+seed = 0
+device = "cpu"
+
+[model]
+name = "curriculum_xxs"
+home = "/home/l2rpn/"
+architecture_path = "{{home}}/pop_configs/architectures/dpop_agent_xxs_noisy.json"
+data_dir = "{{home}}/data/pop_runs"
+checkpoint_dir = "{{data_dir}}/checkpoint/{{name}}"
+
+[training]
+steps = 1e5
+train = true
+tensorboard_dir = "{{data_dir}}/tensorboard/{{name}}/"
+curriculum = true
+
+[evaluation]
+episodes = 100
+evaluation_dir = "{{data_dir}}/evaluation/{{name}}"
+
+[loading]
+load = false
+load_dir = "{{checkpoint_dir}}/{{name}}.pt"
+
+[environment]
+name = "rte_case14_realistic"
+
+[environment.reward]
+CloseToOverflow = 0.7
+Bridge = 0.5
+Redisp = 0.5
+LinesCapacity = 0.2
+LinesReconnected = 0.2
