@@ -68,6 +68,5 @@ class NodeAttention(nn.Module):
 
         # -> Scalar
         best_node = int(th.argmax(mean_over_batch))
-        print(best_node)
 
         return best_node
