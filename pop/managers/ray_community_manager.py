@@ -6,6 +6,8 @@ from managers.community_manager import CommunityManager
 
 import torch as th
 
+from torchinfo import summary
+
 
 @ray.remote
 class RayCommunityManager(CommunityManager):
@@ -50,6 +52,9 @@ class RayCommunityManager(CommunityManager):
             self.chosen_actions,
             self.losses,
         ]
+
+    def get_summary(self):
+        return summary(self)
 
     def get_embedding(self):
         return self.embedding

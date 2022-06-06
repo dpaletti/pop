@@ -10,6 +10,7 @@ from pop.managers.manager import Manager
 from pop.managers.node_attention import NodeAttention
 
 import torch as th
+from torchinfo import summary
 
 
 class HeadManager(Manager):
@@ -51,6 +52,9 @@ class HeadManager(Manager):
     @property
     def node_choice(self):
         return self._node_attention
+
+    def get_summary(self):
+        return summary(self)
 
     def forward(self, g: DGLHeteroGraph) -> Tuple[int, int]:
         node_embeddings: Tensor = self.embedding(g, return_mean_over_heads=True)

@@ -25,7 +25,7 @@ from multiagent_system.space_factorization import (
     factor_observation,
 )
 from node_agents.utilities import from_networkx_to_dgl
-from utility import format_to_md
+from utilities import format_to_md
 
 
 class BasePOP(AgentWithConverter):
@@ -278,9 +278,6 @@ class BasePOP(AgentWithConverter):
             loss = sum(community_losses) / len(community_losses)
 
             manager_losses.append(loss)
-            # optimizer.zero_grad()
-            # loss.backward()
-            # optimizer.step()
 
         self.teach_managers(manager_losses)
 

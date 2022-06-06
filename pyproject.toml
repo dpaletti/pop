@@ -21,6 +21,7 @@ pathos = "^0.2.8"
 ray = {extras = ["rllib"], version = "^1.12.1"}
 dm-tree = "^0.1.7"
 vowpalwabbit = "^9.1.0"
+torchinfo = "^1.7.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

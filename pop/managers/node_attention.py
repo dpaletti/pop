@@ -60,10 +60,14 @@ class NodeAttention(nn.Module):
             dim=-1
         )
 
-        # -> (Nodes, 1)
-        mean_over_batch = th.mean(projected_attention, dim=-1)
+        if len(projected_attention.shape) > 1:
+            # -> (Nodes, 1)
+            mean_over_batch = th.mean(projected_attention, dim=-1)
+        else:
+            mean_over_batch = projected_attention
 
         # -> Scalar
         best_node = int(th.argmax(mean_over_batch))
+        print(best_node)
 
         return best_node

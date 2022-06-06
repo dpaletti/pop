@@ -29,7 +29,7 @@ import argparse
 import importlib
 import pprint
 
-from utility import format_to_md
+from utilities import format_to_md
 
 
 def set_l2rpn_reward(env, alarm: bool = True):

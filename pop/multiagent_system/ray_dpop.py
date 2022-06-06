@@ -12,6 +12,9 @@ from node_agents.ray_gcn_agent import RayGCNAgent
 import torch as th
 
 from node_agents.ray_shallow_gcn_agent import RayShallowGCNAgent
+from torchinfo import summary
+
+from utilities import format_to_md
 
 
 class RayDPOP(BasePOP):
