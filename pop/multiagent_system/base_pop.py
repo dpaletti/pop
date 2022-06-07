@@ -95,6 +95,21 @@ class BasePOP(AgentWithConverter):
             self.writer: Optional[SummaryWriter]
             if tensorboard_dir is not None:
                 self.writer = SummaryWriter(log_dir=tensorboard_dir)
+                to_log = ""
+                for idx, agent_converter in enumerate(self.agent_converters):
+                    to_log = (
+                        to_log
+                        + "Agent "
+                        + str(idx)
+                        + " has "
+                        + str(len(agent_converter.all_actions))
+                        + " actions\n"
+                    )
+                    self.writer.add_text(
+                        "Action Spaces/train",
+                        format_to_md(to_log),
+                        self.trainsteps,
+                    )
             else:
                 self.writer = None
 
@@ -107,22 +122,6 @@ class BasePOP(AgentWithConverter):
             conv.init_converter(action_space)
             conv.seed(seed)
             self.agent_converters.append(conv)
-
-        to_log = ""
-        for idx, agent_converter in enumerate(self.agent_converters):
-            to_log = (
-                to_log
-                + "Agent "
-                + str(idx)
-                + " has "
-                + str(len(agent_converter.all_actions))
-                + " actions\n"
-            )
-        self.writer.add_text(
-            "Action Spaces/train",
-            format_to_md(to_log),
-            self.trainsteps,
-        )
 
         self.local_actions = []
         self.factored_observation = []
