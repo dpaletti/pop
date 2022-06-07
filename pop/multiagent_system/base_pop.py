@@ -24,7 +24,7 @@ from multiagent_system.space_factorization import (
     HashableAction,
     factor_observation,
 )
-from node_agents.utilities import from_networkx_to_dgl
+from node_agents.utilities import from_networkx_to_dgl, add_self_loop
 from utilities import format_to_md
 
 
@@ -85,6 +85,19 @@ class BasePOP(AgentWithConverter):
         self.learning_steps: int = 0
         self.current_chosen_node: int = -1
 
+        # Agents Initialization
+        self.action_spaces, self.action_lookup_table = factor_action_space(env)
+
+        self.agent_converters: List[IdToAct] = []
+        for action_space in self.action_spaces:
+            conv = IdToAct(env.action_space)
+            conv.init_converter(action_space)
+            conv.seed(seed)
+            self.agent_converters.append(conv)
+
+        self.local_actions = []
+        self.factored_observation = []
+
         if training:
             # Logging
             Path(checkpoint_dir).mkdir(parents=True, exist_ok=False)
@@ -112,19 +125,6 @@ class BasePOP(AgentWithConverter):
                     )
             else:
                 self.writer = None
-
-        # Agents Initialization
-        self.action_spaces, self.action_lookup_table = factor_action_space(env)
-
-        self.agent_converters: List[IdToAct] = []
-        for action_space in self.action_spaces:
-            conv = IdToAct(env.action_space)
-            conv.init_converter(action_space)
-            conv.seed(seed)
-            self.agent_converters.append(conv)
-
-        self.local_actions = []
-        self.factored_observation = []
 
         # Community Detector Initialization
         self.community_detector = CommunityDetector(seed)
@@ -188,13 +188,25 @@ class BasePOP(AgentWithConverter):
 
         # Splitting into communities
         nx_subgraphs: List[nx.Graph] = []
-        for community in self.communities:
-            nx_subgraphs.append(graph.subgraph(community))
+        zero_edges_nx_subgraphs: List[nx.Graph] = []
+        positions = []
+        for idx, community in enumerate(self.communities):
+            sub_g = graph.subgraph(community)
+            if sub_g.number_of_edges == 0:
+                positions.append(idx)
+                zero_edges_nx_subgraphs.append(sub_g)
+            else:
+                nx_subgraphs.append(sub_g)
 
-        # Graph is split into one subgraph
         subgraphs: List[dgl.DGLHeteroGraph] = [
             from_networkx_to_dgl(subgraph, self.device) for subgraph in nx_subgraphs
         ]
+
+        feature_schema = subgraphs[0].edata
+        for zero_edge_subg, position in zip(zero_edges_nx_subgraphs, positions):
+            subgraphs.insert(
+                position, add_self_loop(zero_edge_subg, feature_schema, self.device)
+            )
 
         managed_actions, embedded_graphs, chosen_nodes = self.get_manager_actions(
             subgraphs
@@ -237,7 +249,12 @@ class BasePOP(AgentWithConverter):
         current_epsilons,
     ):
         # Tensorboard Logging
-        self.writer.add_scalar("Encoded Action/train", best_action, self.trainsteps)
+        self.writer.add_scalar(
+            "Encoded Action/train",
+            best_action,
+            self.trainsteps,
+        )
+
         self.writer.add_text(
             "Action/train",
             format_to_md(str(self.converter.all_actions[best_action])),
