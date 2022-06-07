@@ -85,12 +85,12 @@ class BasePOP(AgentWithConverter):
         self.learning_steps: int = 0
         self.current_chosen_node: int = -1
 
-        # Logging
-        Path(checkpoint_dir).mkdir(parents=True, exist_ok=False)
-        self.checkpoint_file: str = str(Path(checkpoint_dir, name + ".pt"))
-
-        self.tensorboard_dir = tensorboard_dir
         if training:
+            # Logging
+            Path(checkpoint_dir).mkdir(parents=True, exist_ok=False)
+            self.checkpoint_file: str = str(Path(checkpoint_dir, name + ".pt"))
+
+            self.tensorboard_dir = tensorboard_dir
             Path(tensorboard_dir).mkdir(parents=True, exist_ok=False)
             self.writer: Optional[SummaryWriter]
             if tensorboard_dir is not None:
