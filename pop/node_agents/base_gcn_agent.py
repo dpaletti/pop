@@ -226,13 +226,13 @@ class BaseGCNAgent(ABC):
         if done:
             self.episodes += 1
             self.trainsteps += 1
+            if not stop_decay and self.training:
+                self.decay_steps += 1
 
         else:
             self.memory.push(observation, action, next_observation, reward, done)
             self.trainsteps += 1
             self.alive_steps += 1
-            if not stop_decay and self.training:
-                self.decay_steps += 1
 
             # every so often the node_agents should learn from experiences
             if self.trainsteps % self.architecture["learning_frequency"] == 0:

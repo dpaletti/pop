@@ -42,6 +42,7 @@ class RayCommunityManager(CommunityManager):
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+
         self.losses.append(loss.data)
 
     def get_state(self):

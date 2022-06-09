@@ -221,6 +221,7 @@ def main(**kwargs):
     env_val = grid2op.make(
         nm_env + "_val10",
         reward_class=CombinedScaledReward,  # CARE Multifolder bugs the runner
+        diffculty="competition",
     )
     curriculum_envs = []
     if config["training"]["train"] and config["training"]["curriculum"]:
@@ -274,6 +275,9 @@ def main(**kwargs):
             device=config["reproducibility"]["device"],
             tensorboard_dir=config["training"]["tensorboard_dir"],
             checkpoint_dir=config["model"]["checkpoint_dir"],
+            reset_decay=config["training"]["reset_decay"],
+            new_name=config["model"]["name"],
+            new_env=env_train if config["training"]["train"] else env_val,
         )
     elif not config["training"]["curriculum"]:
         # Instantiate agent ex novo
