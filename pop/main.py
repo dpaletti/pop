@@ -221,7 +221,7 @@ def main(**kwargs):
     env_val = grid2op.make(
         nm_env + "_val10",
         reward_class=CombinedScaledReward,  # CARE Multifolder bugs the runner
-        diffculty="competition",
+        difficulty="competition",
     )
     curriculum_envs = []
     if config["training"]["train"] and config["training"]["curriculum"]:
