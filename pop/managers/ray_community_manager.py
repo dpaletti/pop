@@ -47,6 +47,7 @@ class RayCommunityManager(CommunityManager):
         )
         self.optimizer.zero_grad()
         loss.backward()
+        th.nn.utils.clip_grad_norm_(self.parameters(), self.architecture["max_clip"])
         self.optimizer.step()
 
         self.losses.append(loss.data)

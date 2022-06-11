@@ -191,6 +191,9 @@ class RayDPOP(BasePOP):
 
         self.head_manager_optimizer.zero_grad()
         head_manager_loss.backward()
+        th.nn.utils.clip_grad_norm_(
+            self.head_manager.parameters(), self.head_manager.architecture["max_clip"]
+        )
         self.head_manager_optimizer.step()
 
         # Summary Writer is supposed to not slow down training

@@ -46,7 +46,8 @@
       "dropout": 0.0,
       "embedding_dimension": 128,
       "batch_size": 1,
-      "learning_rate": 1e-2
+      "learning_rate": 1e-2,
+      "max_clip": 1
     },
   "head_manager":
            {
@@ -63,6 +64,7 @@
     "dropout": 0.0,
     "embedding_dimension": 256,
     "batch_size": 1,
-    "learning_rate": 1e-2
+    "learning_rate": 1e-2,
+    "max_clip": 1
   }
 }
