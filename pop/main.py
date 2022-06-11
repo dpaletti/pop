@@ -1,4 +1,5 @@
 import toml
+import json
 from pathlib import Path
 from grid2op.Agent import BaseAgent
 from grid2op.Environment import BaseEnv
@@ -304,6 +305,7 @@ def main(**kwargs):
         )
 
     if config["training"]["train"]:
+        agent.writer.add_hparams
         if not config["training"]["curriculum"]:
             add_recap_to_tensorboard(agent, config)
             train(

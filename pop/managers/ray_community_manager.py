@@ -16,6 +16,7 @@ class RayCommunityManager(CommunityManager):
         node_features: int,
         edge_features: int,
         architecture: Union[str, dict],
+        training: bool,
         name: str,
     ):
         CommunityManager.__init__(
@@ -25,6 +26,7 @@ class RayCommunityManager(CommunityManager):
             architecture=architecture,
             name=name,
             log_dir=None,
+            training=training,
         )
 
         # Logging
@@ -36,9 +38,13 @@ class RayCommunityManager(CommunityManager):
             self.parameters(), lr=self.architecture["learning_rate"]
         )
 
-    def learn(self, loss: float):
-        loss = th.Tensor(loss)
-
+    def learn(self, reward):
+        loss = (
+            self.node_choice.attention_distribution.log_prob(
+                th.tensor(self.current_best_node)
+            )
+            * reward
+        )
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()

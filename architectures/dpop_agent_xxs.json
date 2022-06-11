@@ -28,8 +28,8 @@
         "max_beta": 1.0,
         "min_beta": 0.0,
         "beta_decay": 200,
-        "batch_size": 288,
-        "replay_memory_size": 100000,
+        "batch_size": 4,
+        "replay_memory_size": 16,
         "converter_kwargs": {}
     },
   "manager":

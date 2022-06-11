@@ -20,7 +20,7 @@ class HeadManager(Manager):
         architecture: Union[str, dict],
         name: str,
         log_dir: str,
-        **kwargs  # Compliance with Manager signature
+        training: bool,
     ):
         super(HeadManager, self).__init__(
             node_features=node_features,
@@ -28,6 +28,7 @@ class HeadManager(Manager):
             architecture=architecture,
             name=name,
             log_dir=log_dir,
+            training=training,
         )
 
         self.architecture = (
@@ -42,7 +43,7 @@ class HeadManager(Manager):
         )
 
         self._node_attention = NodeAttention(
-            architecture, self.embedding.get_embedding_dimension()
+            architecture, self.embedding.get_embedding_dimension(), training=training
         )
 
     @property
@@ -58,6 +59,7 @@ class HeadManager(Manager):
 
     def forward(self, g: DGLHeteroGraph) -> Tuple[int, int]:
         node_embeddings: Tensor = self.embedding(g, return_mean_over_heads=True)
-        best_node: int = self.node_choice(node_embeddings)
+        self.current_best_node: int = self.node_choice(node_embeddings)
+        best_node = int(self.current_best_node)
 
         return int(g.nodes[best_node].data["action"].squeeze()[-1].item()), best_node

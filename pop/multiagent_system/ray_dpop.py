@@ -10,11 +10,9 @@ from multiagent_system.base_pop import BasePOP
 from multiagent_system.space_factorization import factor_observation
 from node_agents.ray_gcn_agent import RayGCNAgent
 import torch as th
+from itertools import repeat
 
 from node_agents.ray_shallow_gcn_agent import RayShallowGCNAgent
-from torchinfo import summary
-
-from utilities import format_to_md
 
 
 class RayDPOP(BasePOP):
@@ -27,6 +25,7 @@ class RayDPOP(BasePOP):
         tensorboard_dir: Optional[str],
         checkpoint_dir: Optional[str],
         seed: int,
+        manager_loss: str = "mean",
         device: Optional[str] = None,
         n_jobs: Optional[int] = None,
     ):
@@ -38,6 +37,7 @@ class RayDPOP(BasePOP):
             tensorboard_dir=tensorboard_dir,
             checkpoint_dir=checkpoint_dir,
             seed=seed,
+            manager_loss=manager_loss,
             device=device,
             n_jobs=n_jobs,
         )
@@ -75,6 +75,7 @@ class RayDPOP(BasePOP):
                 edge_features=self.edge_features,
                 architecture=self.architecture["manager"],
                 name="manager_" + str(idx) + "_" + name,
+                training=self.training,
             )
             for idx, _ in enumerate(self.communities)
         ]
@@ -85,6 +86,7 @@ class RayDPOP(BasePOP):
             architecture=self.architecture["head_manager"],
             name="head_manager_" + "_" + name,
             log_dir=self.checkpoint_dir,
+            training=self.training,
         ).to(device)
 
         self.head_manager_optimizer: th.optim.Optimizer = th.optim.Adam(
@@ -164,13 +166,35 @@ class RayDPOP(BasePOP):
         )
         return losses, list(map(lambda x: not (x is None), losses))
 
-    def teach_managers(self, manager_losses):
+    def teach_managers(self, reward):
+        # TODO: see https://arxiv.org/abs/1506.05254
+        # TODO: see score function in https://pytorch.org/docs/stable/distributions.html
         ray.get(
             [
-                manager.learn.remote(loss=loss)
-                for manager, loss in zip(self.managers, manager_losses)
+                manager.learn.remote(reward=r)
+                for manager, r in zip(self.managers, repeat(reward, len(self.managers)))
             ]
         )
+
+    def learn(self, reward: float, losses: List[th.Tensor]):
+        if not self.fixed_communities:
+            raise Exception("In Learn() we assume fixed communities")
+
+        self.teach_managers(reward)
+
+        head_manager_loss = (
+            self.head_manager.node_choice.attention_distribution.log_prob(
+                th.tensor(self.head_manager.current_best_node)
+            )
+            * reward
+        )
+
+        self.head_manager_optimizer.zero_grad()
+        head_manager_loss.backward()
+        self.head_manager_optimizer.step()
+
+        # Summary Writer is supposed to not slow down training
+        self.save_to_tensorboard(head_manager_loss.item(), reward)
 
     @staticmethod
     def load(
@@ -211,7 +235,7 @@ class RayDPOP(BasePOP):
             checkpoint["head_manager"]["optimizer_state"]
         )
 
-        rayDPOP.learning_steps = checkpoint["learning_steps"]
+        rayDPOP.managers_learning_steps = checkpoint["learning_steps"]
         rayDPOP.alive_steps = checkpoint["alive_steps"]
         rayDPOP.trainsteps = checkpoint["trainsteps"]
         rayDPOP.episodes = checkpoint["episodes"]
@@ -282,7 +306,7 @@ class RayDPOP(BasePOP):
             "agents": agents_dict,
             "managers": managers_dict,
             "head_manager": head_manager_dict,
-            "learning_steps": self.learning_steps,
+            "learning_steps": self.managers_learning_steps,
             "trainsteps": self.trainsteps,
             "alive_steps": self.alive_steps,
             "episodes": self.episodes,

@@ -38,6 +38,7 @@ class BasePOP(AgentWithConverter):
         tensorboard_dir: Optional[str],
         checkpoint_dir: Optional[str],
         seed: int,
+        manager_loss: str = "mean",
         device: Optional[str] = None,
         n_jobs: Optional[int] = None,
     ):
@@ -74,6 +75,7 @@ class BasePOP(AgentWithConverter):
         self.training = training
         eb_sched = self.architecture.get("epsilon_beta_scheduling")
         self.epsilon_beta_scheduling = eb_sched if not eb_sched is None else False
+        self.manager_loss = manager_loss
 
         # Checkpointing
         self.checkpoint_dir = checkpoint_dir
@@ -82,8 +84,9 @@ class BasePOP(AgentWithConverter):
         self.trainsteps: int = 0
         self.episodes: int = 0
         self.alive_steps: int = 0
-        self.learning_steps: int = 0
+        self.managers_learning_steps: int = 0
         self.current_chosen_node: int = -1
+        self.current_chosen_manager: int = -1
 
         # Agents Initialization
         self.action_spaces, self.action_lookup_table = factor_action_space(env)
@@ -218,12 +221,12 @@ class BasePOP(AgentWithConverter):
         ).to(self.device)
 
         # The head manager chooses the best action from every community
-        best_action, best_manager = self.get_action(summarized_graph)
+        best_action, self.current_chosen_manager = self.get_action(summarized_graph)
 
         # Global ID of the current chosen node
         self.current_chosen_node = (
-            subgraphs[best_manager]
-            .ndata["global_id"][chosen_nodes[best_manager]]
+            subgraphs[self.current_chosen_manager]
+            .ndata["global_id"][chosen_nodes[self.current_chosen_manager]]
             .item()
         )
 
@@ -233,7 +236,6 @@ class BasePOP(AgentWithConverter):
                 best_action,
                 managed_actions,
                 chosen_nodes,
-                best_manager,
                 current_epsilons,
             )
 
@@ -245,24 +247,23 @@ class BasePOP(AgentWithConverter):
         best_action,
         managed_actions,
         chosen_nodes,
-        best_manager,
         current_epsilons,
     ):
         # Tensorboard Logging
         self.writer.add_scalar(
-            "Encoded Action/train",
+            "Encoded Action/Head Manager",
             best_action,
             self.trainsteps,
         )
 
         self.writer.add_text(
-            "Action/train",
+            "Action/Head Manager",
             format_to_md(str(self.converter.all_actions[best_action])),
             self.trainsteps,
         )
         for idx, obs in enumerate(self.factored_observation):
             self.writer.add_text(
-                "Factored Observation (" + str(idx) + ")/train",
+                "Factored Observation/Agent " + str(idx),
                 format_to_md(str(obs)),
                 self.trainsteps,
             )
@@ -271,70 +272,50 @@ class BasePOP(AgentWithConverter):
             enumerate(encoded_agent_actions), self.agent_converters, current_epsilons
         ):
             self.writer.add_scalar(
-                "Encoded Action (Agent " + str(idx) + ")/train",
+                "Encoded Action/Agent " + str(idx),
                 action,
                 self.trainsteps,
             )
             self.writer.add_text(
-                "Action (Agent " + str(idx) + ")/train",
+                "Action/Agent " + str(idx),
                 format_to_md(str(converter.all_actions[action])),
                 self.trainsteps,
             )
             self.writer.add_scalar(
-                "Epsilon (Agent " + str(idx) + ")/train",
+                "Epsilon/Agent " + str(idx),
                 current_epsilons,
                 self.trainsteps,
             )
 
         for (idx, action), node in zip(enumerate(managed_actions), chosen_nodes):
             self.writer.add_scalar(
-                "Encoded Action (Manager " + str(idx) + ")/train",
+                "Encoded Action/Manager " + str(idx),
                 action,
                 self.trainsteps,
             )
             self.writer.add_scalar(
-                "Chosen Node (Manager " + str(idx) + ")/train",
+                "Chosen Node/Manager " + str(idx),
                 node,
                 self.trainsteps,
             )
 
         self.writer.add_scalar(
-            "Chosen Manager/train",
-            best_manager,
+            "Head Manager/Chosen Manager",
+            self.current_chosen_manager,
             self.trainsteps,
         )
 
         self.writer.add_scalar(
-            "Chosen Node/ train", self.current_chosen_node, self.trainsteps
+            "Head Manager/Chosen Node", self.current_chosen_node, self.trainsteps
         )
 
     @abstractmethod
     def teach_managers(self, manager_losses):
         ...
 
+    @abstractmethod
     def learn(self, reward: float, losses: List[th.Tensor]):
-        if not self.fixed_communities:
-            raise Exception("In Learn() we assume fixed communities")
-        manager_losses = []
-        for community in self.communities:
-            community_losses = [
-                agent_loss
-                for idx, agent_loss in enumerate(losses)
-                if idx in community  # !! HERE we are assuming fixed communities
-            ]
-            loss = sum(community_losses) / len(community_losses)
-
-            manager_losses.append(loss)
-
-        self.teach_managers(manager_losses)
-
-        self.head_manager_optimizer.zero_grad()
-        head_manager_loss = th.mean(th.stack(manager_losses))
-        head_manager_loss.backward()
-        self.head_manager_optimizer.zero_grad()
-
-        # Summary Writer is supposed to not slow down training
-        self.save_to_tensorboard(head_manager_loss.mean().item(), reward)
+        ...
 
     @abstractmethod
     def step_agents(self, next_observation, reward, done):
@@ -349,7 +330,7 @@ class BasePOP(AgentWithConverter):
         if done:
             if self.writer is not None:
                 self.writer.add_scalar(
-                    "Steps Alive per Episode", self.alive_steps, self.episodes
+                    "POP/Steps Alive per Episode", self.alive_steps, self.episodes
                 )
             self.episodes += 1
             self.alive_steps = 0
@@ -359,17 +340,16 @@ class BasePOP(AgentWithConverter):
             losses, have_learnt = self.step_agents(next_observation, reward, done)
             self.trainsteps += 1
             self.alive_steps += 1
-            if all(have_learnt):
-                self.learn(reward, losses)
-                self.learning_steps += 1
+            self.learn(reward, losses)
+            self.managers_learning_steps += 1
 
     @abstractmethod
     def save(self):
         ...
 
     def save_to_tensorboard(self, loss: float, reward: float) -> None:
-        self.writer.add_scalar("Loss/train", loss, self.trainsteps)
-        self.writer.add_scalar("Reward/train", reward, self.trainsteps)
+        self.writer.add_scalar("Head Manager/Loss", loss, self.trainsteps)
+        self.writer.add_scalar("POP/Reward", reward, self.trainsteps)
 
     @staticmethod
     @abstractmethod

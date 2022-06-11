@@ -3,6 +3,7 @@ import json
 
 from dgl import DGLHeteroGraph
 from torch import Tensor
+import torch as th
 from pop.graph_convolutional_networks.egat_gcn import EgatGCN
 from pop.managers.manager import Manager
 from pop.managers.node_attention import NodeAttention
@@ -19,6 +20,7 @@ class CommunityManager(Manager):
         architecture: Union[str, dict],
         name: str,
         log_dir: Optional[str],
+        training: bool,
         **kwargs
     ):
         super(CommunityManager, self).__init__(
@@ -27,7 +29,9 @@ class CommunityManager(Manager):
             architecture=architecture,
             name=name,
             log_dir=log_dir,
+            training=training,
         )
+
         self.architecture = (
             json.load(open(architecture)) if type(architecture) is str else architecture
         )
@@ -40,7 +44,7 @@ class CommunityManager(Manager):
         ).float()
 
         self._node_attention = NodeAttention(
-            architecture, self.embedding.get_embedding_dimension()
+            architecture, self.embedding.get_embedding_dimension(), training=training
         )
 
     def get_embedding_dimension(self):
@@ -59,9 +63,9 @@ class CommunityManager(Manager):
         # -> (Nodes, Embedding Size, (optional) Batch Size)
         node_embedding: Tensor = self.embedding(g)
 
-        best_node: int = self.node_choice(node_embedding)
+        self.current_best_node: int = self.node_choice(node_embedding)
 
         g.ndata["embedding"] = node_embedding.detach()
-        best_action: int = g.nodes[best_node].data["action"].item()
+        best_action: int = g.nodes[self.current_best_node].data["action"].item()
 
-        return best_action, g, best_node
+        return best_action, g, self.current_best_node

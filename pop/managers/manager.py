@@ -19,6 +19,7 @@ class Manager(nn.Module):
         architecture: Union[str, dict],
         name: str,
         log_dir: Optional[str],
+        training: bool,
         **kwargs
     ):
         super(Manager, self).__init__()
@@ -31,6 +32,8 @@ class Manager(nn.Module):
             else architecture
         )
         self.name = name
+        self.current_best_node: int = -1
+        self.training = training
 
         self.log_dir = log_dir
         if log_dir:
