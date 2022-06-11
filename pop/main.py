@@ -32,6 +32,10 @@ import pprint
 
 from utilities import format_to_md
 
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning)
+
 
 def set_l2rpn_reward(env, alarm: bool = True):
     combined_reward: CombinedScaledReward = env.get_reward_instance()
