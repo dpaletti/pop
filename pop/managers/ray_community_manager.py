@@ -40,7 +40,7 @@ class RayCommunityManager(CommunityManager):
 
     def learn(self, reward):
         loss = (
-            self.node_choice.attention_distribution.log_prob(
+            -self.node_choice.attention_distribution.log_prob(
                 th.tensor(self.current_best_node)
             )
             * reward

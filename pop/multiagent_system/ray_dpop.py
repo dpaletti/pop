@@ -182,8 +182,8 @@ class RayDPOP(BasePOP):
 
         self.teach_managers(reward)
 
-        head_manager_loss = (
-            self.head_manager.node_choice.attention_distribution.log_prob(
+        head_manager_loss: th.Tensor = (
+            -self.head_manager.node_choice.attention_distribution.log_prob(
                 th.tensor(self.head_manager.current_best_node)
             )
             * reward
