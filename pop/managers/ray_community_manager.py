@@ -33,24 +33,36 @@ class RayCommunityManager(CommunityManager):
         self.chosen_actions: List[int] = []
         self.losses: List[float] = []
 
+        self.mini_batch: List[tuple] = []
+
         # Optimizer
         self.optimizer = th.optim.Adam(
             self.parameters(), lr=self.architecture["learning_rate"]
         )
 
     def learn(self, reward):
-        loss = (
-            -self.node_choice.attention_distribution.log_prob(
-                th.tensor(self.current_best_node)
-            )
-            * reward
+        self.mini_batch.append(
+            (self.node_choice.attention_distribution, self.current_best_node, reward)
         )
-        self.optimizer.zero_grad()
-        loss.backward()
-        th.nn.utils.clip_grad_norm_(self.parameters(), self.architecture["max_clip"])
-        self.optimizer.step()
+        if len(self.mini_batch) >= self.architecture["batch_size"]:
+            losses = [
+                -distribution.log_prob(th.tensor(node)) * reward
+                for (distribution, node, reward) in self.mini_batch
+            ]
+            loss = losses[0]
+            for _loss in losses[1:]:
+                loss += _loss
+            loss /= len(losses)
 
-        self.losses.append(loss.data)
+            self.optimizer.zero_grad()
+            loss.backward()
+            th.nn.utils.clip_grad_norm_(
+                self.parameters(), self.architecture["max_clip"]
+            )
+            self.optimizer.step()
+
+            self.losses.append(loss.data)
+            self.mini_batch = []
 
     def get_state(self):
         return [

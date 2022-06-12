@@ -36,6 +36,7 @@ class Manager(nn.Module):
         self.training = training
 
         self.log_dir = log_dir
+
         if log_dir:
             Path(self.log_dir).mkdir(parents=True, exist_ok=True)
             self.log_file = str(Path(self.log_dir, name + ".pt"))

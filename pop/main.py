@@ -35,6 +35,7 @@ from utilities import format_to_md
 import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning)
+th.autograd.set_detect_anomaly(True)
 
 
 def set_l2rpn_reward(env, alarm: bool = True):

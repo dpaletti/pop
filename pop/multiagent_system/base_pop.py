@@ -26,6 +26,7 @@ from multiagent_system.space_factorization import (
 )
 from node_agents.utilities import from_networkx_to_dgl, add_self_loop
 from utilities import format_to_md
+import matplotlib.pyplot as plt
 
 
 class BasePOP(AgentWithConverter):
@@ -87,9 +88,16 @@ class BasePOP(AgentWithConverter):
         self.managers_learning_steps: int = 0
         self.current_chosen_node: int = -1
         self.current_chosen_manager: int = -1
+        self.chosen_actions: List[int] = []
+        self.chosen_managers: List[int] = []
+        self.chosen_nodes: List[int] = []
 
         # Agents Initialization
         self.action_spaces, self.action_lookup_table = factor_action_space(env)
+
+        self.agent_chosen_actions: List[List[int]] = [
+            [] for _ in range(len(self.action_spaces))
+        ]
 
         self.agent_converters: List[IdToAct] = []
         for action_space in self.action_spaces:
@@ -241,6 +249,13 @@ class BasePOP(AgentWithConverter):
 
         return best_action
 
+    def _write_histogram_to_tensorboard(self, to_plot: list, tag: str):
+        fig = plt.figure()
+        histogram = plt.hist(to_plot, edgecolor="black", linewidth=2)
+        plt.xticks((list(set(to_plot))))
+        self.writer.add_figure(tag, fig, self.trainsteps)
+        plt.close(fig)
+
     def log_to_tensorboard(
         self,
         encoded_agent_actions,
@@ -249,15 +264,14 @@ class BasePOP(AgentWithConverter):
         chosen_nodes,
         current_epsilons,
     ):
+        self.chosen_actions.append(best_action)
         # Tensorboard Logging
-        self.writer.add_scalar(
-            "Encoded Action/Head Manager",
-            best_action,
-            self.trainsteps,
+        self._write_histogram_to_tensorboard(
+            self.chosen_actions, "Head Manager/Encoded Action"
         )
 
         self.writer.add_text(
-            "Action/Head Manager",
+            "Head Manager/Action",
             format_to_md(str(self.converter.all_actions[best_action])),
             self.trainsteps,
         )
@@ -271,11 +285,12 @@ class BasePOP(AgentWithConverter):
         for (idx, action), converter, current_epsilons in zip(
             enumerate(encoded_agent_actions), self.agent_converters, current_epsilons
         ):
-            self.writer.add_scalar(
-                "Encoded Action/Agent " + str(idx),
-                action,
-                self.trainsteps,
+            self.agent_chosen_actions[idx].append(action)
+
+            self._write_histogram_to_tensorboard(
+                self.agent_chosen_actions[idx], "Action/Agent " + str(idx)
             )
+
             self.writer.add_text(
                 "Action/Agent " + str(idx),
                 format_to_md(str(converter.all_actions[action])),
@@ -298,15 +313,13 @@ class BasePOP(AgentWithConverter):
                 node,
                 self.trainsteps,
             )
-
-        self.writer.add_scalar(
-            "Head Manager/Chosen Manager",
-            self.current_chosen_manager,
-            self.trainsteps,
+        self.chosen_managers.append(self.current_chosen_manager)
+        self._write_histogram_to_tensorboard(
+            self.chosen_managers, "Head Manager/Chosen Manager"
         )
-
-        self.writer.add_scalar(
-            "Head Manager/Chosen Node", self.current_chosen_node, self.trainsteps
+        self.chosen_nodes.append(self.current_chosen_node)
+        self._write_histogram_to_tensorboard(
+            self.chosen_nodes, "Head Manager/Chosen Node"
         )
 
     @abstractmethod

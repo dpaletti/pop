@@ -12,8 +12,6 @@ class NodeAttention(nn.Module):
 
         self.training = training
 
-        self.batch_size = self.architecture["batch_size"]
-
         self.qkv_projection = nn.Linear(
             embedding_dimension,
             3 * self.architecture["embedding_dimension"],
@@ -46,7 +44,7 @@ class NodeAttention(nn.Module):
         # -> (Nodes, (if optional = 1, gets squeezed) Batch Size, 3 * Embedding Size)
         qkv = qkv.reshape(
             node_embedding.shape[0],
-            self.batch_size,
+            1,
             3 * self.architecture["embedding_dimension"],
         ).squeeze()
 

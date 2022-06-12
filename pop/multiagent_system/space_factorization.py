@@ -103,6 +103,8 @@ def assign_action(
 
 
 def factor_action_space(env: BaseEnv):
+    # TODO: better action distribution
+    # TODO: when in conflict distribute action to the agent with min(actions)
     full_converter: IdToAct = IdToAct(env.action_space)
     full_converter.init_converter()
     obs = env.reset()

@@ -89,6 +89,8 @@ class RayDPOP(BasePOP):
             training=self.training,
         ).to(device)
 
+        self.head_manager_mini_batch: List[tuple] = []
+
         self.head_manager_optimizer: th.optim.Optimizer = th.optim.Adam(
             self.head_manager.parameters(),
             lr=self.architecture["head_manager"]["learning_rate"],
@@ -167,8 +169,13 @@ class RayDPOP(BasePOP):
         return losses, list(map(lambda x: not (x is None), losses))
 
     def teach_managers(self, reward):
-        # TODO: see https://arxiv.org/abs/1506.05254
-        # TODO: see score function in https://pytorch.org/docs/stable/distributions.html
+        # TODO: add batching
+        # TODO: this may solve the instability issues that lead to NaN values
+        # TODO: Idea is:
+        # TODO: 1. at each step take a decision
+        # TODO: 2. collect experiences in a batch
+        # TODO: 3a. every <learning_frequency> steps learn
+        # TODO: 3b. use prioritized experience replay (care you need to keep track of weights)
         ray.get(
             [
                 manager.learn.remote(reward=r)
@@ -182,22 +189,47 @@ class RayDPOP(BasePOP):
 
         self.teach_managers(reward)
 
-        head_manager_loss: th.Tensor = (
-            -self.head_manager.node_choice.attention_distribution.log_prob(
-                th.tensor(self.head_manager.current_best_node)
+        self.head_manager_mini_batch.append(
+            (
+                self.head_manager.node_choice.attention_distribution,
+                self.head_manager.current_best_node,
+                reward,
             )
-            * reward
         )
 
-        self.head_manager_optimizer.zero_grad()
-        head_manager_loss.backward()
-        th.nn.utils.clip_grad_norm_(
-            self.head_manager.parameters(), self.head_manager.architecture["max_clip"]
-        )
-        self.head_manager_optimizer.step()
+        if (
+            len(self.head_manager_mini_batch)
+            >= self.head_manager.architecture["batch_size"]
+        ):
+            head_manager_losses = [
+                -distribution.log_prob(th.tensor(node)) * reward
+                for (
+                    distribution,
+                    node,
+                    reward,
+                ) in self.head_manager_mini_batch
+            ]
+            head_manager_loss = head_manager_losses[0]
+            for loss in head_manager_losses[1:]:
+                head_manager_loss += loss
 
-        # Summary Writer is supposed to not slow down training
-        self.save_to_tensorboard(head_manager_loss.item(), reward)
+            head_manager_loss /= len(head_manager_losses)
+
+            self.head_manager_optimizer.zero_grad()
+            head_manager_loss.backward()
+            th.nn.utils.clip_grad_norm_(
+                self.head_manager.parameters(),
+                self.head_manager.architecture["max_clip"],
+            )
+            self.head_manager_optimizer.step()
+
+            self.head_manager_mini_batch = []
+
+            self.writer.add_scalar(
+                "Head Manager/Loss", head_manager_loss, self.trainsteps
+            )
+
+        self.writer.add_scalar("POP/Reward", reward, self.trainsteps)
 
     @staticmethod
     def load(
