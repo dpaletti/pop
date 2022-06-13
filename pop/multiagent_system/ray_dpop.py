@@ -138,56 +138,79 @@ class RayDPOP(BasePOP):
         return self.head_manager(summarized_graph)
 
     def step_agents(self, next_observation, reward, done):
-        losses = ray.get(
-            [
-                agent.step.remote(
-                    observation=agent_observation,
-                    action=agent_action,
-                    reward=reward,
-                    next_observation=agent_next_observation,
-                    done=done,
-                    stop_decay=False
-                    if (
-                        idx == self.current_chosen_node and self.epsilon_beta_scheduling
+        losses, q_network_states, target_network_states = zip(
+            *ray.get(
+                [
+                    agent.step.remote(
+                        observation=agent_observation,
+                        action=agent_action,
+                        reward=reward,
+                        next_observation=agent_next_observation,
+                        done=done,
+                        stop_decay=False
+                        if (
+                            idx == self.current_chosen_node
+                            and self.epsilon_beta_scheduling
+                        )
+                        else True,
                     )
-                    else True,
-                )
-                for (
-                    (idx, agent),
-                    agent_action,
-                    agent_observation,
-                    agent_next_observation,
-                    _,
-                ) in zip(
-                    enumerate(self.agents),
-                    self.encoded_actions,
-                    self.factored_observation,
-                    *factor_observation(next_observation, self.device),
-                )
-            ]
+                    for (
+                        (idx, agent),
+                        agent_action,
+                        agent_observation,
+                        agent_next_observation,
+                        _,
+                    ) in zip(
+                        enumerate(self.agents),
+                        self.encoded_actions,
+                        self.factored_observation,
+                        *factor_observation(next_observation, self.device),
+                    )
+                ]
+            )
         )
-        return losses, list(map(lambda x: not (x is None), losses))
+        return (
+            losses,
+            q_network_states,
+            target_network_states,
+            list(map(lambda x: not (x is None), losses)),
+        )
 
     def teach_managers(self, reward):
-        # TODO: add batching
-        # TODO: this may solve the instability issues that lead to NaN values
-        # TODO: Idea is:
-        # TODO: 1. at each step take a decision
-        # TODO: 2. collect experiences in a batch
-        # TODO: 3a. every <learning_frequency> steps learn
-        # TODO: 3b. use prioritized experience replay (care you need to keep track of weights)
-        ray.get(
-            [
-                manager.learn.remote(reward=r)
-                for manager, r in zip(self.managers, repeat(reward, len(self.managers)))
-            ]
+        return zip(
+            *ray.get(
+                [
+                    manager.learn.remote(reward=r)
+                    for manager, r in zip(
+                        self.managers, repeat(reward, len(self.managers))
+                    )
+                ]
+            )
         )
 
-    def learn(self, reward: float, losses: List[th.Tensor]):
+    def learn(self, reward: float):
         if not self.fixed_communities:
             raise Exception("In Learn() we assume fixed communities")
 
-        self.teach_managers(reward)
+        self.writer.add_scalar("POP/Reward", reward, self.trainsteps)
+        manager_losses, manager_state_dicts = self.teach_managers(reward)
+
+        if not (None in manager_losses):
+            for idx, loss in enumerate(manager_losses):
+                self.writer.add_scalar(
+                    "Manager Loss/Manager " + str(idx),
+                    loss,
+                    self.managers_learning_steps,
+                )
+
+            for idx, state in enumerate(manager_state_dicts):
+                for k, v in state.items():
+                    if v is not None:
+                        self.writer.add_histogram(
+                            "Manager " + str(k) + "/Manager " + str(idx),
+                            v,
+                            self.managers_learning_steps,
+                        )
 
         self.head_manager_mini_batch.append(
             (
@@ -226,10 +249,18 @@ class RayDPOP(BasePOP):
             self.head_manager_mini_batch = []
 
             self.writer.add_scalar(
-                "Head Manager/Loss", head_manager_loss, self.trainsteps
+                "Manager Loss/Head Manager", head_manager_loss, self.trainsteps
             )
+            for k, v in self.head_manager.state_dict().items():
+                if v is not None:
+                    self.writer.add_histogram(
+                        "Manager " + str(k) + "/ Head Manager",
+                        v,
+                        self.managers_learning_steps,
+                    )
 
-        self.writer.add_scalar("POP/Reward", reward, self.trainsteps)
+            # WARNING: Assuming same mini-batch size for managers and head managers
+            self.managers_learning_steps += 1
 
     @staticmethod
     def load(

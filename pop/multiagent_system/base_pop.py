@@ -86,11 +86,9 @@ class BasePOP(AgentWithConverter):
         self.episodes: int = 0
         self.alive_steps: int = 0
         self.managers_learning_steps: int = 0
+        self.agent_learning_steps: int = 0
         self.current_chosen_node: int = -1
         self.current_chosen_manager: int = -1
-        self.chosen_actions: List[int] = []
-        self.chosen_managers: List[int] = []
-        self.chosen_nodes: List[int] = []
 
         # Agents Initialization
         self.action_spaces, self.action_lookup_table = factor_action_space(env)
@@ -264,20 +262,18 @@ class BasePOP(AgentWithConverter):
         chosen_nodes,
         current_epsilons,
     ):
-        self.chosen_actions.append(best_action)
-        # Tensorboard Logging
-        self._write_histogram_to_tensorboard(
-            self.chosen_actions, "Head Manager/Encoded Action"
+        self.writer.add_scalar(
+            "Manager Action/Head Manager", best_action, self.trainsteps
         )
 
         self.writer.add_text(
-            "Head Manager/Action",
+            "Manager Action/Head Manager",
             format_to_md(str(self.converter.all_actions[best_action])),
             self.trainsteps,
         )
         for idx, obs in enumerate(self.factored_observation):
             self.writer.add_text(
-                "Factored Observation/Agent " + str(idx),
+                "Agent Factored Observation/Agent " + str(idx),
                 format_to_md(str(obs)),
                 self.trainsteps,
             )
@@ -285,27 +281,30 @@ class BasePOP(AgentWithConverter):
         for (idx, action), converter, current_epsilons in zip(
             enumerate(encoded_agent_actions), self.agent_converters, current_epsilons
         ):
-            self.agent_chosen_actions[idx].append(action)
-
-            self._write_histogram_to_tensorboard(
-                self.agent_chosen_actions[idx], "Action/Agent " + str(idx)
+            self.writer.add_scalar(
+                "Agent Action/Agent " + str(idx), action, self.trainsteps
             )
 
             self.writer.add_text(
-                "Action/Agent " + str(idx),
+                "Agent Action/Agent " + str(idx),
                 format_to_md(str(converter.all_actions[action])),
                 self.trainsteps,
             )
             self.writer.add_scalar(
-                "Epsilon/Agent " + str(idx),
+                "Agent Epsilon/Agent " + str(idx),
                 current_epsilons,
                 self.trainsteps,
             )
 
         for (idx, action), node in zip(enumerate(managed_actions), chosen_nodes):
             self.writer.add_scalar(
-                "Encoded Action/Manager " + str(idx),
+                "Manager Action/Manager " + str(idx),
                 action,
+                self.trainsteps,
+            )
+            self.writer.add_text(
+                "Manager Action/Manager " + str(idx),
+                format_to_md(str(action)),
                 self.trainsteps,
             )
             self.writer.add_scalar(
@@ -313,13 +312,12 @@ class BasePOP(AgentWithConverter):
                 node,
                 self.trainsteps,
             )
-        self.chosen_managers.append(self.current_chosen_manager)
-        self._write_histogram_to_tensorboard(
-            self.chosen_managers, "Head Manager/Chosen Manager"
+
+        self.writer.add_scalar(
+            "Chosen Manager/Head Manager", self.current_chosen_manager, self.trainsteps
         )
-        self.chosen_nodes.append(self.current_chosen_node)
-        self._write_histogram_to_tensorboard(
-            self.chosen_nodes, "Head Manager/Chosen Node"
+        self.writer.add_scalar(
+            "Chosen Node/Head Manager", self.current_chosen_node, self.trainsteps
         )
 
     @abstractmethod
@@ -327,7 +325,7 @@ class BasePOP(AgentWithConverter):
         ...
 
     @abstractmethod
-    def learn(self, reward: float, losses: List[th.Tensor]):
+    def learn(self, reward: float):
         ...
 
     @abstractmethod
@@ -341,28 +339,54 @@ class BasePOP(AgentWithConverter):
         done: bool,
     ):
         if done:
-            if self.writer is not None:
-                self.writer.add_scalar(
-                    "POP/Steps Alive per Episode", self.alive_steps, self.episodes
-                )
+            self.writer.add_scalar(
+                "POP/Steps Alive per Episode", self.alive_steps, self.episodes
+            )
             self.episodes += 1
             self.alive_steps = 0
             self.trainsteps += 1
         else:
 
-            losses, have_learnt = self.step_agents(next_observation, reward, done)
+            (
+                losses,
+                q_network_states,
+                target_network_states,
+                have_learnt,
+            ) = self.step_agents(next_observation, reward, done)
+            if not (None in losses):
+                for idx, loss in enumerate(losses):
+                    self.writer.add_scalar(
+                        "Agent Loss/Agent " + str(idx), loss, self.agent_learning_steps
+                    )
+                self.agent_learning_steps += 1
+                for (idx, q_state), t_state in zip(
+                    enumerate(q_network_states), target_network_states
+                ):
+                    if q_state is not None and t_state is not None:
+                        for (qk, qv), (tk, tv) in zip(q_state.items(), t_state.items()):
+                            if qv is not None:
+                                self.writer.add_histogram(
+                                    "Agent Q Network " + str(qk) + "/Agent " + str(idx),
+                                    qv,
+                                    self.agent_learning_steps,
+                                )
+                            if tv is not None:
+                                self.writer.add_histogram(
+                                    "Agent Target Network "
+                                    + str(tk)
+                                    + "/Agent "
+                                    + str(idx),
+                                    tv,
+                                    self.agent_learning_steps,
+                                )
+
             self.trainsteps += 1
             self.alive_steps += 1
-            self.learn(reward, losses)
-            self.managers_learning_steps += 1
+            self.learn(reward)
 
     @abstractmethod
     def save(self):
         ...
-
-    def save_to_tensorboard(self, loss: float, reward: float) -> None:
-        self.writer.add_scalar("Head Manager/Loss", loss, self.trainsteps)
-        self.writer.add_scalar("POP/Reward", reward, self.trainsteps)
 
     @staticmethod
     @abstractmethod

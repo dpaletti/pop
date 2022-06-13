@@ -1,4 +1,4 @@
-from typing import Union, Optional, Tuple
+from typing import Union, Optional, Tuple, Any
 
 from dgl import DGLHeteroGraph
 from torch import Tensor
@@ -56,6 +56,9 @@ class HeadManager(Manager):
 
     def get_summary(self):
         return summary(self)
+
+    def get_extra_state(self) -> Any:
+        return None
 
     def forward(self, g: DGLHeteroGraph) -> Tuple[int, int]:
         node_embeddings: Tensor = self.embedding(g, return_mean_over_heads=True)

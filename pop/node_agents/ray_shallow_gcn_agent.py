@@ -79,7 +79,7 @@ class RayShallowGCNAgent(BaseGCNAgent):
         next_observation: nx.Graph,
         done: bool,
         stop_decay: bool = False,
-    ) -> Optional[Tensor]:
+    ):
 
         if done:
             self.episodes += 1
@@ -94,5 +94,5 @@ class RayShallowGCNAgent(BaseGCNAgent):
             # every so often the node_agents should learn from experiences
             if self.trainsteps % self.architecture["learning_frequency"] == 0:
                 self.learning_steps += 1
-                return th.tensor(0.0, requires_grad=True)
-            return None
+                return th.tensor(0.0, requires_grad=True), None, None
+            return None, None, None

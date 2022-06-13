@@ -221,7 +221,7 @@ class BaseGCNAgent(ABC):
         next_observation: nx.Graph,
         done: bool,
         stop_decay: bool = False,
-    ) -> Optional[Tensor]:
+    ) -> Tuple[Optional[Tensor], Optional[dict], Optional[dict]]:
 
         if done:
             self.episodes += 1
@@ -239,5 +239,9 @@ class BaseGCNAgent(ABC):
             if self.trainsteps % self.architecture["learning_frequency"] == 0:
                 loss = self.learn()
                 self.learning_steps += 1
-                return loss
-            return None
+                return (
+                    loss,
+                    self.q_network.state_dict(),
+                    self.target_network.state_dict(),
+                )
+        return None, None, None

@@ -1,4 +1,4 @@
-from typing import Union, List
+from typing import Union, List, Any
 
 import ray
 
@@ -63,6 +63,11 @@ class RayCommunityManager(CommunityManager):
 
             self.losses.append(loss.data)
             self.mini_batch = []
+            return float(loss.item()), self.state_dict()
+        return None, None
+
+    def get_extra_state(self) -> Any:
+        return None
 
     def get_state(self):
         return [
