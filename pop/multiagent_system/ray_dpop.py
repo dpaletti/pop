@@ -249,7 +249,9 @@ class RayDPOP(BasePOP):
             self.head_manager_mini_batch = []
 
             self.writer.add_scalar(
-                "Manager Loss/Head Manager", head_manager_loss, self.trainsteps
+                "Manager Loss/Head Manager",
+                head_manager_loss,
+                self.managers_learning_steps,
             )
             for k, v in self.head_manager.state_dict().items():
                 if v is not None:
