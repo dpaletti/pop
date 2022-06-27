@@ -1,0 +1,19 @@
+frame = "../architectures/gat_architecture_frame.toml"
+
+[attention1]
+out_node_feats = "128"
+num_heads = "2"
+residual = true
+activation = "|nn.ReLU()|"
+allow_zero_in_degree = true
+bias = true
+share_weights = true
+
+[attention2]
+out_node_feats = "256"
+num_heads = "4"
+residual = true
+activation = "|nn.ReLU()|"
+allow_zero_in_degree = true
+bias = true
+share_weights = true

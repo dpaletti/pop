@@ -5,17 +5,7 @@
   "epsilon_beta_scheduling": true,
   "agent":
     {
-        "network": {
-            "noisy_layers": true,
-            "embedding": "egat",
-            "pooling": "avg",
-            "hidden_output_size": 128,
-            "value_stream_size": 64,
-            "advantage_stream_size": 128,
-            "hidden_node_feat_size": [16, 32, 64],
-            "hidden_edge_feat_size": [16, 32, 64],
-            "heads": [2, 4, 6]
-        },
+        "network": {},
         "learning_frequency": 4,
         "replace": 500,
         "gamma": 0.99,
@@ -34,14 +24,7 @@
     },
   "manager":
     {
-      "embedding_architecture": {
-        "embedding": "egat",
-        "pooling": "avg",
-        "hidden_output_size": 32,
-        "hidden_node_feat_size": [8, 16, 32],
-        "hidden_edge_feat_size": [8, 16, 32],
-        "heads": [2, 4, 8]
-      },
+      "network": {},
       "heads": 4,
       "dropout": 0.0,
       "embedding_dimension": 128,
@@ -52,16 +35,7 @@
     },
   "head_manager":
            {
-    "embedding_architecture": {
-      "embedding": "gat",
-      "pooling": "avg",
-      "hidden_output_size": 1024,
-      "value_stream_size": 256,
-      "advantage_stream_size": 512,
-      "hidden_node_feat_size": [128, 256],
-      "heads": [2, 4],
-      "batch_size": 4
-    },
+    "embedding_architecture": {},
     "heads": 4,
     "dropout": 0.0,
     "embedding_dimension": 256,

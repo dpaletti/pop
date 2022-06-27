@@ -1,5 +1,4 @@
 import toml
-import json
 from pathlib import Path
 from grid2op.Agent import BaseAgent
 from grid2op.Environment import BaseEnv
@@ -35,7 +34,6 @@ from utilities import format_to_md
 import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning)
-th.autograd.set_detect_anomaly(True)
 
 
 def set_l2rpn_reward(env, alarm: bool = True):
@@ -310,7 +308,6 @@ def main(**kwargs):
         )
 
     if config["training"]["train"]:
-        agent.writer.add_hparams
         if not config["training"]["curriculum"]:
             add_recap_to_tensorboard(agent, config)
             train(

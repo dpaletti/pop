@@ -12,6 +12,8 @@ from pop.managers.node_attention import NodeAttention
 # TODO: for pointer nets https://ychai.uk/notes/2019/07/21/RL/DRL/Decipher-AlphaStar-on-StarCraft-II/
 # Alternating Learning: actor playing has a higher learning rate
 # Turn-Based Schedule
+
+# TODO: Q learning for managers with masked output
 class CommunityManager(Manager):
     def __init__(
         self,
@@ -59,9 +61,11 @@ class CommunityManager(Manager):
         return self._node_attention
 
     def forward(self, g: DGLHeteroGraph) -> Tuple[int, DGLHeteroGraph, int]:
+        node_embedding: Tensor
+        edge_attention: Tensor
 
-        # -> (Nodes, Embedding Size, (optional) Batch Size)
-        node_embedding: Tensor = self.embedding(g)
+        # -> (Nodes, Embedding Size, (optional) Batch Size), (Edges, Heads, 1, (optional) Batch Size)
+        node_embedding, edge_attention = self.embedding(g, get_attention=True)
 
         self.current_best_node: int = self.node_choice(node_embedding)
 

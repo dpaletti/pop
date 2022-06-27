@@ -10,7 +10,6 @@ from pop.graph_convolutional_networks.gcn import GCN
 from pop.managers.node_attention import NodeAttention
 
 
-# TODO: evaluate contextual MABs for node choice
 class Manager(nn.Module):
     def __init__(
         self,
@@ -43,7 +42,7 @@ class Manager(nn.Module):
 
     @property
     @abstractmethod
-    def node_choice(self) -> Union[NodeAttention, vw.Workspace]:
+    def node_choice(self) -> NodeAttention:
         ...
 
     @property
@@ -51,7 +50,7 @@ class Manager(nn.Module):
     def embedding(self) -> GCN:
         ...
 
-    def save(self):
+    def save(self) -> None:
         if not self.log_dir:
             raise Exception("Calling save() with None log directory from: " + self.name)
         checkpoint = {
@@ -67,7 +66,7 @@ class Manager(nn.Module):
         th.save(checkpoint, self.log_file)
 
     @classmethod
-    def load(cls, log_file: str):
+    def load(cls, log_file: str, training: bool) -> "Manager":
         checkpoint = th.load(log_file)
         architecture = {
             i: j
@@ -81,6 +80,7 @@ class Manager(nn.Module):
             architecture=architecture,
             name=checkpoint["name"],
             log_dir=Path(log_file).parents[0],
+            training=training,
         )
         manager.load_state_dict(checkpoint["manager_state"])
         return manager

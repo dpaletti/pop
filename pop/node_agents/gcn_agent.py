@@ -15,7 +15,7 @@ import numpy as np
 from node_agents.base_gcn_agent import BaseGCNAgent
 from pop.dueling_networks.dueling_net_factory import get_dueling_net
 
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Tuple
 
 from pop.node_agents.utilities import to_dgl
 
@@ -84,7 +84,7 @@ class GCNAgent(AgentWithConverter, BaseGCNAgent):
     def my_act(
         self, transformed_observation: DGLHeteroGraph, reward=None, done=False
     ) -> int:
-        return super().take_action(transformed_observation)
+        return super().take_action(transformed_observation)[0]
 
     def save(
         self,

@@ -1,11 +1,13 @@
 from typing import Tuple, Union, Optional
 
-from dgl import DGLHeteroGraph
+from dgl import DGLHeteroGraph  # type: ignore
 from dgl.nn.pytorch import EGATConv, GraphConv
 from torch import Tensor
 
+from architectures.gcn_architecture import EGATArchitecture
 from pop.graph_convolutional_networks.gcn import GCN
 import torch as th
+import torch.nn as nn
 
 
 class EgatGCN(GCN):
@@ -13,14 +15,17 @@ class EgatGCN(GCN):
         self,
         node_features: int,
         edge_features: int,
-        architecture: Union[str, dict],
+        architecture: EGATArchitecture,
         name: str,
         log_dir: Optional[str],
     ):
         super(EgatGCN, self).__init__(
-            node_features, edge_features, architecture, name, log_dir
+            node_features=node_features,
+            edge_features=edge_features,
+            architecture=architecture,
+            name=name,
+            log_dir=log_dir,
         )
-
         self.attention1 = EGATConv(
             node_features,
             edge_features,
@@ -49,6 +54,7 @@ class EgatGCN(GCN):
             num_heads=self.architecture["heads"][2],
             bias=True,
         )
+        nn.Flatten()
 
         self.conv = GraphConv(
             self.architecture["hidden_node_feat_size"][2],
@@ -65,11 +71,11 @@ class EgatGCN(GCN):
         self, g: DGLHeteroGraph, return_graph: bool = False
     ) -> Union[Tuple[Tensor, Tensor], Tuple[Tensor, Tensor, DGLHeteroGraph]]:
 
-        g = self.preprocess_graph(g)
+        g = self.add_self_loop_to_batched_graph(g)
         node_embeddings, edge_embeddings = self.attention1(
             g,
-            self.dict_to_tensor(dict(g.ndata)),
-            self.dict_to_tensor(dict(g.edata)),
+            self.to_tensor(g.ndata),
+            self.to_tensor(g.edata),
         )
 
         node_embeddings = th.flatten(node_embeddings, 1)

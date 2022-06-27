@@ -1,0 +1,24 @@
+[attention1]
+name = "GATv2Conv"
+module = "dgl"
+in_node_feats = "<node_features>"
+out_node_feats = "..."
+num_heads = "..."
+residual = "..."
+activation = "..."
+allow_zero_in_degree = "..."
+bias = "..."
+share_weights = "..."
+
+[attention2]
+name = "GATv2Conv"
+module = "dgl"
+in_node_feats = "<<attention1_out_node_feats>> * <<attention1_num_heads>>"
+out_node_feats = "..."
+num_heads = "..."
+residual = "..."
+activation = "..."
+allow_zero_in_degree = "..."
+bias = "..."
+share_weights = "..."
+

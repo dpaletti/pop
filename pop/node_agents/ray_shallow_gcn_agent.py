@@ -1,4 +1,4 @@
-from typing import Union, Optional, Tuple
+from typing import Union, Optional, Tuple, List
 
 import networkx as nx
 import torch as th
@@ -7,10 +7,11 @@ from dgl import DGLHeteroGraph
 from torch import Tensor
 
 from node_agents.base_gcn_agent import BaseGCNAgent
+from node_agents.ray_agent import RayAgent
 
 
 @ray.remote
-class RayShallowGCNAgent(BaseGCNAgent):
+class RayShallowGCNAgent(BaseGCNAgent, RayAgent):
     def __init__(
         self,
         agent_actions: int,
@@ -36,28 +37,30 @@ class RayShallowGCNAgent(BaseGCNAgent):
         self.losses = []
         self.actions_taken = []
 
-    def get_q_network(self):
+    def get_q_network(self) -> None:
         raise Exception("Shallow agent: " + self.name + " has no q_network")
 
-    def get_state(self):
-        return [
+    def get_state(
+        self,
+    ) -> Tuple[dict, dict, dict, List[float], List[int], int, int, int, int]:
+        return (
             dict(),
             dict(),
             dict(),
-            0,
+            [0.0],
             self.actions_taken,
             0,
             self.alive_steps,
             self.trainsteps,
             self.learning_steps,
-        ]
+        )
 
-    def get_name(self):
+    def get_name(self) -> str:
         return self.name
 
     def load_state(
         self, losses, actions, alive_steps, trainsteps, learning_steps, **kwargs
-    ):
+    ) -> None:
         self.losses = losses
         self.actions_taken = actions
         self.decay_steps = 0
@@ -73,13 +76,13 @@ class RayShallowGCNAgent(BaseGCNAgent):
 
     def step(
         self,
-        observation,
+        observation: DGLHeteroGraph,
         action: int,
         reward: float,
         next_observation: nx.Graph,
         done: bool,
         stop_decay: bool = False,
-    ):
+    ) -> Tuple[Optional[Tensor], None, None]:
 
         if done:
             self.episodes += 1
@@ -91,8 +94,8 @@ class RayShallowGCNAgent(BaseGCNAgent):
             if not stop_decay:
                 self.decay_steps += 1
 
-            # every so often the node_agents should learn from experiences
+            # Fake learning
             if self.trainsteps % self.architecture["learning_frequency"] == 0:
                 self.learning_steps += 1
-                return th.tensor(0.0, requires_grad=True), None, None
+                return th.tensor(0.0), None, None
             return None, None, None

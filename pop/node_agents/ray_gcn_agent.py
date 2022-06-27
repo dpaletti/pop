@@ -1,13 +1,17 @@
-from typing import Union, Optional
+from typing import Union, Optional, Tuple, List, OrderedDict
 
 import ray
+from torch import Tensor
 
+from dueling_networks.dueling_net import DuelingNet
 from node_agents.base_gcn_agent import BaseGCNAgent
 import torch as th
 
+from node_agents.ray_agent import RayAgent
+
 
 @ray.remote
-class RayGCNAgent(BaseGCNAgent):
+class RayGCNAgent(BaseGCNAgent, RayAgent):
     def __init__(
         self,
         agent_actions: int,
@@ -33,11 +37,23 @@ class RayGCNAgent(BaseGCNAgent):
         self.losses = []
         self.actions_taken = []
 
-    def get_q_network(self):
+    def get_q_network(self) -> DuelingNet:
         return self.q_network
 
-    def get_state(self):
-        return [
+    def get_state(
+        self,
+    ) -> Tuple[
+        dict,
+        OrderedDict[str, Tensor],
+        OrderedDict[str, Tensor],
+        List[float],
+        List[int],
+        int,
+        int,
+        int,
+        int,
+    ]:
+        return (
             self.optimizer.state_dict(),
             self.q_network.state_dict(),
             self.target_network.state_dict(),
@@ -47,24 +63,24 @@ class RayGCNAgent(BaseGCNAgent):
             self.alive_steps,
             self.trainsteps,
             self.learning_steps,
-        ]
+        )
 
-    def get_name(self):
+    def get_name(self) -> str:
         return self.name
 
     def load_state(
         self,
-        optimizer_state,
-        q_network_state,
-        target_network_state,
-        losses,
-        actions,
-        decay_steps,
-        alive_steps,
-        trainsteps,
-        learning_steps,
+        optimizer_state: dict,
+        q_network_state: OrderedDict[str, Tensor],
+        target_network_state: OrderedDict[str, Tensor],
+        losses: List[float],
+        actions: List[int],
+        decay_steps: int,
+        alive_steps: int,
+        trainsteps: int,
+        learning_steps: int,
         reset_decay=False,
-    ):
+    ) -> None:
         self.optimizer.load_state_dict(optimizer_state)
         self.q_network.load_state_dict(q_network_state)
         self.target_network.load_state_dict(target_network_state)

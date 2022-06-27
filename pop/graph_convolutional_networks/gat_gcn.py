@@ -18,7 +18,13 @@ class GatGCN(GCN):
         log_dir: str,
         **kwargs  # Compliance with GCN signature
     ):
-        super(GatGCN, self).__init__(node_features, None, architecture, name, log_dir)
+        super(GatGCN, self).__init__(
+            node_features=node_features,
+            edge_features=None,
+            architecture=architecture,
+            name=name,
+            log_dir=log_dir,
+        )
 
         self.attention1 = GATv2Conv(
             node_features,
@@ -44,10 +50,11 @@ class GatGCN(GCN):
         )
 
     def forward(self, g: dgl.DGLHeteroGraph, return_mean_over_heads=False) -> Tensor:
-        self.preprocess_graph(g)
+        self.add_self_loop_to_batched_graph(g)
 
         node_embeddings: Tensor = self.attention1(
-            g, th.flatten(self.dict_to_tensor(dict(g.ndata)), start_dim=1)
+            g,
+            th.flatten(self.to_tensor(dict(g.ndata)), start_dim=1),
         )
 
         node_embeddings = th.flatten(node_embeddings, 1)

@@ -10,8 +10,9 @@ Grid2Op = "^1.6.5"
 torch = "^1.11.0"
 networkx = "^2.8"
 prettytable = "^3.2.0"
-dgl = {url = "https://data.dgl.ai/wheels/dgl-0.8.1-cp39-cp39-manylinux1_x86_64.whl", platform = "linux"}
-dglgo = "^0.0.1"
+# DGL needs to be installed separately
+# dgl = {url = "https://data.dgl.ai/wheels/dgl-0.8.1-cp39-cp39-manylinux1_x86_64.whl", platform = "linux"}
+# dglgo = "^0.0.1"
 numba = "^0.55.1"
 scipy = "^1.8.0"
 matplotlib = "^3.5.1"
@@ -20,8 +21,7 @@ joblib = "^1.1.0"
 pathos = "^0.2.8"
 ray = {extras = ["rllib"], version = "^1.12.1"}
 dm-tree = "^0.1.7"
-vowpalwabbit = "^9.1.0"
-torchinfo = "^1.7.0"
+pydantic = "^1.9.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

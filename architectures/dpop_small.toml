@@ -1,0 +1,69 @@
+[pop]
+agent_neighbourhood_radius = 1
+decentralized = false
+fixed_communities = true
+epsilon_beta_scheduling = true
+agent_type = "uniform"
+
+[agent]
+network_path = "../architectures/egat_architecture_small.toml"
+learning_rate = 1e-2
+learning_frequency = 4
+target_network_weight_replace_steps = 500
+gamma = 0.99
+huber_loss_delta = 1.0
+batch_size = 4
+
+
+[agent.exploration]
+max_epsilon = 1.0
+min_epsilon = 0.01
+epsilon_decay = 200
+
+[agent.replay_memory]
+alpha = 0.5
+max_beta = 1.0
+min_beta = 0.0
+beta_decay = 200
+
+[manager]
+network_path = "../architectures/egat_architecture_very_small.toml"
+learning_rate = 1e-2
+learning_frequency = 4
+target_network_weight_replace_steps = 500
+gamma = 0.99
+huber_loss_delta = 1.0
+batch_size = 4
+
+[manager.exploration]
+max_epsilon = 1.0
+min_epsilon = 0.01
+epsilon_decay = 200
+
+[manager.replay_memory]
+alpha = 0.5
+max_beta = 1.0
+min_beta = 0.0
+beta_decay = 200
+
+[head_manager]
+network_path = "../architectures/egat_architecture_small.toml"
+learning_rate = 1e-2
+learning_frequency = 4
+target_network_weight_replace_steps = 500
+gamma = 0.99
+huber_loss_delta = 1.0
+batch_size = 4
+
+[head_manager.exploration]
+max_epsilon = 1.0
+min_epsilon = 0.01
+epsilon_decay = 200
+
+[head_manager.replay_memory]
+alpha = 0.5
+max_beta = 1.0
+min_beta = 0.0
+beta_decay = 200
+
+
