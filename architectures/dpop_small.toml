@@ -6,7 +6,9 @@ epsilon_beta_scheduling = true
 agent_type = "uniform"
 
 [agent]
-network_path = "../architectures/egat_architecture_small.toml"
+embedding = "egat_architecture_small"
+advantage_stream = "advantage_stream_small"
+value_stream = "value_stream_small"
 learning_rate = 1e-2
 learning_frequency = 4
 target_network_weight_replace_steps = 500
@@ -27,7 +29,9 @@ min_beta = 0.0
 beta_decay = 200
 
 [manager]
-network_path = "../architectures/egat_architecture_very_small.toml"
+embedding = "egat_architecture_very_small"
+advantage_stream = "advantage_stream_small"
+value_stream = "value_stream_small"
 learning_rate = 1e-2
 learning_frequency = 4
 target_network_weight_replace_steps = 500
@@ -47,7 +51,9 @@ min_beta = 0.0
 beta_decay = 200
 
 [head_manager]
-network_path = "../architectures/egat_architecture_small.toml"
+embedding = "gat_architecture_small"
+advantage_stream = "advantage_stream_small"
+value_stream = "value_stream_small"
 learning_rate = 1e-2
 learning_frequency = 4
 target_network_weight_replace_steps = 500

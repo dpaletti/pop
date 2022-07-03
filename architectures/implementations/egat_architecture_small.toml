@@ -1,4 +1,4 @@
-frame = "../architectures/egat_architecture_frame.toml"
+frame = "egat_architecture_frame"
 
 [attention1]
 out_node_feats = "16"
@@ -19,7 +19,7 @@ num_heads = 6
 bias = true
 
 [conv]
-out_feats = "128"
+out_feats = "784"
 bias = true
 weight = true
 allow_zero_in_degree = true

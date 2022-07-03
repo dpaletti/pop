@@ -4,24 +4,24 @@ device = "cpu"
 
 [model]
 name = "dpop_rte_1e4"
-architecture_path = "../architectures/dpop_agent_xxs.json"
+architecture_path = "../../architectures/dpop_small.toml"
 data_dir = "../test_data"
-checkpoint_dir = "{{data_dir}}/pop_runs/checkpoint/{{name}}"
+checkpoint_dir = "<<model_data_dir>>/pop_runs/checkpoint/<<model_name>>"
 
 [training]
 steps = 1e2
 train = true
-tensorboard_dir = "{{data_dir}}/pop_runs/tensorboard/{{name}}"
+tensorboard_dir = "<<model_data_dir>>/pop_runs/tensorboard/<<model_name>>"
 curriculum = false
 reset_decay = true
 
 [evaluation]
 episodes = 100
-evaluation_dir = "{{data_dir}}/evaluation/{{name}}"
+evaluation_dir = "<<model_data_dir>>/evaluation/<<model_name>>"
 
 [loading]
 load = false
-load_dir = "{{checkpoint_dir}}/{{name}}.pt"
+load_dir = "<<model_checkpoint_dir>>/<<model_name>>.pt"
 
 [environment]
 name = "rte_case14_realistic"

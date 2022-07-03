@@ -1,11 +1,10 @@
-from typing import Union, Optional, Tuple, List, OrderedDict
+from typing import Union, Tuple, List, OrderedDict
 
 import ray
 from torch import Tensor
 
-from dueling_networks.dueling_net import DuelingNet
+from networks.dueling_net import DuelingNet
 from node_agents.base_gcn_agent import BaseGCNAgent
-import torch as th
 
 from node_agents.ray_agent import RayAgent
 

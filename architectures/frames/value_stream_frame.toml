@@ -1,0 +1,16 @@
+[linear1]
+type = "Linear"
+module = "pytorch"
+in_features = "<embedding_size>"
+out_features = "..."
+bias = "..."
+
+[activation1]
+type = "ReLU"
+module = "pytorch"
+
+[linear2]
+type = "Linear"
+module = "pytorch"
+in_features = "<<linear1_out_features>>"
+out_features = 1

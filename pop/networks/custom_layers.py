@@ -5,7 +5,7 @@ import torch as th
 from dgl.nn.pytorch import GraphConv
 from torch import Tensor
 
-from typings.dgl.heterograph import DGLHeteroGraph
+from dgl import DGLHeteroGraph
 
 
 class EGATFlatten(nn.Module):
@@ -13,15 +13,21 @@ class EGATFlatten(nn.Module):
         super(EGATFlatten, self).__init__()
 
     def forward(
-        self, node_edge_embedding_pair: Tuple[Tensor, Tensor]
+        self, g: DGLHeteroGraph, node_embedding: Tensor, edge_embedding: Tensor
     ) -> Tuple[Tensor, Tensor]:
-        # -> (nodes, heads, node_features, batch_size),
-        # -> (edges, heads, edge_features, batch_size)
-        node_embedding, edge_embedding = node_edge_embedding_pair
 
         # -> (nodes, node_features * heads, batch_size),
         # -> (edges, edge_features * heads, batch_size)
         return th.flatten(node_embedding, 1), th.flatten(edge_embedding, 1)
+
+
+class GATFlatten(nn.Module):
+    def __init__(self):
+        super(GATFlatten, self).__init__()
+
+    def forward(self, g: DGLHeteroGraph, node_embedding: Tensor):
+        # -> (nodes, node_features * heads, batch_size)
+        return th.flatten(node_embedding, 1)
 
 
 class EGATNodeConv(nn.Module):
@@ -43,11 +49,7 @@ class EGATNodeConv(nn.Module):
         )
 
     def forward(
-        self, g: DGLHeteroGraph, node_edge_embedding_pair: Tuple[Tensor, Tensor]
-    ):
-        # -> (nodes, node_features, batch_size),
-        # -> (edges, edge_features, batch_size)
-        node_embedding, edge_embedding = node_edge_embedding_pair
-
+        self, g: DGLHeteroGraph, node_embedding: Tensor, edge_embedding: Tensor
+    ) -> Tensor:
         # -> (nodes, node_features, batch_size)
         return self.convolution(g, node_embedding, edge_weight=edge_embedding)

@@ -4,7 +4,7 @@ import json
 from dgl import DGLHeteroGraph
 from torch import Tensor
 import torch as th
-from pop.graph_convolutional_networks.egat_gcn import EgatGCN
+from pop.networks.egat_gcn import EgatGCN
 from pop.managers.manager import Manager
 from pop.managers.node_attention import NodeAttention
 

@@ -3,7 +3,7 @@ from typing import Union, Optional, Tuple, Any
 from dgl import DGLHeteroGraph
 from torch import Tensor
 
-from pop.graph_convolutional_networks.gat_gcn import GatGCN
+from pop.networks.gat_gcn import GatGCN
 import json
 
 from pop.managers.manager import Manager

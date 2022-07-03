@@ -6,7 +6,7 @@ from dgl import DGLHeteroGraph
 from torch import Tensor
 
 from node_agents.utilities import batch_observations
-from pop.dueling_networks.dueling_net import DuelingNet
+from networks.dueling_net import DuelingNet
 from pop.dueling_networks.dueling_net_factory import get_dueling_net
 import networkx as nx
 import numpy as np

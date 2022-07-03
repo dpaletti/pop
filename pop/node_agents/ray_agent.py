@@ -4,7 +4,7 @@ from typing import Tuple, List, Optional
 
 from torch import Tensor
 
-from dueling_networks.dueling_net import DuelingNet
+from networks.dueling_net import DuelingNet
 
 
 class RayAgent(ABC):

@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Tuple, Union, List
 from random import choice, sample
 
 import dgl
@@ -9,26 +9,16 @@ import torch as th
 
 
 def from_networkx_to_dgl(graph, device) -> dgl.DGLHeteroGraph:
-    try:
-        return dgl.from_networkx(
-            graph.to_directed(),
-            node_attrs=list(graph.nodes[choice(list(graph.nodes))].keys())
-            if len(graph.nodes) > 0
-            else [],
-            edge_attrs=list(graph.edges[choice(list(graph.edges))].keys())
-            if len(graph.edges) > 0
-            else [],
-            device=device,
-        )
-    except Exception as e:
-        if type(graph) is dgl.DGLHeteroGraph:
-            return graph
-        else:
-            print("Hit Exception in from_networkx_to_dgl")
-            print(graph)
-            print(graph.nodes)
-            print(graph.edges)
-            raise e
+    return dgl.from_networkx(
+        graph.to_directed(),
+        node_attrs=list(graph.nodes[choice(list(graph.nodes))].keys())
+        if len(graph.nodes) > 0
+        else [],
+        edge_attrs=list(graph.edges[choice(list(graph.edges))].keys())
+        if len(graph.edges) > 0
+        else [],
+        device=device,
+    )
 
 
 def to_dgl(obs: BaseObservation, device) -> dgl.DGLHeteroGraph:
@@ -42,14 +32,14 @@ def to_dgl(obs: BaseObservation, device) -> dgl.DGLHeteroGraph:
 
 
 def batch_observations(
-    observations: Union[Tuple[BaseObservation], Tuple[nx.Graph]], device
+    observations: Union[Tuple[BaseObservation, ...], Tuple[nx.Graph, ...]], device
 ) -> dgl.DGLHeteroGraph:
 
     graphs = []
     for o in observations:
         graph = (
             to_dgl(o, device)
-            if type(o) is BaseObservation
+            if isinstance(o, BaseObservation)
             else from_networkx_to_dgl(o, device)
         )
         graphs.append(graph)

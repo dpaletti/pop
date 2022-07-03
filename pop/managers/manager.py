@@ -6,7 +6,7 @@ from pathlib import Path
 import torch.nn as nn
 import torch as th
 import vowpalwabbit as vw
-from pop.graph_convolutional_networks.gcn import GCN
+from pop.networks.gcn import GCN
 from pop.managers.node_attention import NodeAttention
 
 
