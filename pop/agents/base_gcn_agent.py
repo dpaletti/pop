@@ -1,21 +1,24 @@
-import json
 from abc import ABC
-from typing import Union, Optional, Tuple
+from typing import Optional, Tuple, List
 
 from dgl import DGLHeteroGraph
 from torch import Tensor
 
-from node_agents.utilities import batch_observations
+from configs.agent_architecture import AgentArchitecture
+from networks.serializable_module import SerializableModule
+from agents.loggable_module import LoggableModule
+from agents.utilities import batch_observations
 from networks.dueling_net import DuelingNet
-from pop.dueling_networks.dueling_net_factory import get_dueling_net
 import networkx as nx
+import copy
 import numpy as np
+import numpy.ma as ma
 import torch as th
 import torch.nn as nn
-from pop.node_agents.replay_buffer import ReplayMemory, Transition
+from pop.agents.replay_buffer import ReplayMemory, Transition
 
 
-class BaseGCNAgent(ABC):
+class BaseGCNAgent(ABC, SerializableModule, LoggableModule):
 
     # This names are used to find files in the load directory
     # When loading an agent
@@ -27,18 +30,19 @@ class BaseGCNAgent(ABC):
         self,
         agent_actions: int,
         node_features: int,
-        edge_features: int,
-        architecture: Union[str, dict],
+        architecture: AgentArchitecture,
         name: str,
         training: bool,
         device: str,
-        **kwargs
+        log_dir: Optional[str],
+        tensorboard_dir: Optional[str],
+        edge_features: Optional[int] = None,
     ):
+        SerializableModule.__init__(self, name=name, log_dir=log_dir)
+        LoggableModule.__init__(self, tensorboard_dir=tensorboard_dir)
 
         # Agent Architecture
-        self.architecture = (
-            json.load(open(architecture)) if type(architecture) is str else architecture
-        )
+        self.architecture = architecture
         self.actions = agent_actions
         self.node_features = node_features
         self.edge_features = edge_features
@@ -53,39 +57,39 @@ class BaseGCNAgent(ABC):
             self.device: th.device = th.device(device)
 
         # Initialize deep networks
-        self.q_network: DuelingNet = get_dueling_net(
+        self.q_network: DuelingNet = DuelingNet(
+            action_space_size=agent_actions,
             node_features=node_features,
             edge_features=edge_features,
-            action_space_size=agent_actions,
-            architecture=self.architecture["network"],
-            name=name + self.q_network_name_suffix,
-        ).to(self.device)
-        self.target_network: DuelingNet = get_dueling_net(
-            node_features=node_features,
-            edge_features=edge_features,
-            action_space_size=agent_actions,
-            architecture=self.architecture["network"],
-            name=name + self.target_network_name_suffix,
-        ).to(self.device)
-
-        # Optimizer
-        self.optimizer: th.optim.Optimizer = th.optim.Adam(
-            self.q_network.parameters(), lr=self.architecture["learning_rate"]
+            embedding_architecture=architecture.embedding,
+            advantage_stream_architecture=architecture.advantage_stream,
+            value_stream_architecture=architecture.value_stream,
+            name=name + "_dueling",
+            log_dir=None,
         )
-
-        # Huber Loss initialization with delta
-        self.loss_func: nn.HuberLoss = nn.HuberLoss(delta=self.architecture["delta"])
-
-        # Replay Buffer
-        self.memory: ReplayMemory = ReplayMemory(int(1e5), self.architecture["alpha"])
+        self.target_network: DuelingNet = copy.deepcopy(self.q_network)
 
         # Reporting
-        self.trainsteps: int = 0
         self.decay_steps: int = 0
+        self.train_steps: int = 0
         self.episodes: int = 0
         self.alive_steps: int = 0
         self.learning_steps: int = 0
-        self.cumulative_reward: float = 0
+
+        # Optimizer
+        self.optimizer: th.optim.Optimizer = th.optim.Adam(
+            self.q_network.parameters(), lr=self.architecture.learning_rate
+        )
+
+        # Huber Loss initialization with delta
+        self.loss_func: nn.HuberLoss = nn.HuberLoss(
+            delta=self.architecture.huber_loss_delta
+        )
+
+        # Replay Buffer
+        self.memory: ReplayMemory = ReplayMemory(
+            int(1e5), self.architecture.replay_memory.alpha
+        )
 
         # Training or Evaluation
         self.training: bool = training
@@ -94,16 +98,15 @@ class BaseGCNAgent(ABC):
         self, transitions_batch: Transition, sampling_weights: Tensor
     ) -> Tuple[Tensor, Tensor, DGLHeteroGraph, DGLHeteroGraph]:
 
-        # Unwrap batch
-        # Get observation start and end
-
         observation_batch = batch_observations(
             transitions_batch.observation, self.device
         )
         next_observation_batch = batch_observations(
             transitions_batch.next_observation, self.device
         )
+
         # Get 1 action per batch and restructure as an index for gather()
+        # -> (batch_size)
         actions = (
             th.Tensor(transitions_batch.action)
             .unsqueeze(1)
@@ -112,28 +115,36 @@ class BaseGCNAgent(ABC):
         )
 
         # Get rewards and unsqueeze to get 1 reward per batch
+        # -> (batch_size)
         rewards = th.Tensor(transitions_batch.reward).unsqueeze(1).to(self.device)
 
         # Compute Q value for the current observation
+        # -> (batch_size)
         q_values: Tensor = (
             self.q_network(observation_batch).gather(1, actions).to(self.device)
         )
 
         # Compute TD error
+        # -> (batch_size, action_space_size)
         target_q_values: Tensor = self.target_network(next_observation_batch).to(
             self.device
         )
+
+        # -> (batch_size)
         best_actions: Tensor = (
             th.argmax(self.q_network(next_observation_batch), dim=1)
             .unsqueeze(1)
             .type(th.int64)
         ).to(self.device)
-        td_errors: Tensor = rewards + self.architecture[
-            "gamma"
-        ] * target_q_values.gather(1, best_actions).to(self.device)
+
+        # -> (batch_size)
+        td_errors: Tensor = rewards + self.architecture.gamma * target_q_values.gather(
+            1, best_actions
+        ).to(self.device)
 
         # deltas = weights (q_values - td_errors)
         # to keep interfaces general we distribute weights
+        # -> (1)
         loss: Tensor = self.loss_func(
             q_values * sampling_weights, td_errors * sampling_weights
         ).to(self.device)
@@ -146,22 +157,41 @@ class BaseGCNAgent(ABC):
     def take_action(
         self,
         transformed_observation: DGLHeteroGraph,
+        mask: Optional[List[int]] = None,
     ) -> Tuple[int, float]:
 
         epsilon = self.exponential_decay(
-            self.architecture["max_epsilon"],
-            self.architecture["min_epsilon"],
-            self.architecture["epsilon_decay"],
+            self.architecture.exploration.max_epsilon,
+            self.architecture.exploration.min_epsilon,
+            self.architecture.exploration.epsilon_decay,
         )
-        if self.training and not self.architecture["network"].get("noisy_layers"):
+        action_list = list(range(self.actions))
+        if self.training:
             # epsilon-greedy Exploration
             if np.random.rand() <= epsilon:
-                return np.random.choice(list(range(self.actions))), epsilon
+                if mask is None:
+                    return (
+                        np.random.choice(action_list),
+                        epsilon,
+                    )
+                else:
+                    return (
+                        np.random.choice(
+                            action_list,
+                            p=[
+                                1 / len(mask) if action in mask else 0
+                                for action in action_list
+                            ],
+                        ),
+                        epsilon,
+                    )
 
-        # Exploitation or Noisy Layers Exploration
-        graph = transformed_observation  # extract output of converted obs
-
-        advantages: Tensor = self.q_network.advantage(graph.to(self.device))
+        # -> (actions)
+        advantages: Tensor = self.q_network.advantage(transformed_observation)
+        if mask is not None:
+            advantages[
+                [False if action in mask else True for action in action_list]
+            ] = float("-inf")
 
         return (
             int(th.argmax(advantages).item()),
@@ -180,18 +210,21 @@ class BaseGCNAgent(ABC):
         self.memory.push(observation, action, next_observation, reward, done)
 
     def learn(self) -> Optional[Tensor]:
-        if len(self.memory) < self.architecture["batch_size"]:
+        if len(self.memory) < self.architecture.batch_size:
             return None
-        if self.trainsteps % self.architecture["replace"] == 0:
+        if (
+            self.train_steps % self.architecture.target_network_weight_replace_steps
+            == 0
+        ):
             self.target_network.parameters = self.q_network.parameters
 
         # Sample from Replay Memory and unpack
         idxs, transitions, sampling_weights = self.memory.sample(
-            self.architecture["batch_size"],
+            self.architecture.batch_size,
             self.exponential_decay(
-                self.architecture["max_beta"],
-                self.architecture["min_beta"],
-                self.architecture["beta_decay"],
+                self.architecture.replay_memory.max_beta,
+                self.architecture.replay_memory.min_beta,
+                self.architecture.replay_memory.beta_decay,
             ),
         )
         transitions = Transition(*zip(*transitions))
@@ -221,22 +254,22 @@ class BaseGCNAgent(ABC):
         next_observation: nx.Graph,
         done: bool,
         stop_decay: bool = False,
-    ) -> Tuple[Optional[Tensor], Optional[dict], Optional[dict]]:
+    ) -> Optional[Tuple[Tensor, dict, dict]]:
 
+        self.train_steps += 1
         if done:
             self.episodes += 1
-            self.trainsteps += 1
+            self.alive_steps = 0
 
         else:
             self.memory.push(observation, action, next_observation, reward, done)
-            self.trainsteps += 1
             self.alive_steps += 1
 
             if not stop_decay and self.training:
                 self.decay_steps += 1
 
-            # every so often the node_agents should learn from experiences
-            if self.trainsteps % self.architecture["learning_frequency"] == 0:
+            # every so often the agents should learn from experiences
+            if self.train_steps % self.architecture.learning_frequency == 0:
                 loss = self.learn()
                 self.learning_steps += 1
                 return (
@@ -244,4 +277,3 @@ class BaseGCNAgent(ABC):
                     self.q_network.state_dict(),
                     self.target_network.state_dict(),
                 )
-        return None, None, None

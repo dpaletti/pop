@@ -1,7 +1,7 @@
 from configs.run_config import RunConfiguration
 from networks.dueling_net import DuelingNet
 import grid2op
-from pop.node_agents.utilities import batch_observations
+from pop.agents.utilities import batch_observations
 
 
 def test_gcn():
@@ -18,10 +18,13 @@ def test_gcn():
         advantage_stream_architecture=advantage_architecture,
         value_stream_architecture=value_architecture,
     )
-    env = grid2op.make()
-    obs1 = env.reset()
-    obs2 = env.reset()
+    # env = grid2op.make()
+    # obs1 = env.reset()
+    # obs2 = env.reset()
 
-    batched = batch_observations((obs1, obs2), device="cpu")
+    # batched = batch_observations((obs1, obs2), device="cpu")
 
-    print(g(batched).shape)
+    # print(g.advantage(batched).shape)
+
+    s = g.get_state()
+    print(g.load(checkpoint_dict=s))

@@ -12,12 +12,12 @@ from torch.utils.tensorboard.writer import SummaryWriter
 import dgl
 import numpy as np
 
-from node_agents.base_gcn_agent import BaseGCNAgent
+from agents.base_gcn_agent import BaseGCNAgent
 from pop.dueling_networks.dueling_net_factory import get_dueling_net
 
 from typing import List, Optional, Union, Tuple
 
-from pop.node_agents.utilities import to_dgl
+from pop.agents.utilities import to_dgl
 
 
 class GCNAgent(AgentWithConverter, BaseGCNAgent):
@@ -44,6 +44,8 @@ class GCNAgent(AgentWithConverter, BaseGCNAgent):
             name=name,
             training=training,
             device=device,
+            log_dir=log_dir,
+            tensorboard_dir=tensorboard_log_dir,
         )
 
         AgentWithConverter.__init__(
@@ -93,7 +95,7 @@ class GCNAgent(AgentWithConverter, BaseGCNAgent):
     ) -> None:
         checkpoint = {
             "optimizer_state": self.optimizer.state_dict(),
-            "trainsteps": self.trainsteps,
+            "train_steps": self.trainsteps,
             "episodes": self.episodes,
             "name": self.name,
             "architecture": self.architecture,

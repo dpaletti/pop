@@ -1,5 +1,4 @@
 from collections import namedtuple
-from typing import Optional
 import numpy as np
 from typing import Tuple, List, Any
 
@@ -23,36 +22,19 @@ class ReplayMemory(object):
     the priority of transition 'i'.
     \alpha determines how much prioritization is used, with '\alpha > 0' corresponding
     to the uniform random sampling case.
-    In order for the node_agents to converge the bias introduced by the non-uniform sampling needs
+    In order for the agents to converge the bias introduced by the non-uniform sampling needs
     to be corrected. We use importance sampling so that we can use weights when computing
     the loss:
     :math:`w_i = (\frac{1}{N}\frac{1}{P(i)})^\beta`
     :math:`beta` controls how strongly to correct for the bias where 0 means no correction while
     1 fully compensate for the bias. This weights are normalized by the maximum for stability
     concerns when computing the loss
-
-    Attributes
-    ----------
-    capacity: ``int``
-        capacity of the replay buffer
-
-    memory: :class: np.array
-        actual buffer implemented through a python deque
-
-    alpha: ``float``
-        strength of prioritized sampling
-
-    buffer_length: ``int``
-        number of transitions inside the memory
-
-    random_state: :class: np.random
     """
 
     def __init__(
         self,
         capacity: int,
         alpha: float,
-        random_state: Optional[np.random.RandomState] = None,
     ) -> None:
         self.memory = np.empty(
             capacity, dtype=[("priority", np.float32), ("transition", Transition)]
@@ -60,9 +42,6 @@ class ReplayMemory(object):
         self.capacity = capacity
         self.alpha = alpha
         self.buffer_length = 0
-        self.random_state = (
-            np.random.RandomState() if random_state is None else random_state
-        )
 
     def push(
         self,
@@ -72,7 +51,6 @@ class ReplayMemory(object):
         reward: float,
         done: bool,
     ) -> None:
-        """Add a transition to the buffer together with its priority"""
 
         transition = Transition(
             observation=observation,
@@ -104,22 +82,23 @@ class ReplayMemory(object):
     def sample(
         self, batch_size: int, beta: float
     ) -> Tuple[List[int], List[Transition], List[float]]:
-        """Sample `batch_size` transitions"""
+
         priorities = self.memory[: self.buffer_length]["priority"]
         sampling_probabilities = priorities**self.alpha / np.sum(
             priorities**self.alpha
         )
-        idxs = self.random_state.choice(
+
+        indices = np.choice(
             np.arange(priorities.size),
             size=batch_size,
             replace=True,
             p=sampling_probabilities,
         )
-        transitions = self.memory["transition"][idxs]
-        weights = (self.buffer_length * sampling_probabilities[idxs]) ** -beta
+        transitions = self.memory["transition"][indices]
+        weights = (self.buffer_length * sampling_probabilities[indices]) ** -beta
         normalized_weights = weights / weights.max()
 
-        return list(idxs), list(transitions), list(normalized_weights)
+        return list(indices), list(transitions), list(normalized_weights)
 
     def update_priorities(self, idxs: List[int], priorities: List[float]) -> None:
         """Update priorities of all samples with index in idxs"""

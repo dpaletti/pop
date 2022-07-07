@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 # Necessary imports (with aliases) for parsing
 import torch.nn as nn
 import dgl.nn.pytorch as dgl_nn
+import pop.networks.custom_layers as cl  # pylint: disable=unused-import
 
 
 def get_network(

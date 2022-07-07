@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Optional
 
 import toml
 
@@ -23,8 +23,29 @@ class NetworkArchitecture:
     layers: List[NetworkLayer]
 
     def __init__(
-        self, network: str, implementation_folder_path: str, frame_folder_path: str
+        self,
+        load_from_dict: Optional[
+            Dict[str, List[Dict[str, Union[int, float, str, bool]]]]
+        ] = None,
+        network: Optional[str] = None,
+        implementation_folder_path: Optional[str] = None,
+        frame_folder_path: Optional[str] = None,
     ):
+        if load_from_dict:
+            object.__setattr__(
+                self,
+                "layers",
+                [NetworkLayer(**layer) for layer in load_from_dict["layers"]],
+            )
+            return
+
+        if (
+            network is None
+            or implementation_folder_path is None
+            or frame_folder_path is None
+        ):
+            raise Exception("Pleas pass either layers or all the other parameters")
+
         # Loading implementation value with actual architecture values
         network_architecture_implementation_dict: Dict[
             str, Union[str, Dict[str, Union[int, float, str, bool]]]

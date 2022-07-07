@@ -1,11 +1,9 @@
-from typing import Tuple, Union, List
-from random import choice, sample
+from typing import Tuple, Union
+from random import choice
 
 import dgl
 import networkx as nx
 from grid2op.Observation import BaseObservation
-import numpy as np
-import torch as th
 
 
 def from_networkx_to_dgl(graph, device) -> dgl.DGLHeteroGraph:
@@ -45,20 +43,3 @@ def batch_observations(
         graphs.append(graph)
     graph_batch = dgl.batch(graphs)
     return graph_batch
-
-
-def add_self_loop(zero_edges_graph, feature_schema, device):
-    lone_node = list(zero_edges_graph.nodes)[0]
-    zero_edges_graph.add_edge(
-        lone_node,
-        lone_node,
-        **{
-            feature_name: np.float32(0)
-            if feature_value.dtype == th.float
-            else np.int32(0)
-            if feature_value.dtype == th.int
-            else False
-            for feature_name, feature_value in feature_schema.items()
-        }
-    )
-    return from_networkx_to_dgl(zero_edges_graph, device)

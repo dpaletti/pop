@@ -6,8 +6,8 @@ import ray
 from dgl import DGLHeteroGraph
 from torch import Tensor
 
-from node_agents.base_gcn_agent import BaseGCNAgent
-from node_agents.ray_agent import RayAgent
+from agents.base_gcn_agent import BaseGCNAgent
+from agents.ray_agent import RayAgent
 
 
 @ray.remote
@@ -59,13 +59,13 @@ class RayShallowGCNAgent(BaseGCNAgent, RayAgent):
         return self.name
 
     def load_state(
-        self, losses, actions, alive_steps, trainsteps, learning_steps, **kwargs
+        self, losses, actions, alive_steps, train_steps, learning_steps, **kwargs
     ) -> None:
         self.losses = losses
         self.actions_taken = actions
         self.decay_steps = 0
         self.alive_steps = alive_steps
-        self.trainsteps = trainsteps
+        self.trainsteps = train_steps
         self.learning_steps = learning_steps
 
     def take_action(

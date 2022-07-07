@@ -1,4 +1,6 @@
-from typing import Optional
+from dataclasses import asdict
+from pathlib import Path
+from typing import Optional, Dict, Any
 
 import torch as th
 import torch.nn as nn
@@ -8,12 +10,11 @@ from torch import Tensor, FloatTensor
 
 from configs.network_architecture import NetworkArchitecture
 from networks.network_architecture_parsing import get_network
+from networks.serializable_module import SerializableModule, T
 from pop.networks.gcn import GCN
 
-from utilities import get_log_file
 
-
-class DuelingNet(nn.Module):
+class DuelingNet(nn.Module, SerializableModule):
     def __init__(
         self,
         action_space_size: int,
@@ -25,10 +26,10 @@ class DuelingNet(nn.Module):
         log_dir: Optional[str] = None,
         edge_features: Optional[int] = None,
     ):
-        super(DuelingNet, self).__init__()
-        self.name = name
+        nn.Module.__init__(self)
+        SerializableModule.__init__(self, log_dir, name)
 
-        self.log_file = get_log_file(log_dir, name)
+        self.name = name
 
         # Parameters
         self.action_space_size = action_space_size
@@ -39,7 +40,7 @@ class DuelingNet(nn.Module):
             edge_features=edge_features,
             architecture=embedding_architecture,
             name=name + "_embedding",
-            log_dir=log_dir,
+            log_dir=None,
         )
 
         self.embedding_size: int = self.embedding.get_embedding_dimension()
@@ -47,30 +48,40 @@ class DuelingNet(nn.Module):
         self.advantage_stream: nn.Sequential = get_network(
             self, advantage_stream_architecture, is_graph_network=False
         )
+        self.advantage_stream_architecture = advantage_stream_architecture
+
         self.value_stream: nn.Module = get_network(
             self, value_stream_architecture, is_graph_network=False
         )
+        self.value_stream_architecture = value_stream_architecture
 
     @staticmethod
     def _compute_graph_embedding(
         g: DGLHeteroGraph, node_embeddings: th.Tensor
     ) -> th.Tensor:
 
+        # -> (node*batch_size, embedding_size)
         g.ndata["node_embeddings"] = node_embeddings
+
+        # -> (batch_size, embedding_size)
         graph_embedding: Tensor = dgl.mean_nodes(g, "node_embeddings")
         del g.ndata["node_embeddings"]
         return graph_embedding
 
     def _extract_features(self, g: DGLHeteroGraph) -> Tensor:
+        # (node*batch_size, embedding_size)
         node_embeddings = self.embedding(g)
 
+        # -> (batch_size, embedding_size)
         graph_embedding = self._compute_graph_embedding(g, node_embeddings)
 
         graph_embedding = th.flatten(graph_embedding, 1)
 
+        # -> (batch_size, embedding_size)
         return graph_embedding
 
     def forward(self, g: DGLHeteroGraph) -> Tensor:
+        # -> (batch_size, embedding_size)
         graph_embedding: Tensor = self._extract_features(g)
 
         # Compute value of current state
@@ -84,53 +95,61 @@ class DuelingNet(nn.Module):
         # -> (batch_size, action_space_size)
         q_values: Tensor = state_value + (state_advantages - state_advantages.mean())
 
-        if len(q_values.shape) == 2:
-            # -> (action_space_size)
-            q_values: Tensor = th.mean(q_values, 0)
-
-        # -> (action_space_size)
+        # -> (batch_size, action_space_size)
         return q_values
 
     def advantage(self, g: DGLHeteroGraph) -> Tensor:
 
+        # -> (batch_size, embedding_size)
         graph_embedding: Tensor = self._extract_features(g)
 
         # Compute advantage of (current_state, action) for each action
-        state_advantages: FloatTensor = self.advantage_stream(graph_embedding)
+        # -> (batch_size, action_space_size)
+        state_advantages: Tensor = self.advantage_stream(graph_embedding)
 
+        # -> (action_space_size)
+        state_advantages: Tensor = th.mean(state_advantages, 0)
+
+        # -> (action_space_size)
         return state_advantages
 
-    def save(self):
-        """
-        Save a checkpoint of the network.
-        Save all the hyperparameters.
-        """
-        checkpoint = {
+    def get_state(self: T) -> Dict[str, Any]:
+        return {
             "name": self.name,
-            "network_state": self.state_dict(),
             "action_space_size": self.action_space_size,
+            "embedding_state": self.embedding.get_state(),
+            "advantage_stream_architecture": asdict(self.advantage_stream_architecture),
+            "advantage_stream_state": self.advantage_stream.state_dict(),
+            "value_stream_architecture": asdict(self.value_stream_architecture),
+            "value_stream_state": self.value_stream.state_dict(),
+            "log_file": self.log_file,
         }
-        checkpoint = dict(list(checkpoint.items()) + list(self.architecture.items()))
-        th.save(checkpoint, self.log_file)
 
-    def load(
-        self,
-        log_dir: str,
-    ):
-        checkpoint = th.load(log_dir)
-        self.name = checkpoint["name"]
-        self.load_state_dict(checkpoint["network_state"])
-        self.action_space_size = checkpoint["action_space_size"]
-        self.architecture = {
-            i: j
-            for i, j in checkpoint.items()
-            if i
-            not in {
-                "network_state",
-                "node_features",
-                "edge_features",
-                "action_space_size",
-                "name",
-            }
-        }
-        print("Network Succesfully Loaded!")
+    @staticmethod
+    def _factory(checkpoint: Dict[str, Any]) -> "DuelingNet":
+        dueling_net: "DuelingNet" = DuelingNet(
+            action_space_size=checkpoint["action_space_size"],
+            node_features=checkpoint["embedding_state"]["node_features"],
+            edge_features=checkpoint["embedding_state"]["edge_features"],
+            embedding_architecture=NetworkArchitecture(
+                load_from_dict=checkpoint["embedding_state"]["architecture"]
+            ),
+            advantage_stream_architecture=NetworkArchitecture(
+                load_from_dict=checkpoint["advantage_stream_architecture"]
+            ),
+            value_stream_architecture=NetworkArchitecture(
+                load_from_dict=checkpoint["value_stream_architecture"]
+            ),
+            log_dir=str(Path(checkpoint["log_file"]).parents[0])
+            if checkpoint["log_file"] is not None
+            else None,
+            name=checkpoint["name"],
+        )
+        dueling_net.embedding.load_state_dict(
+            checkpoint["embedding_state"]["network_state"]
+        )
+        dueling_net.advantage_stream.load_state_dict(
+            checkpoint["advantage_stream_state"]
+        )
+        dueling_net.value_stream.load_state_dict(checkpoint["value_stream_state"])
+        return dueling_net

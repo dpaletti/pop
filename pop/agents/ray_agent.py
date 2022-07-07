@@ -13,9 +13,7 @@ class RayAgent(ABC):
         ...
 
     @abstractmethod
-    def get_state(
-        self,
-    ) -> Tuple[dict, dict, dict, List[float], List[int], int, int, int, int,]:
+    def reset_decay(self):
         ...
 
     @abstractmethod
@@ -28,7 +26,7 @@ class RayAgent(ABC):
         actions: List[int],
         decay_steps: int,
         alive_steps: int,
-        trainsteps: int,
+        train_steps: int,
         learning_steps: int,
         reset_decay=False,
     ) -> None:

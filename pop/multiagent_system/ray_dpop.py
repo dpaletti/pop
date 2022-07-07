@@ -1,33 +1,41 @@
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Dict, Set, Tuple
 
 import dgl
+import networkx as nx
 from grid2op.Environment import BaseEnv
 import ray
 
-from managers.head_manager import HeadManager
-from managers.ray_community_manager import RayCommunityManager
+from configs.architecture import Architecture
 from multiagent_system.base_pop import BasePOP
-from multiagent_system.space_factorization import factor_observation
-from node_agents.ray_gcn_agent import RayGCNAgent
+from multiagent_system.space_factorization import (
+    factor_observation,
+    split_graph_into_communities,
+)
+from agents.ray_gcn_agent import RayGCNAgent
 import torch as th
 from itertools import repeat
 
-from node_agents.ray_shallow_gcn_agent import RayShallowGCNAgent
+from agents.ray_shallow_gcn_agent import RayShallowGCNAgent
 
 
+# TODO: we can try not to factor the observation space but only the action space
+# TODO: the idea here is that each node sees all the graph but can act only on a subset
+# TODO: the manager takes actions only from a community (or more)
+# TODO: but still sees all the graph
+# TODO: this may greatly stabilise the training (removing partial observability) while
+# TODO: still retaining the advantages of sensible action space factorization
+# TODO: we can achieve this with radius < 0 and a switch in the observation factorization method
 class RayDPOP(BasePOP):
     def __init__(
         self,
         env: BaseEnv,
         name: str,
-        architecture: Union[str, dict],
+        architecture: Architecture,
         training: bool,
         tensorboard_dir: Optional[str],
         checkpoint_dir: Optional[str],
         seed: int,
-        manager_loss: str = "mean",
         device: Optional[str] = None,
-        n_jobs: Optional[int] = None,
     ):
         super(RayDPOP, self).__init__(
             env=env,
@@ -37,9 +45,7 @@ class RayDPOP(BasePOP):
             tensorboard_dir=tensorboard_dir,
             checkpoint_dir=checkpoint_dir,
             seed=seed,
-            manager_loss=manager_loss,
             device=device,
-            n_jobs=n_jobs,
         )
 
         # Agents Initialization
@@ -47,7 +53,7 @@ class RayDPOP(BasePOP):
         self._agents: List[RayGCNAgent] = [
             RayGCNAgent.remote(
                 agent_actions=len(action_space),
-                architecture=self.architecture["agent"],
+                architecture=self.architecture.agent,
                 node_features=self.node_features,
                 edge_features=self.edge_features,
                 name="agent_" + str(idx) + "_" + name,
@@ -57,7 +63,7 @@ class RayDPOP(BasePOP):
             if len(action_space) > 1
             else RayShallowGCNAgent.remote(
                 agent_actions=len(action_space),
-                architecture=self.architecture["agent"],
+                architecture=self.architecture.agent,
                 node_features=self.node_features,
                 edge_features=self.edge_features,
                 name="agent_" + str(idx) + "_" + name,
@@ -67,41 +73,47 @@ class RayDPOP(BasePOP):
             for idx, action_space in enumerate(self.action_spaces)
         ]
 
-        # Managers Initializations
-        self._managers: List[RayCommunityManager] = [
-            RayCommunityManager.remote(
+        # Managers Initialization
+        self._managers: Dict[Tuple[int, ...], RayGCNAgent] = {
+            community: RayGCNAgent.remote(
+                agent_actions=self.graph.nodes,
                 node_features=self.node_features
                 + 2,  # Node Features + Action + Global Node Id
                 edge_features=self.edge_features,
-                architecture=self.architecture["manager"],
-                name="manager_" + str(idx) + "_" + name,
+                architecture=self.architecture.manager,
+                name="manager_" + str(idx) + "_" + self.name,
                 training=self.training,
+                device=device,
             )
-            for idx, _ in enumerate(self.communities)
-        ]
+            for idx, community in enumerate(self.communities)
+        }
 
-        self.head_manager = HeadManager(
-            node_features=ray.get(self.managers[0].get_embedding_dimension.remote())
-            * 2,  # Manager Embedding + Action (padded)
-            architecture=self.architecture["head_manager"],
-            name="head_manager_" + "_" + name,
-            log_dir=self.checkpoint_dir,
+        # Head Manager Initialization
+        self.head_manager: RayGCNAgent = RayGCNAgent(
+            agent_actions=self.graph.nodes,
+            node_features=ray.get(
+                list(self.managers.values())[
+                    0
+                ].q_network.embedding.get_embedding_dimension()
+            ),
+            architecture=self.architecture.head_manager,
+            name="head_manager_" + name,
+            log_dir=None,
             training=self.training,
-        ).to(device)
-
-        self.head_manager_mini_batch: List[tuple] = []
+            device=device,
+        )
 
         self.head_manager_optimizer: th.optim.Optimizer = th.optim.Adam(
             self.head_manager.parameters(),
-            lr=self.architecture["head_manager"]["learning_rate"],
+            lr=self.architecture.head_manager.learning_rate,
         )
 
     @property
-    def agents(self):
+    def agents(self) -> List[RayGCNAgent]:
         return self._agents
 
     @property
-    def managers(self):
+    def managers(self) -> Dict[Tuple[int, ...], RayGCNAgent]:
         return self._managers
 
     def get_agent_actions(self, factored_observation):
@@ -124,18 +136,29 @@ class RayDPOP(BasePOP):
             current_epsilons,
         )
 
-    def get_manager_actions(self, subgraphs: List[dgl.DGLHeteroGraph]):
-        return zip(
+    def get_manager_actions(
+        self, subgraphs: Dict[Tuple[int, ...], dgl.DGLHeteroGraph]
+    ) -> Tuple[List[int], List[float]]:
+        chosen_nodes: List[int]
+        epsilons: List[float]
+        chosen_nodes, epsilons = zip(
             *ray.get(
                 [
-                    manager.forward.remote(g=subgraph)
-                    for manager, subgraph in zip(self.managers, subgraphs)
+                    self.managers[community].take_action(
+                        subgraphs[community], mask=community
+                    )
+                    for community in self.communities
                 ]
             )
         )
 
-    def get_action(self, summarized_graph: dgl.DGLHeteroGraph):
-        return self.head_manager(summarized_graph)
+        return (
+            chosen_nodes,
+            epsilons,
+        )
+
+    def get_action(self, graph: dgl.DGLHeteroGraph):
+        return self.head_manager.take_action(graph, mask=graph.nodes)
 
     def step_agents(self, next_observation, reward, done):
         losses, q_network_states, target_network_states = zip(
@@ -192,7 +215,7 @@ class RayDPOP(BasePOP):
         if not self.fixed_communities:
             raise Exception("In Learn() we assume fixed communities")
 
-        self.writer.add_scalar("POP/Reward", reward, self.trainsteps)
+        self.writer.add_scalar("POP/Reward", reward, self.train_steps)
         manager_losses, manager_state_dicts = self.teach_managers(reward)
 
         if not (None in manager_losses):
@@ -305,7 +328,7 @@ class RayDPOP(BasePOP):
 
         rayDPOP.managers_learning_steps = checkpoint["learning_steps"]
         rayDPOP.alive_steps = checkpoint["alive_steps"]
-        rayDPOP.trainsteps = checkpoint["trainsteps"]
+        rayDPOP.train_steps = checkpoint["train_steps"]
         rayDPOP.episodes = checkpoint["episodes"]
 
         print("Model Loaded")
@@ -328,7 +351,7 @@ class RayDPOP(BasePOP):
                         "actions",
                         "decay_steps",
                         "alive_steps",
-                        "trainsteps",
+                        "train_steps",
                         "learning_steps",
                     ],
                 )
@@ -375,7 +398,7 @@ class RayDPOP(BasePOP):
             "managers": managers_dict,
             "head_manager": head_manager_dict,
             "learning_steps": self.managers_learning_steps,
-            "trainsteps": self.trainsteps,
+            "train_steps": self.train_steps,
             "alive_steps": self.alive_steps,
             "episodes": self.episodes,
         }

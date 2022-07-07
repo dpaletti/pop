@@ -17,13 +17,12 @@ from torch import Tensor
 from networks.network_architecture_parsing import (
     get_network,
 )
+from networks.serializable_module import SerializableModule, T
 from pop.configs.network_architecture import NetworkArchitecture, NetworkLayer
 from dataclasses import asdict
 
-from utilities import get_log_file
 
-
-class GCN(nn.Module):
+class GCN(nn.Module, SerializableModule):
     def __init__(
         self,
         node_features: int,
@@ -32,7 +31,8 @@ class GCN(nn.Module):
         log_dir: Optional[str] = None,
         edge_features: Optional[int] = None,
     ) -> None:
-        super(GCN, self).__init__()
+        nn.Module.__init__(self)
+        SerializableModule.__init__(self, log_dir, name)
 
         self.name: str = name
 
@@ -45,9 +45,6 @@ class GCN(nn.Module):
             self, architecture, is_graph_network=True
         )
         self.architecture: NetworkArchitecture = architecture
-
-        # Logging
-        self.log_file: Optional[str] = get_log_file(log_dir, name)
 
     def forward(self, g: DGLHeteroGraph) -> Tensor:
         g = self._add_self_loop_to_batched_graph(g)
@@ -64,6 +61,7 @@ class GCN(nn.Module):
             node_embeddings = self.model(g, self._to_tensor(dict(g.ndata)))
 
         if len(node_embeddings.shape) == 3:
+            # Mean over heads if multi-headed attention
             # -> (nodes*batch_size, out_node_features)
             return th.mean(node_embeddings, dim=1)
 
@@ -73,29 +71,27 @@ class GCN(nn.Module):
     def get_embedding_dimension(self) -> int:
         return self.architecture.layers[-1].kwargs["out_feats"]
 
-    def save(self) -> None:
-        if self.log_file is None:
-            raise Exception("Called save() in " + self.name + " with None log_dir")
-
-        checkpoint = {
+    def get_state(self) -> Dict[str, Any]:
+        return {
             "name": self.name,
             "network_state": self.state_dict(),
             "node_features": self.node_features,
             "edge_features": self.edge_features,
             "architecture": asdict(self.architecture),
+            "log_file": self.log_file,
         }
 
-        th.save(checkpoint, self.log_file)
-
     @staticmethod
-    def load(log_file: str) -> "GCN":
-        checkpoint = th.load(log_file)
-        gcn = GCN(
+    def _factory(checkpoint: Dict[str, Any]) -> "GCN":
+
+        gcn: "GCN" = GCN(
             node_features=checkpoint["node_features"],
             edge_features=checkpoint["edge_features"],
-            architecture=NetworkArchitecture(**checkpoint["architecture"]),
+            architecture=NetworkArchitecture(load_from_dict=checkpoint["architecture"]),
             name=checkpoint["name"],
-            log_dir=str(Path(log_file).parents[0]),
+            log_dir=str(Path(checkpoint["log_file"]).parents[0])
+            if checkpoint["log_file"] is not None
+            else None,
         )
 
         gcn.load_state_dict(checkpoint["network_state"])

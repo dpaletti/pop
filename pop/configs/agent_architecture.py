@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, Union
+from typing import Dict, Union, Optional
 
 from configs.network_architecture import NetworkArchitecture
 
@@ -35,39 +35,63 @@ class AgentArchitecture:
 
     def __init__(
         self,
-        agent_dict: Dict[
-            str, Union[int, float, bool, str, Dict[str, Union[int, float, bool, str]]]
-        ],
-        network_architecture_implementation_folder_path: str,
-        network_architecture_frame_folder_path: str,
+        agent_dict: Optional[
+            Dict[
+                str,
+                Union[int, float, bool, str, Dict[str, Union[int, float, bool, str]]],
+            ]
+        ] = None,
+        network_architecture_implementation_folder_path: Optional[str] = None,
+        network_architecture_frame_folder_path: Optional[str] = None,
+        load_from_dict: dict = None,
     ):
-        object.__setattr__(
-            self,
-            "embedding",
-            NetworkArchitecture(
-                agent_dict["embedding"],
-                implementation_folder_path=network_architecture_implementation_folder_path,
-                frame_folder_path=network_architecture_frame_folder_path,
-            ),
-        )
-        object.__setattr__(
-            self,
-            "advantage_stream",
-            NetworkArchitecture(
-                agent_dict["advantage_stream"],
-                implementation_folder_path=network_architecture_implementation_folder_path,
-                frame_folder_path=network_architecture_frame_folder_path,
-            ),
-        )
-        object.__setattr__(
-            self,
-            "value_stream",
-            NetworkArchitecture(
-                agent_dict["value_stream"],
-                implementation_folder_path=network_architecture_implementation_folder_path,
-                frame_folder_path=network_architecture_frame_folder_path,
-            ),
-        )
+        if load_from_dict is not None:
+            object.__setattr__(
+                self,
+                "embedding",
+                NetworkArchitecture(load_from_dict=load_from_dict["embedding"]),
+            )
+            object.__setattr__(
+                self,
+                "advantage_stream",
+                NetworkArchitecture(load_from_dict=load_from_dict["advantage_stream"]),
+            )
+            object.__setattr__(
+                self,
+                "value_stream",
+                NetworkArchitecture(load_from_dict=load_from_dict["value_stream"]),
+            )
+            agent_dict = load_from_dict
+
+        else:
+            object.__setattr__(
+                self,
+                "embedding",
+                NetworkArchitecture(
+                    network=agent_dict["embedding"],
+                    implementation_folder_path=network_architecture_implementation_folder_path,
+                    frame_folder_path=network_architecture_frame_folder_path,
+                ),
+            )
+            object.__setattr__(
+                self,
+                "advantage_stream",
+                NetworkArchitecture(
+                    network=agent_dict["advantage_stream"],
+                    implementation_folder_path=network_architecture_implementation_folder_path,
+                    frame_folder_path=network_architecture_frame_folder_path,
+                ),
+            )
+            object.__setattr__(
+                self,
+                "value_stream",
+                NetworkArchitecture(
+                    network=agent_dict["value_stream"],
+                    implementation_folder_path=network_architecture_implementation_folder_path,
+                    frame_folder_path=network_architecture_frame_folder_path,
+                ),
+            )
+
         object.__setattr__(
             self, "exploration", ExplorationParameters(**agent_dict["exploration"])
         )
