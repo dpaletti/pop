@@ -1,15 +1,9 @@
-from typing import Optional, Any, Dict, List, Union, Tuple
+from typing import Optional, Any, Dict, List
 import dgl
 
 import torch as th
 from pathlib import Path
-import re
 
-# This imports must be aliased this way for network instantiation
-# Do not remove such aliases before changing the instantiation function
-import torch.nn as nn
-import pop.networks.custom_layers as cl
-import dgl.nn.pytorch as dgl_nn
 
 from dgl import DGLHeteroGraph
 from torch import Tensor
@@ -17,9 +11,24 @@ from torch import Tensor
 from networks.network_architecture_parsing import (
     get_network,
 )
-from networks.serializable_module import SerializableModule, T
-from pop.configs.network_architecture import NetworkArchitecture, NetworkLayer
+from networks.serializable_module import SerializableModule
+from pop.configs.network_architecture import NetworkArchitecture
 from dataclasses import asdict
+
+# ----------------------------------------------------------------#
+# This imports must be aliased this way for network instantiation
+# Do not remove such aliases before changing the instantiation function
+
+# noinspection PyUnresolvedReferences
+import torch.nn as nn
+
+# noinspection PyUnresolvedReferences
+import pop.networks.custom_layers as cl
+
+# noinspection PyUnresolvedReferences
+import dgl.nn.pytorch as dgl_nn
+
+# ----------------------------------------------------------------#
 
 
 class GCN(nn.Module, SerializableModule):

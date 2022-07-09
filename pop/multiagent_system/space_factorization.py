@@ -3,14 +3,18 @@ import hashlib
 import dgl
 from grid2op.Action import BaseAction
 from grid2op.Converter import IdToAct
-from grid2op.Environment import BaseEnv
 from grid2op.Observation import BaseObservation
-from typing import List, Tuple, Optional, Dict, Set
+from typing import List, Tuple, Optional, Dict
 import networkx as nx
 import numpy as np
 import torch as th
+from torch import Tensor
 
-from pop.agents.utilities import from_networkx_to_dgl
+from agents.base_gcn_agent import BaseGCNAgent
+from community_detection.community_detector import Community
+
+Substation = int
+EncodedAction = int
 
 
 class HashableAction:
@@ -114,26 +118,27 @@ def _assign_action(
 
 
 def factor_action_space(
-    env: BaseEnv,
-) -> Tuple[List[List[int]], Dict[HashableAction, int]]:
-
-    # Initializing converter and reference observation
-    full_converter: IdToAct = IdToAct(env.action_space)
-    full_converter.init_converter()
-    obs = env.reset()
-    graph = obs.as_networkx()
+    observation: BaseObservation,
+    observation_graph: nx.Graph,
+    full_converter: IdToAct,
+) -> Tuple[Dict[int, List[int]], Dict[HashableAction, int]]:
 
     # Here we retrieve the mappings between objects and buses (aka nodes)
-    _, mappings = obs.flow_bus_matrix()
+    # actual flow_bus_matrix is ignored, useless in this context
+    _, mappings = observation.flow_bus_matrix()
 
     # Unpacking the mappings for each object type
     (
         load_to_node,
         generator_to_node,
-        _,
+        _,  # storage_to_node ignored
         line_origin_to_node,
         line_extremity_to_node,
     ) = mappings
+
+    print(
+        "WARNING: Storage objects are ignored, check if they are present in the environment"
+    )
 
     # Factoring Action Lookup Table
     owner, actions, encoded_actions = zip(
@@ -154,23 +159,31 @@ def factor_action_space(
         ]
     )
 
-    action_spaces = [
-        [full_converter.all_actions[0]]
-        + [action for owner, action in zip(owner, actions) if owner == node]
-        for node in graph.nodes
-    ]
+    sub_id_to_action_space = {
+        node_data["sub_id"]: [full_converter.all_actions[0]]
+        + [
+            action
+            for owner, action in zip(owner, actions)
+            if owner == node_data["sub_id"]
+        ]
+        for node_id, node_data in observation_graph.nodes.data()
+    }
 
-    return action_spaces, {
+    return sub_id_to_action_space, {
         HashableAction(full_converter.all_actions[encoded_action]): encoded_action
         for encoded_action in encoded_actions
     }
 
 
 def _factor_observation_helper_ego_graph(graph, node, radius, device):
-    return from_networkx_to_dgl(nx.ego_graph(graph, node, radius), device)
+    return BaseGCNAgent.from_networkx_to_dgl(nx.ego_graph(graph, node, radius), device)
 
 
-def _add_self_loop(zero_edges_graph, feature_schema, device):
+def _add_self_loop(
+    zero_edges_graph: nx.Graph,
+    feature_schema: Dict[str, Tensor],
+    device: str,
+) -> dgl.DGLHeteroGraph:
     lone_node = list(zero_edges_graph.nodes)[0]
     zero_edges_graph.add_edge(
         lone_node,
@@ -184,35 +197,32 @@ def _add_self_loop(zero_edges_graph, feature_schema, device):
             for feature_name, feature_value in feature_schema.items()
         }
     )
-    return from_networkx_to_dgl(zero_edges_graph, device)
+    return BaseGCNAgent.from_networkx_to_dgl(zero_edges_graph, device)
 
 
 def factor_observation(
-    obs: BaseObservation, device, radius: int = 1
-) -> Tuple[List[dgl.DGLHeteroGraph], nx.Graph]:
+    obs_graph: nx.Graph, device: str, radius: int = 1
+) -> Dict[int, dgl.DGLHeteroGraph]:
 
-    graph: nx.Graph = obs.as_networkx()
-    sub_graphs: List[dgl.DGLHeteroGraph] = []
-    zero_edges_ego_graphs: List[nx.Graph] = []
-    positions = []
+    sub_graphs: Dict[int, dgl.DGLHeteroGraph] = {}
+    zero_edges_ego_graphs: List[Tuple[int, nx.Graph]] = []
 
-    for idx, node in enumerate(graph.nodes):
-        ego_graph: nx.Graph = nx.ego_graph(graph, node, radius)
+    for node_id, node_data in obs_graph.nodes.data():
+        ego_graph: nx.Graph = nx.ego_graph(obs_graph, node_id, radius)
 
         if ego_graph.number_of_edges() == 0:
             # Zero edges ego-graphs must have at least a self loop
-            positions.append(idx)
             print(
                 "WARNING: found zero edges ego graph, adding self-loop and zeroed-out features for consistency"
             )
             print(
                 "WARNING: features are assumed to have 32-bit precision and be either int, float or bool"
             )
-            zero_edges_ego_graphs.append(ego_graph)
+            zero_edges_ego_graphs.append((node_data["sub_id"], ego_graph))
             continue
 
-        subgraph = from_networkx_to_dgl(ego_graph, device)
-        sub_graphs.append(subgraph)
+        subgraph = BaseGCNAgent.from_networkx_to_dgl(ego_graph, device)
+        sub_graphs[node_data["sub_id"]] = subgraph
 
     if not sub_graphs:
         # At least 1 ego graph must be non-degenerate
@@ -222,18 +232,16 @@ def factor_observation(
 
     if zero_edges_ego_graphs:
         # Fixing zero edges ego graphs
-        feature_schema = sub_graphs[0].edata
-        for ego_graph, position in zip(zero_edges_ego_graphs, positions):
-            sub_graphs.insert(
-                position, _add_self_loop(ego_graph, feature_schema, device)
-            )
+        feature_schema = list(sub_graphs.values())[0].edata
+        for sub_id, ego_graph in zero_edges_ego_graphs:
+            sub_graphs[sub_id] = _add_self_loop(ego_graph, feature_schema, device)
 
-    return sub_graphs, graph
+    return sub_graphs
 
 
 def split_graph_into_communities(
-    graph: nx.Graph, communities: List[Tuple[int, ...]], device
-) -> Dict[Tuple[int, ...], dgl.DGLHeteroGraph]:
+    graph: nx.Graph, communities: List[Community], device: str
+) -> Dict[Community, dgl.DGLHeteroGraph]:
 
     nx_sub_graphs: List[nx.Graph] = []
     zero_edges_nx_sub_graphs: List[nx.Graph] = []
@@ -252,7 +260,8 @@ def split_graph_into_communities(
 
     # Convert correct sub_graphs to dgl
     sub_graphs: List[dgl.DGLHeteroGraph] = [
-        from_networkx_to_dgl(subgraph, device) for subgraph in nx_sub_graphs
+        BaseGCNAgent.from_networkx_to_dgl(subgraph, device)
+        for subgraph in nx_sub_graphs
     ]
 
     # Add self loop to 0 edges subgraphs

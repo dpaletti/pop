@@ -1,21 +1,22 @@
 from abc import ABC
 from typing import Optional, Tuple, List
 
+import networkx as nx
 from dgl import DGLHeteroGraph
+from grid2op.Observation import BaseObservation
 from torch import Tensor
 
 from configs.agent_architecture import AgentArchitecture
 from networks.serializable_module import SerializableModule
 from agents.loggable_module import LoggableModule
-from agents.utilities import batch_observations
 from networks.dueling_net import DuelingNet
-import networkx as nx
 import copy
 import numpy as np
-import numpy.ma as ma
 import torch as th
 import torch.nn as nn
+import dgl
 from pop.agents.replay_buffer import ReplayMemory, Transition
+from random import choice
 
 
 class BaseGCNAgent(ABC, SerializableModule, LoggableModule):
@@ -69,12 +70,13 @@ class BaseGCNAgent(ABC, SerializableModule, LoggableModule):
         )
         self.target_network: DuelingNet = copy.deepcopy(self.q_network)
 
-        # Reporting
+        # Logging
         self.decay_steps: int = 0
         self.train_steps: int = 0
         self.episodes: int = 0
         self.alive_steps: int = 0
         self.learning_steps: int = 0
+        self.epsilon: float = self.architecture.exploration.max_epsilon
 
         # Optimizer
         self.optimizer: th.optim.Optimizer = th.optim.Adam(
@@ -96,13 +98,11 @@ class BaseGCNAgent(ABC, SerializableModule, LoggableModule):
 
     def compute_loss(
         self, transitions_batch: Transition, sampling_weights: Tensor
-    ) -> Tuple[Tensor, Tensor, DGLHeteroGraph, DGLHeteroGraph]:
+    ) -> Tuple[Tensor, Tensor]:
 
-        observation_batch = batch_observations(
-            transitions_batch.observation, self.device
-        )
-        next_observation_batch = batch_observations(
-            transitions_batch.next_observation, self.device
+        observation_batch = self.batch_observations(transitions_batch.observation)
+        next_observation_batch = self.batch_observations(
+            transitions_batch.next_observation
         )
 
         # Get 1 action per batch and restructure as an index for gather()
@@ -149,18 +149,17 @@ class BaseGCNAgent(ABC, SerializableModule, LoggableModule):
             q_values * sampling_weights, td_errors * sampling_weights
         ).to(self.device)
 
-        return loss, td_errors, observation_batch, next_observation_batch
+        return loss, td_errors
 
-    def exponential_decay(self, max_val: float, min_val: float, decay: int) -> float:
+    def _exponential_decay(self, max_val: float, min_val: float, decay: int) -> float:
         return min_val + (max_val - min_val) * np.exp(-1.0 * self.decay_steps / decay)
 
     def take_action(
         self,
         transformed_observation: DGLHeteroGraph,
-        mask: Optional[List[int]] = None,
-    ) -> Tuple[int, float]:
+    ) -> int:
 
-        epsilon = self.exponential_decay(
+        self.epsilon = self._exponential_decay(
             self.architecture.exploration.max_epsilon,
             self.architecture.exploration.min_epsilon,
             self.architecture.exploration.epsilon_decay,
@@ -168,35 +167,13 @@ class BaseGCNAgent(ABC, SerializableModule, LoggableModule):
         action_list = list(range(self.actions))
         if self.training:
             # epsilon-greedy Exploration
-            if np.random.rand() <= epsilon:
-                if mask is None:
-                    return (
-                        np.random.choice(action_list),
-                        epsilon,
-                    )
-                else:
-                    return (
-                        np.random.choice(
-                            action_list,
-                            p=[
-                                1 / len(mask) if action in mask else 0
-                                for action in action_list
-                            ],
-                        ),
-                        epsilon,
-                    )
+            if np.random.rand() <= self.epsilon:
+                return np.random.choice(action_list)
 
         # -> (actions)
         advantages: Tensor = self.q_network.advantage(transformed_observation)
-        if mask is not None:
-            advantages[
-                [False if action in mask else True for action in action_list]
-            ] = float("-inf")
 
-        return (
-            int(th.argmax(advantages).item()),
-            epsilon,
-        )
+        return int(th.argmax(advantages).item())
 
     def update_mem(
         self,
@@ -209,7 +186,7 @@ class BaseGCNAgent(ABC, SerializableModule, LoggableModule):
 
         self.memory.push(observation, action, next_observation, reward, done)
 
-    def learn(self) -> Optional[Tensor]:
+    def learn(self) -> None:
         if len(self.memory) < self.architecture.batch_size:
             return None
         if (
@@ -219,9 +196,9 @@ class BaseGCNAgent(ABC, SerializableModule, LoggableModule):
             self.target_network.parameters = self.q_network.parameters
 
         # Sample from Replay Memory and unpack
-        idxs, transitions, sampling_weights = self.memory.sample(
+        memory_indices, transitions, sampling_weights = self.memory.sample(
             self.architecture.batch_size,
-            self.exponential_decay(
+            self._exponential_decay(
                 self.architecture.replay_memory.max_beta,
                 self.architecture.replay_memory.min_beta,
                 self.architecture.replay_memory.beta_decay,
@@ -229,12 +206,7 @@ class BaseGCNAgent(ABC, SerializableModule, LoggableModule):
         )
         transitions = Transition(*zip(*transitions))
 
-        (
-            loss,
-            td_error,
-            observation_batch,
-            next_observation_batch,
-        ) = self.compute_loss(transitions, th.Tensor(sampling_weights))
+        loss, td_error = self.compute_loss(transitions, th.Tensor(sampling_weights))
 
         # Backward propagation
         self.optimizer.zero_grad()
@@ -242,19 +214,19 @@ class BaseGCNAgent(ABC, SerializableModule, LoggableModule):
         self.optimizer.step()
 
         # Update priorities for sampling
-        self.memory.update_priorities(idxs, td_error.abs().detach().numpy().flatten())
-
-        return loss
+        self.memory.update_priorities(
+            memory_indices, td_error.abs().detach().numpy().flatten()
+        )
 
     def step(
         self,
-        observation,
+        observation: DGLHeteroGraph,
         action: int,
         reward: float,
-        next_observation: nx.Graph,
+        next_observation: DGLHeteroGraph,
         done: bool,
         stop_decay: bool = False,
-    ) -> Optional[Tuple[Tensor, dict, dict]]:
+    ) -> None:
 
         self.train_steps += 1
         if done:
@@ -270,10 +242,32 @@ class BaseGCNAgent(ABC, SerializableModule, LoggableModule):
 
             # every so often the agents should learn from experiences
             if self.train_steps % self.architecture.learning_frequency == 0:
-                loss = self.learn()
+                self.learn()
                 self.learning_steps += 1
-                return (
-                    loss,
-                    self.q_network.state_dict(),
-                    self.target_network.state_dict(),
-                )
+
+    @staticmethod
+    def batch_observations(graphs: List[DGLHeteroGraph]) -> DGLHeteroGraph:
+        return dgl.batch(graphs)
+
+    @staticmethod
+    def to_dgl(obs: BaseObservation, device: str) -> DGLHeteroGraph:
+
+        # Convert Grid2op graph to a directed (for compatibility reasons) networkx graph
+        net = obs.as_networkx()
+        net = net.to_directed()  # Typing error from networkx, ignore it
+
+        # Convert from networkx to dgl graph
+        return BaseGCNAgent.from_networkx_to_dgl(net, device)
+
+    @staticmethod
+    def from_networkx_to_dgl(graph: nx.Graph, device: str) -> DGLHeteroGraph:
+        return dgl.from_networkx(
+            graph.to_directed(),
+            node_attrs=list(graph.nodes[choice(list(graph.nodes))].keys())
+            if len(graph.nodes) > 0
+            else [],
+            edge_attrs=list(graph.edges[choice(list(graph.edges))].keys())
+            if len(graph.edges) > 0
+            else [],
+            device=device,
+        )

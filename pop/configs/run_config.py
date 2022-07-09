@@ -7,6 +7,8 @@ import toml
 from configs.architecture import Architecture
 from configs.placeholders_handling import replace_backward_reference
 
+ParsedTOMLDict = Dict[str, Dict[str, Union[int, float, bool, str]]]
+
 
 @dataclass(frozen=True)
 class Reproducibility:
@@ -96,9 +98,7 @@ class RunConfiguration:
     environment: EnvironmentParameters
 
     def __init__(self, path: str):
-        run_config_dict: Dict[str, Dict[str, Union[int, str, bool, float]]] = toml.load(
-            open(path)
-        )
+        run_config_dict: ParsedTOMLDict = toml.load(open(path))
 
         run_config_full_dict = {
             section_name: {

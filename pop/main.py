@@ -23,7 +23,7 @@ import dgl
 import os
 import resource
 
-from pop.multiagent_system.ray_dpop import RayDPOP
+from pop.multiagent_system.dpop import DPOP
 from pop.multiagent_system.base_pop import train
 import argparse
 import importlib
@@ -273,7 +273,7 @@ def main(**kwargs):
 
     if config["loading"]["load"]:
         # Load agent
-        agent = RayDPOP.load(
+        agent = DPOP.load(
             checkpoint_file=config["loading"]["load_dir"],
             training=config["training"]["train"],
             device=config["reproducibility"]["device"],
@@ -285,7 +285,7 @@ def main(**kwargs):
         )
     elif not config["training"]["curriculum"]:
         # Instantiate agent ex novo
-        agent = RayDPOP(
+        agent = DPOP(
             env=env_train,
             name=config["model"]["name"],
             architecture=config["model"]["architecture_path"],
@@ -296,7 +296,7 @@ def main(**kwargs):
             device=config["reproducibility"]["device"],
         )
     else:
-        agent = RayDPOP(
+        agent = DPOP(
             env=curriculum_envs[0],
             name=config["model"]["name"] + "_curr_0",
             architecture=config["model"]["architecture_path"],
@@ -320,7 +320,7 @@ def main(**kwargs):
             for idx, env in enumerate(curriculum_envs[:-1]):
                 train(env=env, dpop=agent, iterations=steps)
 
-                agent = RayDPOP.load(
+                agent = DPOP.load(
                     checkpoint_file=str(Path(config["loading"]["load_dir"]).parents[0])
                     + "_curr_"
                     + str(idx)

@@ -3,6 +3,11 @@ from typing import Dict, Union, Optional
 
 from configs.network_architecture import NetworkArchitecture
 
+EventuallyNestedDict = Dict[
+    str,
+    Union[int, float, bool, str, Dict[str, Union[int, float, bool, str]]],
+]
+
 
 @dataclass(frozen=True)
 class ExplorationParameters:
@@ -35,12 +40,7 @@ class AgentArchitecture:
 
     def __init__(
         self,
-        agent_dict: Optional[
-            Dict[
-                str,
-                Union[int, float, bool, str, Dict[str, Union[int, float, bool, str]]],
-            ]
-        ] = None,
+        agent_dict: EventuallyNestedDict = None,
         network_architecture_implementation_folder_path: Optional[str] = None,
         network_architecture_frame_folder_path: Optional[str] = None,
         load_from_dict: dict = None,

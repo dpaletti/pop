@@ -1,26 +1,24 @@
-from typing import Union, Optional, Tuple, List
+from typing import Optional, Dict, Any
 
 import networkx as nx
-import torch as th
 import ray
 from dgl import DGLHeteroGraph
-from torch import Tensor
 
 from agents.base_gcn_agent import BaseGCNAgent
-from agents.ray_agent import RayAgent
+from configs.agent_architecture import AgentArchitecture
 
 
 @ray.remote
-class RayShallowGCNAgent(BaseGCNAgent, RayAgent):
+class RayShallowGCNAgent(BaseGCNAgent):
     def __init__(
         self,
-        agent_actions: int,
-        node_features: int,
-        edge_features: int,
-        architecture: Union[str, dict],
         name: str,
-        training: bool,
         device: str,
+        agent_actions: Optional[int] = None,
+        node_features: Optional[int] = None,
+        edge_features: Optional[int] = None,
+        architecture: Optional[AgentArchitecture] = None,
+        training: Optional[bool] = None,
     ):
         BaseGCNAgent.__init__(
             self,
@@ -31,48 +29,33 @@ class RayShallowGCNAgent(BaseGCNAgent, RayAgent):
             name=name,
             training=training,
             device=device,
+            log_dir=None,
+            tensorboard_dir=None,
         )
-
-        # Logging
-        self.losses = []
-        self.actions_taken = []
-
-    def get_q_network(self) -> None:
-        raise Exception("Shallow agent: " + self.name + " has no q_network")
 
     def get_state(
         self,
-    ) -> Tuple[dict, dict, dict, List[float], List[int], int, int, int, int]:
-        return (
-            dict(),
-            dict(),
-            dict(),
-            [0.0],
-            self.actions_taken,
-            0,
-            self.alive_steps,
-            self.trainsteps,
-            self.learning_steps,
-        )
+    ) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "device": self.device,
+        }
 
     def get_name(self) -> str:
         return self.name
 
-    def load_state(
-        self, losses, actions, alive_steps, train_steps, learning_steps, **kwargs
-    ) -> None:
-        self.losses = losses
-        self.actions_taken = actions
-        self.decay_steps = 0
-        self.alive_steps = alive_steps
-        self.trainsteps = train_steps
-        self.learning_steps = learning_steps
+    @staticmethod
+    def _factory(checkpoint: Dict[str, Any]) -> "RayShallowGCNAgent":
+        agent: "RayShallowGCNAgent" = RayShallowGCNAgent(
+            name=checkpoint["name"], device=checkpoint["device"]
+        )
+        return agent
 
     def take_action(
         self,
         transformed_observation: DGLHeteroGraph,
-    ) -> Tuple[int, float]:
-        return 0, 0  # Action chosen always zero and Epsilon always zero
+    ) -> int:
+        return 0  # Always no-action
 
     def step(
         self,
@@ -82,20 +65,5 @@ class RayShallowGCNAgent(BaseGCNAgent, RayAgent):
         next_observation: nx.Graph,
         done: bool,
         stop_decay: bool = False,
-    ) -> Tuple[Optional[Tensor], None, None]:
-
-        if done:
-            self.episodes += 1
-            self.trainsteps += 1
-
-        else:
-            self.trainsteps += 1
-            self.alive_steps += 1
-            if not stop_decay:
-                self.decay_steps += 1
-
-            # Fake learning
-            if self.trainsteps % self.architecture["learning_frequency"] == 0:
-                self.learning_steps += 1
-                return th.tensor(0.0), None, None
-            return None, None, None
+    ) -> None:
+        return

@@ -1,16 +1,16 @@
 from dataclasses import asdict
-from typing import OrderedDict, Dict, Any, Optional
+from typing import Optional, List, Dict, Any, OrderedDict
 
-import ray
 from torch import Tensor
 
-from configs.agent_architecture import AgentArchitecture
-from networks.dueling_net import DuelingNet
 from agents.base_gcn_agent import BaseGCNAgent
+from configs.agent_architecture import AgentArchitecture
+from dgl import DGLHeteroGraph
+import numpy as np
+import torch as th
 
 
-@ray.remote
-class RayGCNAgent(BaseGCNAgent):
+class Manager(BaseGCNAgent):
     def __init__(
         self,
         agent_actions: int,
@@ -34,18 +34,55 @@ class RayGCNAgent(BaseGCNAgent):
             log_dir=None,
         )
 
-    def get_q_network(self) -> DuelingNet:
-        return self.q_network
+        self.node_embeddings: Optional[Tensor] = None
 
-    def get_name(self) -> str:
-        return self.name
+    def get_node_embeddings(self) -> Tensor:
+        if self.node_embeddings is None:
+            raise Exception("None embedding in: " + self.name)
+        return self.node_embeddings
 
-    def reset_decay(self):
-        self.decay_steps = 0
+    def take_action(
+        self, transformed_observation: DGLHeteroGraph, mask: Optional[List[int]] = None
+    ) -> int:
+        if mask is None:
+            raise Exception(
+                "Manager '" + self.name + " take_action() invoked with None mask"
+            )
+
+        action_list = list(range(self.actions))
+
+        self.epsilon = self.exponential_decay(
+            self.architecture.exploration.max_epsilon,
+            self.architecture.exploration.min_epsilon,
+            self.architecture.exploration.epsilon_decay,
+        )
+
+        self.node_embeddings = self.q_network.get_node_embeddings(
+            transformed_observation
+        )
+        if self.training:
+            # epsilon-greedy Exploration
+            if np.random.rand() <= self.epsilon:
+                return np.random.choice(
+                    action_list,
+                    p=[
+                        1 / len(mask) if action in mask else 0 for action in action_list
+                    ],
+                )
+
+        # -> (actions)
+        advantages: Tensor = self.q_network.advantage(transformed_observation)
+
+        # Masking advantages
+        advantages[
+            [False if action in mask else True for action in action_list]
+        ] = float("-inf")
+
+        return int(th.argmax(advantages).item())
 
     @staticmethod
-    def _factory(checkpoint: Dict[str, Any]) -> "RayGCNAgent":
-        agent: "RayGCNAgent" = RayGCNAgent(
+    def _factory(checkpoint: Dict[str, Any]) -> "Manager":
+        manager: "Manager" = Manager(
             agent_actions=checkpoint["agent_actions"],
             node_features=checkpoint["node_features"],
             architecture=AgentArchitecture(load_from_dict=checkpoint["architecture"]),
@@ -54,7 +91,7 @@ class RayGCNAgent(BaseGCNAgent):
             device=checkpoint["device"],
             edge_features=checkpoint["edge_features"],
         )
-        agent.load_state(
+        manager.load_state(
             optimizer_state=checkpoint["optimizer_state"],
             q_network_state=checkpoint["q_network_state"],
             target_network_state=checkpoint["target_network_state"],
@@ -63,7 +100,7 @@ class RayGCNAgent(BaseGCNAgent):
             train_steps=checkpoint["train_steps"],
             learning_steps=checkpoint["learning_steps"],
         )
-        return agent
+        return manager
 
     def get_state(
         self,

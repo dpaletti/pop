@@ -8,6 +8,7 @@ from configs.placeholders_handling import (
     replace_backward_reference,
     replace_placeholders,
 )
+from configs.run_config import ParsedTOMLDict
 
 
 @dataclass(frozen=True)
@@ -15,7 +16,7 @@ class NetworkLayer:
     name: str
     type: str
     module: str
-    kwargs: Dict[str, Union[int, float, str, bool]]
+    kwargs: ParsedTOMLDict
 
 
 @dataclass(frozen=True)
@@ -24,9 +25,7 @@ class NetworkArchitecture:
 
     def __init__(
         self,
-        load_from_dict: Optional[
-            Dict[str, List[Dict[str, Union[int, float, str, bool]]]]
-        ] = None,
+        load_from_dict: Optional[Dict[str, List[ParsedTOMLDict]]] = None,
         network: Optional[str] = None,
         implementation_folder_path: Optional[str] = None,
         frame_folder_path: Optional[str] = None,

@@ -44,6 +44,7 @@ class DuelingNet(nn.Module, SerializableModule):
         )
 
         self.embedding_size: int = self.embedding.get_embedding_dimension()
+        self._node_embeddings: Optional[Tensor] = None
 
         self.advantage_stream: nn.Sequential = get_network(
             self, advantage_stream_architecture, is_graph_network=False
@@ -54,6 +55,13 @@ class DuelingNet(nn.Module, SerializableModule):
             self, value_stream_architecture, is_graph_network=False
         )
         self.value_stream_architecture = value_stream_architecture
+
+    def get_node_embeddings(self, g: DGLHeteroGraph) -> Tensor:
+        return (
+            self._node_embeddings
+            if self._node_embeddings is not None
+            else self.embedding(g)
+        )
 
     @staticmethod
     def _compute_graph_embedding(
@@ -70,10 +78,10 @@ class DuelingNet(nn.Module, SerializableModule):
 
     def _extract_features(self, g: DGLHeteroGraph) -> Tensor:
         # (node*batch_size, embedding_size)
-        node_embeddings = self.embedding(g)
+        self._node_embeddings = self.embedding(g)
 
         # -> (batch_size, embedding_size)
-        graph_embedding = self._compute_graph_embedding(g, node_embeddings)
+        graph_embedding = self._compute_graph_embedding(g, self._node_embeddings)
 
         graph_embedding = th.flatten(graph_embedding, 1)
 

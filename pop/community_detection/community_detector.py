@@ -1,11 +1,14 @@
 from random import Random
-from typing import List, Set, Tuple, Optional
+from typing import List, Set, Tuple, Optional, FrozenSet
 
 import networkx as nx
 import networkx.linalg as nx_linalg
 import numpy as np
 from pop.community_detection.louvain import louvain_communities
 from pop.community_detection.power_supply_modularity import belong_to_same_community
+
+
+Community = FrozenSet[int]
 
 
 class CommunityDetector:
@@ -111,7 +114,7 @@ class CommunityDetector:
         enable_power_supply_modularity=False,
         alpha: float = 0.5,
         beta: float = 0.5,
-    ) -> List[Set[int]]:
+    ) -> List[FrozenSet[int]]:
         """
         Two phases:
         - initialize an intermediate community structure
@@ -157,14 +160,17 @@ class CommunityDetector:
             comm_t1.append(set(two_vertices_community))
 
         comm_t1 = [i for i in comm_t1 if i]
-        return louvain_communities(
-            graph_t1,
-            comm_t1,
-            weight=None,
-            resolution=self.resolution,
-            threshold=self.threshold,
-            seed=Random(self.seed),
-            enable_power_supply_modularity=enable_power_supply_modularity,
-            alpha=alpha,
-            beta=beta,
-        )
+        return [
+            frozenset(community)
+            for community in louvain_communities(
+                graph_t1,
+                comm_t1,
+                weight=None,
+                resolution=self.resolution,
+                threshold=self.threshold,
+                seed=Random(self.seed),
+                enable_power_supply_modularity=enable_power_supply_modularity,
+                alpha=alpha,
+                beta=beta,
+            )
+        ]

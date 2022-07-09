@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-from typing import Dict, Union
 import toml
 from configs.agent_architecture import AgentArchitecture
+from configs.run_config import ParsedTOMLDict
 
 
 @dataclass(frozen=True)
@@ -29,9 +29,7 @@ class Architecture:
         network_architecture_implementation_folder_path: str,
         network_architecture_frame_folder_path: str,
     ):
-        architecture_dict: Dict[
-            str, Dict[str, Union[int, bool, str, float]]
-        ] = toml.load(open(path))
+        architecture_dict: ParsedTOMLDict = toml.load(open(path))
 
         assert "pop" in architecture_dict.keys()
         assert "agent" in architecture_dict.keys()

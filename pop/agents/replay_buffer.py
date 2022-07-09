@@ -8,29 +8,6 @@ Transition = namedtuple(
 
 
 class ReplayMemory(object):
-    """
-    Prioritized Experience Replay buffer implemented on top of a structured Numpy Array.
-    The idea is associating with every transition additional information:
-    - priority: updated according to the loss
-    - probability: computed out of transition priorities
-    - weight: computed out of probabilities, correct for sampling bias
-    Two hyper-parameters are introduced :math: `\alpha, \beta` which control how much
-    we want to prioritize, at the end of the training we want to sample uniformly to
-    avoid overfitting.
-    Probability of sampling experience 'i':
-    :math:`P(i)=\frac{p_i^\alpha}{\sum_{j=0}^N p_j^\alpha}` where :math:`p_i > 0` is
-    the priority of transition 'i'.
-    \alpha determines how much prioritization is used, with '\alpha > 0' corresponding
-    to the uniform random sampling case.
-    In order for the agents to converge the bias introduced by the non-uniform sampling needs
-    to be corrected. We use importance sampling so that we can use weights when computing
-    the loss:
-    :math:`w_i = (\frac{1}{N}\frac{1}{P(i)})^\beta`
-    :math:`beta` controls how strongly to correct for the bias where 0 means no correction while
-    1 fully compensate for the bias. This weights are normalized by the maximum for stability
-    concerns when computing the loss
-    """
-
     def __init__(
         self,
         capacity: int,
@@ -101,7 +78,6 @@ class ReplayMemory(object):
         return list(indices), list(transitions), list(normalized_weights)
 
     def update_priorities(self, idxs: List[int], priorities: List[float]) -> None:
-        """Update priorities of all samples with index in idxs"""
         self.memory["priority"][idxs] = priorities
 
     def __len__(self) -> int:
