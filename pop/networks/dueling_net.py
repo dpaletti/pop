@@ -56,12 +56,8 @@ class DuelingNet(nn.Module, SerializableModule):
         )
         self.value_stream_architecture = value_stream_architecture
 
-    def get_node_embeddings(self, g: DGLHeteroGraph) -> Tensor:
-        return (
-            self._node_embeddings
-            if self._node_embeddings is not None
-            else self.embedding(g)
-        )
+    def get_embedding_size(self):
+        return self.embedding.get_embedding_dimension()
 
     @staticmethod
     def _compute_graph_embedding(
@@ -134,7 +130,7 @@ class DuelingNet(nn.Module, SerializableModule):
         }
 
     @staticmethod
-    def _factory(checkpoint: Dict[str, Any]) -> "DuelingNet":
+    def factory(checkpoint: Dict[str, Any]) -> "DuelingNet":
         dueling_net: "DuelingNet" = DuelingNet(
             action_space_size=checkpoint["action_space_size"],
             node_features=checkpoint["embedding_state"]["node_features"],

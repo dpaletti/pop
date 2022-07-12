@@ -27,6 +27,7 @@ def get_network(
         model: nn.Sequential = nn.Sequential()
     for layer in architecture.layers:
         model.append(eval(_parse_layer(self, layer)))
+
     return model
 
 

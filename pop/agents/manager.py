@@ -1,6 +1,7 @@
 from dataclasses import asdict
 from typing import Optional, List, Dict, Any, OrderedDict
 
+from ray import ObjectRef
 from torch import Tensor
 
 from agents.base_gcn_agent import BaseGCNAgent
@@ -8,8 +9,10 @@ from configs.agent_architecture import AgentArchitecture
 from dgl import DGLHeteroGraph
 import numpy as np
 import torch as th
+import ray
 
 
+@ray.remote
 class Manager(BaseGCNAgent):
     def __init__(
         self,
@@ -35,6 +38,10 @@ class Manager(BaseGCNAgent):
         )
 
         self.node_embeddings: Optional[Tensor] = None
+        self.embedding_size = self.q_network.get_embedding_size()
+
+    def get_embedding_size(self):
+        return self.embedding_size
 
     def get_node_embeddings(self) -> Tensor:
         if self.node_embeddings is None:
@@ -51,15 +58,14 @@ class Manager(BaseGCNAgent):
 
         action_list = list(range(self.actions))
 
-        self.epsilon = self.exponential_decay(
+        self.epsilon = self._exponential_decay(
             self.architecture.exploration.max_epsilon,
             self.architecture.exploration.min_epsilon,
             self.architecture.exploration.epsilon_decay,
         )
 
-        self.node_embeddings = self.q_network.get_node_embeddings(
-            transformed_observation
-        )
+        self.node_embeddings = self.q_network.embedding(transformed_observation)
+
         if self.training:
             # epsilon-greedy Exploration
             if np.random.rand() <= self.epsilon:
@@ -81,8 +87,8 @@ class Manager(BaseGCNAgent):
         return int(th.argmax(advantages).item())
 
     @staticmethod
-    def _factory(checkpoint: Dict[str, Any]) -> "Manager":
-        manager: "Manager" = Manager(
+    def factory(checkpoint: Dict[str, Any], **kwargs) -> ObjectRef:
+        manager: ObjectRef = Manager.remote(
             agent_actions=checkpoint["agent_actions"],
             node_features=checkpoint["node_features"],
             architecture=AgentArchitecture(load_from_dict=checkpoint["architecture"]),
@@ -91,7 +97,7 @@ class Manager(BaseGCNAgent):
             device=checkpoint["device"],
             edge_features=checkpoint["edge_features"],
         )
-        manager.load_state(
+        manager.load_state.remote(
             optimizer_state=checkpoint["optimizer_state"],
             q_network_state=checkpoint["q_network_state"],
             target_network_state=checkpoint["target_network_state"],

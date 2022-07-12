@@ -2,11 +2,12 @@ from dataclasses import asdict
 from typing import OrderedDict, Dict, Any, Optional
 
 import ray
+from ray import ObjectRef
 from torch import Tensor
 
+from agents.base_gcn_agent import BaseGCNAgent
 from configs.agent_architecture import AgentArchitecture
 from networks.dueling_net import DuelingNet
-from agents.base_gcn_agent import BaseGCNAgent
 
 
 @ray.remote
@@ -44,8 +45,8 @@ class RayGCNAgent(BaseGCNAgent):
         self.decay_steps = 0
 
     @staticmethod
-    def _factory(checkpoint: Dict[str, Any]) -> "RayGCNAgent":
-        agent: "RayGCNAgent" = RayGCNAgent(
+    def factory(checkpoint: Dict[str, Any], **kwargs) -> ObjectRef:
+        agent = RayGCNAgent.remote(
             agent_actions=checkpoint["agent_actions"],
             node_features=checkpoint["node_features"],
             architecture=AgentArchitecture(load_from_dict=checkpoint["architecture"]),
@@ -54,7 +55,7 @@ class RayGCNAgent(BaseGCNAgent):
             device=checkpoint["device"],
             edge_features=checkpoint["edge_features"],
         )
-        agent.load_state(
+        agent.load_state.remote(
             optimizer_state=checkpoint["optimizer_state"],
             q_network_state=checkpoint["q_network_state"],
             target_network_state=checkpoint["target_network_state"],

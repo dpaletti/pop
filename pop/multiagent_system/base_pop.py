@@ -1,8 +1,10 @@
 from abc import abstractmethod
+from dataclasses import asdict
 from typing import Optional, List, Tuple, Dict, Union, Any
 
 import dgl
 import networkx as nx
+import numpy as np
 from grid2op.Action import BaseAction
 from grid2op.Agent import AgentWithConverter
 from grid2op.Converter import IdToAct
@@ -43,6 +45,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         checkpoint_dir: Optional[str] = None,
         tensorboard_dir: Optional[str] = None,
         device: Optional[str] = None,
+        pre_initialized: bool = False,
     ):
         AgentWithConverter.__init__(self, env.action_space, IdToAct)
         SerializableModule.__init__(self, checkpoint_dir, name)
@@ -71,9 +74,10 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         self.env = env
         self.node_features: Optional[int] = None
         self.edge_features: Optional[int] = None
-        self.node_number: Optional[int] = None
 
         # Training or Evaluation
+        self.pre_initialized = pre_initialized  # skips part of post_init
+        self.initialized = False
         self.training = training
 
         # Logging
@@ -85,11 +89,16 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         # This state is saved so that after my_act()
         # step() can use pre-computed values
         self.chosen_action: Optional[EncodedAction] = None
-        self.manager_actions: Optional[Dict[Community, EncodedAction]] = None
-        self.agent_actions: Optional[Dict[Substation, EncodedAction]] = None
+        self.community_to_substation: Optional[Dict[Community, EncodedAction]] = None
+        self.substation_to_local_action: Optional[
+            Dict[Substation, EncodedAction]
+        ] = None
         self.sub_graphs: Optional[Dict[Community, dgl.DGLHeteroGraph]] = None
         self.summarized_graph: Optional[dgl.DGLHeteroGraph] = None
         self.factored_observation: Optional[Dict[Substation, dgl.DGLHeteroGraph]] = None
+        self.chosen_community: Optional[Community] = None
+        self.chosen_node: Optional[int] = None
+        self.substation_to_encoded_action: Optional[Substation, EncodedAction] = None
 
         # Agents
         self.action_lookup_table: Optional[Dict[HashableAction, int]] = None
@@ -112,9 +121,36 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         self.communities: Optional[List[Community]] = None
 
     def finalize_init_on_first_observation(
-        self, first_observation: BaseObservation, first_observation_graph: nx.Graph
+        self,
+        first_observation: BaseObservation,
+        first_observation_graph: nx.Graph,
+        pre_initialized=False,
     ) -> None:
-        self.node_number = len(first_observation_graph.nodes)
+        if pre_initialized:
+            sub_id_to_action_space, self.action_lookup_table = factor_action_space(
+                first_observation,
+                first_observation_graph,
+                self.converter,
+                self.env.n_sub,
+            )
+            self.sub_to_agent_converters_dict: Dict[int, IdToAct] = {}
+            for sub_id, action_space in sub_id_to_action_space.items():
+                conv = IdToAct(self.env.action_space)
+                conv.init_converter(action_space)
+                conv.seed(self.seed)
+                self.sub_to_agent_converters_dict[sub_id] = conv
+
+            sub_id_to_action_space, self.action_lookup_table = factor_action_space(
+                first_observation,
+                first_observation_graph,
+                self.converter,
+                self.env.n_sub,
+            )
+
+            self.log_action_space_size(
+                agent_converters=self.sub_to_agent_converters_dict
+            )
+            return
 
         # Compute node and edge features
         self.node_features = len(
@@ -135,7 +171,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         # Agents Initialization
         sub_id_to_action_space, self.action_lookup_table = factor_action_space(
-            first_observation, first_observation_graph, self.converter
+            first_observation, first_observation_graph, self.converter, self.env.n_sub
         )
 
         # Agents Initialization
@@ -169,7 +205,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         # Managers Initialization
         self.community_to_manager_dict: Dict[Community, Manager] = {
             community: Manager.remote(
-                agent_actions=first_observation_graph.nodes,
+                agent_actions=len(first_observation_graph.nodes),
                 node_features=self.node_features + 1,  # Node Features + Action
                 edge_features=self.edge_features,
                 architecture=self.architecture.manager,
@@ -182,7 +218,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
     def get_agent_actions(
         self, factored_observation: Dict[Substation, dgl.DGLHeteroGraph]
-    ) -> Dict[Substation, EncodedAction]:
+    ) -> Dict[Substation, int]:
         action_list: List[int] = ray.get(
             [
                 self.sub_to_agent_dict[sub_id].take_action.remote(
@@ -192,38 +228,41 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             ]
         )
         return {
-            sub_id: self.lookup_local_action(
-                self.sub_to_agent_converters_dict[sub_id].all_actions[action]
-            )
+            sub_id: action
             for sub_id, action in zip(factored_observation.keys(), action_list)
         }
 
     def get_manager_actions(
-        self, community_to_subgraphs_dict: Dict[Community, dgl.DGLHeteroGraph]
-    ) -> Dict[Community, EncodedAction]:
+        self, community_to_sub_graphs_dict: Dict[Community, dgl.DGLHeteroGraph]
+    ) -> Dict[Community, Substation]:
         action_list: List[Substation] = ray.get(
             [
                 self.community_to_manager_dict[community].take_action.remote(
-                    transformed_observation=community_to_subgraphs_dict[community],
-                    mask=community,
-                    return_embedding=True,
+                    transformed_observation=community_to_sub_graphs_dict[community],
+                    mask=frozenset(
+                        [
+                            sub
+                            for sub in community
+                            if sub in list(self.substation_to_encoded_action.keys())
+                        ]
+                    ),
                 )
                 for community in self.communities
             ]
         )
         return {
-            community: self.agent_actions[action]
+            community: action
             for community, action in zip(self.communities, action_list)
         }
 
     @abstractmethod
-    def get_action(self, observation: dgl.DGLHeteroGraph) -> EncodedAction:
+    def get_action(self, observation: dgl.DGLHeteroGraph) -> int:
         ...
 
     def step_managers(
         self,
         community_to_sub_graphs_dict: Dict[Community, dgl.DGLHeteroGraph],
-        action: EncodedAction,
+        actions: Dict[Community, Substation],
         reward: float,
         next_community_to_sub_graphs_dict: Dict[Community, dgl.DGLHeteroGraph],
         done: bool,
@@ -233,7 +272,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             [
                 self.community_to_manager_dict[community].step.remote(
                     observation=community_to_sub_graphs_dict[community],
-                    action=action,
+                    action=actions[community],
                     reward=reward,
                     next_observation=next_community_to_sub_graphs_dict[community],
                     done=done,
@@ -246,29 +285,35 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
     def step_agents(
         self,
         factored_observation: Dict[Substation, dgl.DGLHeteroGraph],
-        action: EncodedAction,
+        actions: Dict[Substation, int],
         reward: float,
         next_factored_observation: Dict[Substation, dgl.DGLHeteroGraph],
         done: bool,
         stop_decay: Dict[Substation, bool],
     ) -> None:
-        ray.get(
-            [
-                self.sub_to_agent_dict[sub_id].step.remote(
-                    observation=observation,
-                    action=action,
-                    reward=reward,
-                    next_observation=next_factored_observation[sub_id],
-                    done=done,
-                    stop_decay=stop_decay[sub_id],
+        step_promises = []
+        for sub_id, observation in factored_observation.items():
+            next_observation: Optional[
+                dgl.DGLHeteroGraph
+            ] = next_factored_observation.get(sub_id)
+            if next_observation is not None:
+                step_promises.append(
+                    self.sub_to_agent_dict[sub_id].step.remote(
+                        observation=observation,
+                        action=actions[sub_id],
+                        reward=reward,
+                        next_observation=next_factored_observation[sub_id],
+                        done=done,
+                        stop_decay=stop_decay[sub_id],
+                    )
                 )
-                for sub_id, observation in factored_observation.items()
-            ]
-        )
-
-    @abstractmethod
-    def learn(self, reward: float):
-        ...
+            else:
+                print(
+                    "Substation '"
+                    + str(sub_id)
+                    + "' not present in current next_state, related agent is not stepping..."
+                )
+        ray.get(step_promises)
 
     def my_act(
         self,
@@ -285,18 +330,25 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         if self.communities and not self.fixed_communities:
             raise Exception("\nDynamic Communities are not implemented yet\n")
 
-        # Actions retreived are encoded with local agent converters
+        # Actions retrieved are encoded with local agent converters
         # need to be remapped to the global converter
-        self.agent_actions: Dict[Substation, EncodedAction] = self.get_agent_actions(
+        self.substation_to_local_action: Dict[Substation, int] = self.get_agent_actions(
             self.factored_observation
         )
+
+        self.substation_to_encoded_action: Dict[Substation, EncodedAction] = {
+            sub_id: self.lookup_local_action(
+                self.sub_to_agent_converters_dict[sub_id].all_actions[local_action]
+            )
+            for sub_id, local_action in self.substation_to_local_action.items()
+        }
 
         # Each agent is assigned to its chosen action
         nx.set_node_attributes(
             graph,
             {
                 node_id: {
-                    "action": self.agent_actions[node_data["sub_id"]],
+                    "action": self.substation_to_encoded_action[node_data["sub_id"]],
                 }
                 for node_id, node_data in graph.nodes.data()
             },
@@ -307,31 +359,58 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             Community, dgl.DGLHeteroGraph
         ] = split_graph_into_communities(graph, self.communities, str(self.device))
 
-        # Managers chooses the best action
-        self.manager_actions: Dict[Community, EncodedAction] = self.get_manager_actions(
-            self.sub_graphs
-        )
+        # Managers chooses the best substation
+        self.community_to_substation: Dict[
+            Community, Substation
+        ] = self.get_manager_actions(self.sub_graphs)
 
         # The graph is summarized by contracting every community in 1 supernode
         # And storing the embedding of each manager in each supernode as node feature
         # Together with the action chosen by the manager
         self.summarized_graph: dgl.DGLHeteroGraph = self.summarize_graph(
-            graph, self.manager_actions, self.sub_graphs
+            graph,
+            {
+                community: self.substation_to_encoded_action[substation]
+                for community, substation in self.community_to_substation.items()
+            },
+            self.sub_graphs,
         ).to(self.device)
 
         # The head manager chooses the best action from every community given the summarized graph
-        self.chosen_action: EncodedAction = self.get_action(self.summarized_graph)
+        self.chosen_node = self.get_action(self.summarized_graph)
+
+        self.chosen_community = frozenset(
+            [
+                substation
+                for substation, belongs_to_community in enumerate(
+                    self.summarized_graph.ndata["embedding_action"][self.chosen_node][
+                        -(self.env.n_sub + 1) : -1
+                    ]
+                    .detach()
+                    .tolist()
+                )
+                if belongs_to_community
+            ]
+        )
+
+        self.chosen_action = self.substation_to_encoded_action[
+            self.community_to_substation[self.chosen_community]
+        ]
 
         # Log to Tensorboard
         self.log_system_behaviour(
             best_action=self.chosen_action,
             manager_actions={
-                self.community_to_manager_dict[community].name.split("_")[1]: action
-                for community, action in self.manager_actions.items()
+                ray.get(
+                    self.community_to_manager_dict[community].get_name.remote()
+                ).split("_")[1]: action
+                for community, action in self.community_to_substation.items()
             },
             agent_actions={
-                self.sub_to_agent_dict[sub_id].name.split("_")[1]: action
-                for sub_id, action in self.agent_actions.items()
+                ray.get(self.sub_to_agent_dict[sub_id].get_name.remote()).split("_")[
+                    1
+                ]: action
+                for sub_id, action in self.substation_to_local_action.items()
             },
             train_steps=self.train_steps,
         )
@@ -340,7 +419,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
     def _extra_step(
         self,
-        action: EncodedAction,
+        action: int,
         reward: float,
         next_sub_graphs: Dict[Community, dgl.DGLHeteroGraph],
         next_graph: nx.Graph,
@@ -359,10 +438,13 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
     ):
         if done:
             self.log_alive_steps(self.alive_steps, self.episodes)
+            self.train_steps += 1
             self.episodes += 1
             self.alive_steps = 0
-            self.train_steps += 1
         else:
+            self.log_reward(reward, self.train_steps)
+            self.alive_steps += 1
+            self.train_steps += 1
 
             next_graph: nx.Graph = next_observation.as_networkx()
             next_factored_observation: Dict[
@@ -373,20 +455,26 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 radius=self.architecture.pop.agent_neighbourhood_radius,
             )
 
+            # WARNING: for no-action there may be multiple agents playing such action
+            # WARNING: this is intended to encourage sparse policies
             agents_stop_decay: Dict[Substation, bool] = {
-                sub_id: True if action == self.chosen_action else False
-                for sub_id, action in self.agent_actions.items()
+                sub_id: False if agent_action == self.chosen_action else True
+                for sub_id, agent_action in self.substation_to_encoded_action.items()
             }
 
-            next_agent_actions: Dict[
-                Substation, EncodedAction
-            ] = self.get_agent_actions(next_factored_observation)
+            next_agent_actions: Dict[Substation, int] = self.get_agent_actions(
+                next_factored_observation
+            )
 
             nx.set_node_attributes(
                 next_graph,
                 {
                     node_id: {
-                        "action": next_agent_actions[node_data["sub_id"]],
+                        "action": self.lookup_local_action(
+                            self.sub_to_agent_converters_dict[
+                                node_data["sub_id"]
+                            ].all_actions[next_agent_actions[node_data["sub_id"]]]
+                        )
                     }
                     for node_id, node_data in next_graph.nodes.data()
                 },
@@ -403,21 +491,21 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             )
 
             manager_stop_decay: Dict[Community, bool] = {
-                community: True if action == self.chosen_action else False
-                for community, action in self.manager_actions
+                community: False if community == self.chosen_community else True
+                for community, _ in self.community_to_manager_dict.items()
             }
 
             self._extra_step(
                 next_sub_graphs=next_sub_graphs,
                 next_graph=next_graph,
                 reward=reward,
-                action=action,
+                action=self.chosen_node,
                 done=done,
             )
 
             self.step_managers(
                 community_to_sub_graphs_dict=self.sub_graphs,
-                action=action,
+                actions=self.community_to_substation,
                 reward=reward,
                 next_community_to_sub_graphs_dict=next_sub_graphs,
                 done=done,
@@ -426,15 +514,12 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
             self.step_agents(
                 factored_observation=self.factored_observation,
-                action=action,
+                actions=self.substation_to_local_action,
                 reward=reward,
                 next_factored_observation=next_factored_observation,
                 done=done,
                 stop_decay=agents_stop_decay,
             )
-
-            self.train_steps += 1
-            self.alive_steps += 1
 
     def convert_obs(
         self, observation: BaseObservation
@@ -447,9 +532,13 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             self.architecture.pop.agent_neighbourhood_radius,
         )
 
-        if self.node_features is None:
+        if not self.initialized:
             # if this is the first observation received by the agent system
-            self.finalize_init_on_first_observation(observation, observation_graph)
+
+            self.finalize_init_on_first_observation(
+                observation, observation_graph, pre_initialized=self.pre_initialized
+            )
+            self.initialized = True
 
         return factored_observation, observation_graph
 
@@ -466,16 +555,19 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         # CommunityManager node embedding is assigned to each node
         node_attribute_dict = {}
         for community, sub_graph in sub_graphs.items():
-            sub_graphs[community].ndata[
-                "node_embeddings"
-            ] = self.community_to_manager_dict[community].get_node_embeddings()
+            node_embeddings = ray.get(
+                self.community_to_manager_dict[community].get_node_embeddings.remote()
+            )
+            sub_graphs[community].ndata["node_embeddings"] = node_embeddings
             for node in community:
                 node_attribute_dict[node] = {
                     "embedding": dgl.mean_nodes(
                         sub_graphs[community], "node_embeddings"
                     )
+                    .squeeze()
+                    .detach(),
                 }
-                node_attribute_dict[node] = {"community": community}
+            del sub_graphs[community].ndata["node_embeddings"]
 
         nx.set_node_attributes(
             graph,
@@ -491,16 +583,26 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 summarized_graph = nx.contracted_nodes(
                     summarized_graph, community_list[0], node
                 )
-            summarized_graph.nodes[community_list[0]]["action"] = manager_actions[
-                community
-            ]
+            summarized_graph.nodes[community_list[0]]["embedding_action"] = th.cat(
+                (
+                    summarized_graph.nodes[community_list[0]]["embedding"],
+                    th.tensor(
+                        [
+                            1 if substation in community else 0
+                            for substation in range(self.env.n_sub)
+                        ]
+                    ),
+                    th.tensor([manager_actions[community]]),
+                ),
+                dim=-1,
+            )
 
         # The summarized graph is returned in DGL format
         # Each supernode has the action chosen by its community manager
         # And the contracted embedding
         return dgl.from_networkx(
             summarized_graph.to_directed(),
-            node_attrs=["action", "embedding", "community"],
+            node_attrs=["embedding_action"],
             device=self.device,
         )
 
@@ -527,9 +629,17 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                     list(self.community_to_manager_dict.keys()), managers_state_list
                 )
             },
+            "node_features": self.node_features,
+            "edge_features": self.edge_features,
+            "train_steps": self.train_steps,
+            "episodes": self.episodes,
+            "alive_steps": self.alive_steps,
+            "name": self.name,
+            "architecture": asdict(self.architecture),
+            "seed": self.seed,
+            "device": str(self.device),
+            "communities": self.communities,
         }
-
-    # TODO: finish serialization implementation
 
 
 def train(env: BaseEnv, iterations: int, dpop):
@@ -551,7 +661,7 @@ def train(env: BaseEnv, iterations: int, dpop):
             action = dpop.convert_act(encoded_action)
             next_obs, reward, done, _ = env.step(action)
             dpop.step(
-                action=action,
+                action=encoded_action,
                 observation=obs,
                 reward=reward,
                 next_observation=next_obs,

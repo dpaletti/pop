@@ -65,7 +65,7 @@ class ReplayMemory(object):
             priorities**self.alpha
         )
 
-        indices = np.choice(
+        indices = np.random.choice(
             np.arange(priorities.size),
             size=batch_size,
             replace=True,

@@ -6,8 +6,7 @@ import toml
 
 from configs.architecture import Architecture
 from configs.placeholders_handling import replace_backward_reference
-
-ParsedTOMLDict = Dict[str, Dict[str, Union[int, float, bool, str]]]
+from configs.type_aliases import ParsedTOMLDict
 
 
 @dataclass(frozen=True)
@@ -100,15 +99,16 @@ class RunConfiguration:
     def __init__(self, path: str):
         run_config_dict: ParsedTOMLDict = toml.load(open(path))
 
-        run_config_full_dict = {
-            section_name: {
-                param_name: replace_backward_reference(
-                    run_config_dict, param_value, evaluate_expressions=False
+        # No List comprehension allows length > 1 bacward references
+        run_config_full_dict = {}
+        for section_name, section_param_dict in run_config_dict.items():
+            run_config_full_dict[section_name] = {}
+            for param_name, param_value in section_param_dict.items():
+                run_config_full_dict[section_name][
+                    param_name
+                ] = replace_backward_reference(
+                    run_config_full_dict, param_value, evaluate_expressions=False
                 )
-                for param_name, param_value in section_param_dict.items()
-            }
-            for section_name, section_param_dict in run_config_dict.items()
-        }
 
         object.__setattr__(
             self,

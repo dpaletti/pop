@@ -6,20 +6,20 @@ from dgl import DGLHeteroGraph
 from grid2op.Observation import BaseObservation
 from torch import Tensor
 
+from agents.loggable_module import LoggableModule
+from agents.replay_buffer import ReplayMemory, Transition
 from configs.agent_architecture import AgentArchitecture
 from networks.serializable_module import SerializableModule
-from agents.loggable_module import LoggableModule
 from networks.dueling_net import DuelingNet
 import copy
 import numpy as np
 import torch as th
 import torch.nn as nn
 import dgl
-from pop.agents.replay_buffer import ReplayMemory, Transition
 from random import choice
 
 
-class BaseGCNAgent(ABC, SerializableModule, LoggableModule):
+class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
 
     # This names are used to find files in the load directory
     # When loading an agent
@@ -29,11 +29,11 @@ class BaseGCNAgent(ABC, SerializableModule, LoggableModule):
 
     def __init__(
         self,
-        agent_actions: int,
-        node_features: int,
-        architecture: AgentArchitecture,
-        name: str,
+        agent_actions: Optional[int],
+        node_features: Optional[int],
+        architecture: Optional[AgentArchitecture],
         training: bool,
+        name: str,
         device: str,
         log_dir: Optional[str],
         tensorboard_dir: Optional[str],
@@ -56,6 +56,9 @@ class BaseGCNAgent(ABC, SerializableModule, LoggableModule):
             )
         else:
             self.device: th.device = th.device(device)
+
+        if architecture is None:
+            return
 
         # Initialize deep networks
         self.q_network: DuelingNet = DuelingNet(
@@ -95,6 +98,9 @@ class BaseGCNAgent(ABC, SerializableModule, LoggableModule):
 
         # Training or Evaluation
         self.training: bool = training
+
+    def get_name(self):
+        return self.name
 
     def compute_loss(
         self, transitions_batch: Transition, sampling_weights: Tensor

@@ -91,7 +91,7 @@ class GCN(nn.Module, SerializableModule):
         }
 
     @staticmethod
-    def _factory(checkpoint: Dict[str, Any]) -> "GCN":
+    def factory(checkpoint: Dict[str, Any], **kwargs) -> "GCN":
 
         gcn: "GCN" = GCN(
             node_features=checkpoint["node_features"],

@@ -54,7 +54,9 @@ def _get_topological_action_owner(
     elif topological_object["object_type"] == "generator":
         return generator_to_node[topological_object["object_id"]]
     else:
-        raise Exception("Unkown object_type: " + str(topological_object["object_type"]))
+        raise Exception(
+            "Unknown object_type: " + str(topological_object["object_type"])
+        )
 
 
 def _assign_action(
@@ -121,6 +123,7 @@ def factor_action_space(
     observation: BaseObservation,
     observation_graph: nx.Graph,
     full_converter: IdToAct,
+    n_substations: int,
 ) -> Tuple[Dict[int, List[int]], Dict[HashableAction, int]]:
 
     # Here we retrieve the mappings between objects and buses (aka nodes)
@@ -141,7 +144,7 @@ def factor_action_space(
     )
 
     # Factoring Action Lookup Table
-    owner, actions, encoded_actions = zip(
+    owners, actions, encoded_actions = zip(
         *[
             action_assignment
             for action_assignment in [
@@ -159,20 +162,24 @@ def factor_action_space(
         ]
     )
 
+    action_space_dict = {
+        substation: [(full_converter.all_actions[0], 0)]
+        for substation in range(n_substations)
+    }
+    for owner, action, encoded_action in zip(owners, actions, encoded_actions):
+        action_space_dict[owner].append((action, encoded_action))
+
     sub_id_to_action_space = {
-        node_data["sub_id"]: [full_converter.all_actions[0]]
-        + [
-            action
-            for owner, action in zip(owner, actions)
-            if owner == node_data["sub_id"]
-        ]
-        for node_id, node_data in observation_graph.nodes.data()
+        substation: [action[0] for action in action_space_dict[substation]]
+        for substation in range(n_substations)
     }
 
-    return sub_id_to_action_space, {
-        HashableAction(full_converter.all_actions[encoded_action]): encoded_action
-        for encoded_action in encoded_actions
-    }
+    lookup_table = {}
+    for owner, action_mapping_list in action_space_dict.items():
+        for action, encoded_action in action_mapping_list:
+            lookup_table[HashableAction(action)] = encoded_action
+
+    return sub_id_to_action_space, lookup_table
 
 
 def _factor_observation_helper_ego_graph(graph, node, radius, device):

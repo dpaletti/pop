@@ -8,7 +8,7 @@ from configs.placeholders_handling import (
     replace_backward_reference,
     replace_placeholders,
 )
-from configs.run_config import ParsedTOMLDict
+from configs.type_aliases import ParsedTOMLDict
 
 
 @dataclass(frozen=True)
@@ -16,7 +16,7 @@ class NetworkLayer:
     name: str
     type: str
     module: str
-    kwargs: ParsedTOMLDict
+    kwargs: Dict[str, Union[int, float, bool, str]]
 
 
 @dataclass(frozen=True)

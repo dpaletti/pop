@@ -1,7 +1,9 @@
 from dataclasses import dataclass
+from typing import Optional
+
 import toml
 from configs.agent_architecture import AgentArchitecture
-from configs.run_config import ParsedTOMLDict
+from configs.type_aliases import ParsedTOMLDict
 
 
 @dataclass(frozen=True)
@@ -25,10 +27,27 @@ class Architecture:
 
     def __init__(
         self,
-        path: str,
-        network_architecture_implementation_folder_path: str,
-        network_architecture_frame_folder_path: str,
+        path: Optional[str] = None,
+        network_architecture_implementation_folder_path: Optional[str] = None,
+        network_architecture_frame_folder_path: Optional[str] = None,
+        load_from_dict: Optional[dict] = None,
     ):
+        if load_from_dict is not None:
+            object.__setattr__(self, "pop", POPArchitecture(**load_from_dict["pop"]))
+            object.__setattr__(
+                self, "agent", AgentArchitecture(load_from_dict=load_from_dict["agent"])
+            )
+            object.__setattr__(
+                self,
+                "manager",
+                AgentArchitecture(load_from_dict=load_from_dict["manager"]),
+            )
+            object.__setattr__(
+                self,
+                "head_manager",
+                AgentArchitecture(load_from_dict=load_from_dict["head_manager"]),
+            )
+            return
         architecture_dict: ParsedTOMLDict = toml.load(open(path))
 
         assert "pop" in architecture_dict.keys()

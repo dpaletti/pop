@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any
 import networkx as nx
 import ray
 from dgl import DGLHeteroGraph
+from ray import ObjectRef
 
 from agents.base_gcn_agent import BaseGCNAgent
 from configs.agent_architecture import AgentArchitecture
@@ -18,7 +19,7 @@ class RayShallowGCNAgent(BaseGCNAgent):
         node_features: Optional[int] = None,
         edge_features: Optional[int] = None,
         architecture: Optional[AgentArchitecture] = None,
-        training: Optional[bool] = None,
+        training: bool = False,
     ):
         BaseGCNAgent.__init__(
             self,
@@ -45,8 +46,8 @@ class RayShallowGCNAgent(BaseGCNAgent):
         return self.name
 
     @staticmethod
-    def _factory(checkpoint: Dict[str, Any]) -> "RayShallowGCNAgent":
-        agent: "RayShallowGCNAgent" = RayShallowGCNAgent(
+    def factory(checkpoint: Dict[str, Any], **kwargs) -> ObjectRef:
+        agent = RayShallowGCNAgent.remote(
             name=checkpoint["name"], device=checkpoint["device"]
         )
         return agent

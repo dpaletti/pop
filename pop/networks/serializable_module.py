@@ -38,15 +38,16 @@ class SerializableModule(ABC):
         cls,
         log_file: Optional[str] = None,
         checkpoint_dict: Optional[Dict[str, Any]] = None,
+        **kwargs
     ) -> T:
         checkpoint: Dict[str, Any] = SerializableModule._load_checkpoint(
             log_file, checkpoint_dict
         )
-        return cls._factory(checkpoint)
+        return cls.factory(checkpoint, **kwargs)
 
     @staticmethod
     @abstractmethod
-    def _factory(checkpoint: Dict[str, Any]) -> T:
+    def factory(checkpoint: Dict[str, Any], **kwargs) -> T:
         ...
 
     @staticmethod

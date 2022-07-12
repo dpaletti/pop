@@ -143,6 +143,10 @@ class LoggableModule:
                 "Agent Action/Agent " + str(idx), action, train_steps
             )
 
+    def log_reward(self, reward: float, train_steps: int):
+        if self.is_logging_active():
+            self.writer.add_scalar("POP/Reward", reward, train_steps)
+
     @staticmethod
     def _format_to_md(s: str) -> str:
         lines = s.split("\n")

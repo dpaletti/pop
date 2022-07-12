@@ -122,17 +122,20 @@ class CommunityDetector:
           community structure until the modularity gain is negligible
         """
         if not comm_t and not graph_t1:
-            return louvain_communities(
-                graph_t,
-                [{i} for i in graph_t.nodes],
-                weight=None,
-                resolution=self.resolution,
-                threshold=self.threshold,
-                seed=Random(self.seed),
-                enable_power_supply_modularity=enable_power_supply_modularity,
-                alpha=alpha,
-                beta=beta,
-            )
+            return [
+                frozenset(community)
+                for community in louvain_communities(
+                    graph_t,
+                    [{i} for i in graph_t.nodes],
+                    weight=None,
+                    resolution=self.resolution,
+                    threshold=self.threshold,
+                    seed=Random(self.seed),
+                    enable_power_supply_modularity=enable_power_supply_modularity,
+                    alpha=alpha,
+                    beta=beta,
+                )
+            ]
         if (not comm_t and graph_t1) or (comm_t and not graph_t1):
             raise Exception(
                 "comm_t and graph_t1 must be either both None or both not None"

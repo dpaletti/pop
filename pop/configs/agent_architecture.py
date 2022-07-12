@@ -1,12 +1,8 @@
 from dataclasses import dataclass
-from typing import Dict, Union, Optional
+from typing import Optional
 
 from configs.network_architecture import NetworkArchitecture
-
-EventuallyNestedDict = Dict[
-    str,
-    Union[int, float, bool, str, Dict[str, Union[int, float, bool, str]]],
-]
+from configs.type_aliases import EventuallyNestedDict
 
 
 @dataclass(frozen=True)
