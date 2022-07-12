@@ -14,7 +14,7 @@ learning_frequency = 4
 target_network_weight_replace_steps = 500
 gamma = 0.99
 huber_loss_delta = 1.0
-batch_size = 4
+batch_size = 288
 
 
 [agent.exploration]
@@ -37,7 +37,7 @@ learning_frequency = 4
 target_network_weight_replace_steps = 500
 gamma = 0.99
 huber_loss_delta = 1.0
-batch_size = 4
+batch_size = 288
 
 [manager.exploration]
 max_epsilon = 1.0
@@ -59,7 +59,7 @@ learning_frequency = 4
 target_network_weight_replace_steps = 500
 gamma = 0.99
 huber_loss_delta = 1.0
-batch_size = 4
+batch_size = 288
 
 [head_manager.exploration]
 max_epsilon = 1.0
