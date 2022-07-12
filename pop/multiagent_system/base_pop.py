@@ -4,7 +4,6 @@ from typing import Optional, List, Tuple, Dict, Union, Any
 
 import dgl
 import networkx as nx
-import numpy as np
 from grid2op.Action import BaseAction
 from grid2op.Agent import AgentWithConverter
 from grid2op.Converter import IdToAct

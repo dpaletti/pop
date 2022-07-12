@@ -1,9 +1,0 @@
-{
-  "name": "ddgcn_conv_small",
-  "embedding": "conv",
-  "pooling": "avg",
-  "hidden_size": 128,
-  "hidden_output_size": 256,
-  "value_stream_size": 512,
-  "advantage_stream_size": 512
-}

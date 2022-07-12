@@ -1,8 +1,0 @@
-{
-  "embedding": "conv",
-  "pooling": "avg",
-  "hidden_size": 256,
-  "hidden_output_size": 512,
-  "value_stream_size": 1024,
-  "advantage_stream_size": 1024
-}

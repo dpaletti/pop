@@ -9,7 +9,7 @@ data_dir = "../test_data"
 checkpoint_dir = "<<model_data_dir>>/pop_runs/checkpoint/<<model_name>>"
 
 [training]
-steps = 20
+steps = 1e4
 train = true
 tensorboard_dir = "<<model_data_dir>>/pop_runs/tensorboard/<<model_name>>"
 curriculum = false
