@@ -216,13 +216,15 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         }
 
     def get_agent_actions(
-        self, factored_observation: Dict[Substation, dgl.DGLHeteroGraph]
+        self, factored_observation: Dict[Substation, Optional[dgl.DGLHeteroGraph]]
     ) -> Dict[Substation, int]:
         action_list: List[int] = ray.get(
             [
                 self.sub_to_agent_dict[sub_id].take_action.remote(
                     transformed_observation=observation
                 )
+                if observation is not None
+                else 0
                 for sub_id, observation in factored_observation.items()
             ]
         )
@@ -316,7 +318,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
     def my_act(
         self,
-        transformed_observation: Tuple[Dict[Substation, dgl.DGLHeteroGraph], nx.Graph],
+        transformed_observation: Tuple[
+            Dict[Substation, Optional[dgl.DGLHeteroGraph]], nx.Graph
+        ],
         reward: float,
         done=False,
     ) -> EncodedAction:
@@ -522,10 +526,12 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
     def convert_obs(
         self, observation: BaseObservation
-    ) -> Tuple[Dict[Substation, dgl.DGLHeteroGraph], nx.Graph]:
+    ) -> Tuple[Dict[Substation, Optional[dgl.DGLHeteroGraph]], nx.Graph]:
 
         observation_graph: nx.Graph = observation.as_networkx()
-        factored_observation = factor_observation(
+        factored_observation: Dict[
+            Substation, Optional[dgl.DGLHeteroGraph]
+        ] = factor_observation(
             observation_graph,
             str(self.device),
             self.architecture.pop.agent_neighbourhood_radius,

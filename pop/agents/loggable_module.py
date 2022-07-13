@@ -126,11 +126,6 @@ class LoggableModule:
                 action,
                 train_steps,
             )
-            self.writer.add_text(
-                "Manager Action/Manager " + str(action_manager_idx),
-                self._format_to_md(str(action)),
-                train_steps,
-            )
 
     def log_agents_behaviour(
         self,

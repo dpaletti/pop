@@ -7,8 +7,6 @@ from grid2op.Observation import BaseObservation
 from typing import List, Tuple, Optional, Dict
 import networkx as nx
 import numpy as np
-import torch as th
-from torch import Tensor
 
 from agents.base_gcn_agent import BaseGCNAgent
 from community_detection.community_detector import Community
@@ -182,103 +180,26 @@ def factor_action_space(
     return sub_id_to_action_space, lookup_table
 
 
-def _factor_observation_helper_ego_graph(graph, node, radius, device):
-    return BaseGCNAgent.from_networkx_to_dgl(nx.ego_graph(graph, node, radius), device)
-
-
-def _add_self_loop(
-    zero_edges_graph: nx.Graph,
-    feature_schema: Dict[str, Tensor],
-    device: str,
-) -> dgl.DGLHeteroGraph:
-    lone_node = list(zero_edges_graph.nodes)[0]
-    zero_edges_graph.add_edge(
-        lone_node,
-        lone_node,
-        **{
-            feature_name: np.float32(0)
-            if feature_value.dtype == th.float
-            else np.int32(0)
-            if feature_value.dtype == th.int
-            else False
-            for feature_name, feature_value in feature_schema.items()
-        }
-    )
-    return BaseGCNAgent.from_networkx_to_dgl(zero_edges_graph, device)
-
-
 def factor_observation(
     obs_graph: nx.Graph, device: str, radius: int = 1
-) -> Dict[int, dgl.DGLHeteroGraph]:
+) -> Dict[Substation, Optional[dgl.DGLHeteroGraph]]:
 
-    sub_graphs: Dict[int, dgl.DGLHeteroGraph] = {}
-    zero_edges_ego_graphs: List[Tuple[int, nx.Graph]] = []
-
-    for node_id, node_data in obs_graph.nodes.data():
-        ego_graph: nx.Graph = nx.ego_graph(obs_graph, node_id, radius)
-
-        if ego_graph.number_of_edges() == 0:
-            # Zero edges ego-graphs must have at least a self loop
-            print(
-                "WARNING: found zero edges ego graph, adding self-loop and zeroed-out features for consistency"
-            )
-            print(
-                "WARNING: features are assumed to have 32-bit precision and be either int, float or bool"
-            )
-            zero_edges_ego_graphs.append((node_data["sub_id"], ego_graph))
-            continue
-
-        subgraph = BaseGCNAgent.from_networkx_to_dgl(ego_graph, device)
-        sub_graphs[node_data["sub_id"]] = subgraph
-
-    if not sub_graphs:
-        # At least 1 ego graph must be non-degenerate
-        for ego_graph in zero_edges_ego_graphs:
-            print(ego_graph)
-        raise Exception("Found only ego graphs with zero features")
-
-    if zero_edges_ego_graphs:
-        # Fixing zero edges ego graphs
-        feature_schema = list(sub_graphs.values())[0].edata
-        for sub_id, ego_graph in zero_edges_ego_graphs:
-            sub_graphs[sub_id] = _add_self_loop(ego_graph, feature_schema, device)
-
-    return sub_graphs
+    return {
+        sub_id: BaseGCNAgent.from_networkx_to_dgl(ego_graph, device)
+        if ego_graph.number_of_edges() > 0
+        else None
+        for sub_id, ego_graph in {
+            node_data["sub_id"]: nx.ego_graph(obs_graph, node_id, radius)
+            for node_id, node_data in obs_graph.nodes.data()
+        }.items()
+    }
 
 
 def split_graph_into_communities(
     graph: nx.Graph, communities: List[Community], device: str
 ) -> Dict[Community, dgl.DGLHeteroGraph]:
 
-    nx_sub_graphs: List[nx.Graph] = []
-    zero_edges_nx_sub_graphs: List[nx.Graph] = []
-    positions = []
-
-    # Split into one subgraph for each community
-    for idx, community in enumerate(communities):
-        sub_g = graph.subgraph(community)
-
-        # If subgraph does not have any edge
-        if sub_g.number_of_edges == 0:
-            positions.append(idx)
-            zero_edges_nx_sub_graphs.append(sub_g)
-        else:
-            nx_sub_graphs.append(sub_g)
-
-    # Convert correct sub_graphs to dgl
-    sub_graphs: List[dgl.DGLHeteroGraph] = [
-        BaseGCNAgent.from_networkx_to_dgl(subgraph, device)
-        for subgraph in nx_sub_graphs
-    ]
-
-    # Add self loop to 0 edges subgraphs
-    feature_schema = sub_graphs[0].edata
-    for zero_edge_sub_graph, position in zip(zero_edges_nx_sub_graphs, positions):
-        sub_graphs.insert(
-            position,
-            _add_self_loop(zero_edge_sub_graph, feature_schema, device),
-        )
-
     return {
-        community: sub_graph for community, sub_graph in zip(communities, sub_graphs)
+        community: BaseGCNAgent.from_networkx_to_dgl(graph.subgraph(community), device)
+        for community in communities
     }
