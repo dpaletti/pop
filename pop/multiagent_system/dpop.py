@@ -95,10 +95,9 @@ class DPOP(BasePOP):
         next_graph: nx.Graph,
         done: bool,
     ):
-
         next_community_to_substation: Dict[
             Community, Substation
-        ] = self.get_manager_actions(next_sub_graphs)
+        ] = self.get_manager_actions(next_sub_graphs, next_substation_to_encoded_action)
 
         next_summarized_graph: dgl.DGLHeteroGraph = self._compute_summarized_graph(
             next_graph,
@@ -120,7 +119,8 @@ class DPOP(BasePOP):
 
         if loss is not None:
             self.log_loss(
-                {ray.get(self.head_manager.get_name.remote()): loss}, self.train_steps
+                {ray.get(self.head_manager.get_name.remote()): loss},
+                self.train_steps,
             )
 
     def get_state(self: "DPOP") -> Dict[str, Any]:

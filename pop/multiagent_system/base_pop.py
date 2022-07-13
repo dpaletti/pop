@@ -239,7 +239,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         }
 
     def get_manager_actions(
-        self, community_to_sub_graphs_dict: Dict[Community, dgl.DGLHeteroGraph]
+        self,
+        community_to_sub_graphs_dict: Dict[Community, dgl.DGLHeteroGraph],
+        substation_to_encoded_action: Dict[Substation, EncodedAction],
     ) -> Dict[Community, Substation]:
         action_list: List[Substation] = ray.get(
             [
@@ -249,7 +251,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                         [
                             sub
                             for sub in community
-                            if sub in list(self.substation_to_encoded_action.keys())
+                            if sub in list(substation_to_encoded_action.keys())
                         ]
                     ),
                 )
@@ -334,7 +336,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 substations.append(sub_id)
             else:
                 print(
-                    "Substation '"
+                    "("
+                    + str(self.train_steps)
+                    + ") Substation '"
                     + str(sub_id)
                     + "' not present in current next_state, related agent is not stepping..."
                 )
@@ -435,7 +439,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         # Managers chooses the best substation
         self.community_to_substation: Dict[
             Community, Substation
-        ] = self.get_manager_actions(self.sub_graphs)
+        ] = self.get_manager_actions(self.sub_graphs, self.substation_to_encoded_action)
 
         self.summarized_graph = self._compute_summarized_graph(
             graph=graph,
