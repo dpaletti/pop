@@ -6,7 +6,6 @@ from grid2op.Environment import BaseEnv
 from grid2op.Observation import BaseObservation
 from ray.util.client import ray
 
-from agents.base_gcn_agent import BaseGCNAgent
 from agents.manager import Manager
 from agents.ray_gcn_agent import RayGCNAgent
 from agents.ray_shallow_gcn_agent import RayShallowGCNAgent
@@ -14,7 +13,7 @@ from community_detection.community_detector import Community
 from configs.architecture import Architecture
 from multiagent_system.base_pop import BasePOP
 
-from multiagent_system.space_factorization import EncodedAction
+from multiagent_system.space_factorization import EncodedAction, Substation
 
 
 class DPOP(BasePOP):
@@ -92,15 +91,20 @@ class DPOP(BasePOP):
         action: int,
         reward: float,
         next_sub_graphs: Dict[Community, dgl.DGLHeteroGraph],
+        next_substation_to_encoded_action: Dict[Substation, EncodedAction],
         next_graph: nx.Graph,
         done: bool,
     ):
 
-        next_manager_actions: Dict[Community, EncodedAction] = self.get_manager_actions(
-            next_sub_graphs
-        )
-        next_summarized_graph: dgl.DGLHeteroGraph = self.summarize_graph(
-            next_graph, next_manager_actions, next_sub_graphs
+        next_community_to_substation: Dict[
+            Community, Substation
+        ] = self.get_manager_actions(next_sub_graphs)
+
+        next_summarized_graph: dgl.DGLHeteroGraph = self._compute_summarized_graph(
+            next_graph,
+            next_sub_graphs,
+            next_substation_to_encoded_action,
+            next_community_to_substation,
         )
 
         loss = ray.get(

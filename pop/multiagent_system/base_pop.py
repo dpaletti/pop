@@ -356,6 +356,51 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             self.train_steps,
         )
 
+    def _compute_managers_sub_graphs(
+        self, graph: nx.graph, substation_to_local_action: Dict[Substation, int]
+    ) -> Tuple[Dict[Community, dgl.DGLHeteroGraph], Dict[Substation, EncodedAction]]:
+        substation_to_encoded_action: Dict[Substation, EncodedAction] = {
+            sub_id: self.lookup_local_action(
+                self.sub_to_agent_converters_dict[sub_id].all_actions[local_action]
+            )
+            for sub_id, local_action in substation_to_local_action.items()
+        }
+
+        # Each agent is assigned to its chosen action
+        nx.set_node_attributes(
+            graph,
+            {
+                node_id: {
+                    "action": substation_to_encoded_action[node_data["sub_id"]],
+                }
+                for node_id, node_data in graph.nodes.data()
+            },
+        )
+
+        return (
+            split_graph_into_communities(graph, self.communities, str(self.device)),
+            substation_to_encoded_action,
+        )
+
+    def _compute_summarized_graph(
+        self,
+        graph,
+        sub_graphs: Dict[Community, dgl.DGLHeteroGraph],
+        substation_to_encoded_action: Dict[Substation, EncodedAction],
+        community_to_substation: Dict[Community, Substation],
+    ):
+        # The graph is summarized by contracting every community in 1 supernode
+        # And storing the embedding of each manager in each supernode as node feature
+        # Together with the action chosen by the manager
+        return self.summarize_graph(
+            graph,
+            {
+                community: substation_to_encoded_action[substation]
+                for community, substation in community_to_substation.items()
+            },
+            sub_graphs,
+        ).to(self.device)
+
     def my_act(
         self,
         transformed_observation: Tuple[
@@ -379,45 +424,25 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             self.factored_observation
         )
 
-        self.substation_to_encoded_action: Dict[Substation, EncodedAction] = {
-            sub_id: self.lookup_local_action(
-                self.sub_to_agent_converters_dict[sub_id].all_actions[local_action]
-            )
-            for sub_id, local_action in self.substation_to_local_action.items()
-        }
-
-        # Each agent is assigned to its chosen action
-        nx.set_node_attributes(
-            graph,
-            {
-                node_id: {
-                    "action": self.substation_to_encoded_action[node_data["sub_id"]],
-                }
-                for node_id, node_data in graph.nodes.data()
-            },
+        # Split graph into communities
+        (
+            self.sub_graphs,
+            self.substation_to_encoded_action,
+        ) = self._compute_managers_sub_graphs(
+            graph=graph, substation_to_local_action=self.substation_to_local_action
         )
-
-        # The main graph is split into communities
-        self.sub_graphs: Dict[
-            Community, dgl.DGLHeteroGraph
-        ] = split_graph_into_communities(graph, self.communities, str(self.device))
 
         # Managers chooses the best substation
         self.community_to_substation: Dict[
             Community, Substation
         ] = self.get_manager_actions(self.sub_graphs)
 
-        # The graph is summarized by contracting every community in 1 supernode
-        # And storing the embedding of each manager in each supernode as node feature
-        # Together with the action chosen by the manager
-        self.summarized_graph: dgl.DGLHeteroGraph = self.summarize_graph(
-            graph,
-            {
-                community: self.substation_to_encoded_action[substation]
-                for community, substation in self.community_to_substation.items()
-            },
-            self.sub_graphs,
-        ).to(self.device)
+        self.summarized_graph = self._compute_summarized_graph(
+            graph=graph,
+            sub_graphs=self.sub_graphs,
+            substation_to_encoded_action=self.substation_to_encoded_action,
+            community_to_substation=self.community_to_substation,
+        )
 
         # The head manager chooses the best action from every community given the summarized graph
         self.chosen_node = self.get_action(self.summarized_graph)
@@ -465,6 +490,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         action: int,
         reward: float,
         next_sub_graphs: Dict[Community, dgl.DGLHeteroGraph],
+        next_substation_to_encoded_action: Dict[Substation, EncodedAction],
         next_graph: nx.Graph,
         done: bool,
     ):
@@ -491,7 +517,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
             next_graph: nx.Graph = next_observation.as_networkx()
             next_factored_observation: Dict[
-                Substation, dgl.DGLHeteroGraph
+                Substation, Optional[dgl.DGLHeteroGraph]
             ] = factor_observation(
                 next_graph,
                 device=str(self.device),
@@ -505,33 +531,21 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 for sub_id, agent_action in self.substation_to_encoded_action.items()
             }
 
-            next_agent_actions: Dict[Substation, int] = self.get_agent_actions(
-                next_factored_observation
-            )
+            next_substation_to_local_actions: Dict[
+                Substation, int
+            ] = self.get_agent_actions(next_factored_observation)
 
-            nx.set_node_attributes(
-                next_graph,
-                {
-                    node_id: {
-                        "action": self.lookup_local_action(
-                            self.sub_to_agent_converters_dict[
-                                node_data["sub_id"]
-                            ].all_actions[next_agent_actions[node_data["sub_id"]]]
-                        )
-                    }
-                    for node_id, node_data in next_graph.nodes.data()
-                },
+            (
+                next_sub_graphs,
+                next_substation_to_encoded_action,
+            ) = self._compute_managers_sub_graphs(
+                graph=next_graph,
+                substation_to_local_action=next_substation_to_local_actions,
             )
 
             if not self.architecture.pop.fixed_communities:
                 # TODO recompute community clustering for observation and next_observation
                 raise Exception("Dynamic communities not yet implemented.")
-
-            next_sub_graphs: Dict[
-                Community, dgl.DGLHeteroGraph
-            ] = split_graph_into_communities(
-                next_graph, self.communities, str(self.device)
-            )
 
             manager_stop_decay: Dict[Community, bool] = {
                 community: False if community == self.chosen_community else True
@@ -541,6 +555,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             self._extra_step(
                 next_sub_graphs=next_sub_graphs,
                 next_graph=next_graph,
+                next_substation_to_encoded_action=next_substation_to_encoded_action,
                 reward=reward,
                 action=self.chosen_node,
                 done=done,
