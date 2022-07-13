@@ -18,6 +18,11 @@ class LoggableModule:
     def is_logging_active(self) -> bool:
         return self.tensorboard_dir is not None
 
+    def log_loss(self, losses: Dict[str, float], train_steps: int):
+        if self.is_logging_active():
+            for iid, loss in losses.items():
+                self.writer.add_scalar("Loss/" + iid, loss, train_steps)
+
     def log_action_space_size(self, agent_converters: Dict[int, IdToAct]) -> None:
         if not self.is_logging_active():
             return

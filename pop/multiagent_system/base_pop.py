@@ -218,16 +218,21 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
     def get_agent_actions(
         self, factored_observation: Dict[Substation, Optional[dgl.DGLHeteroGraph]]
     ) -> Dict[Substation, int]:
-        action_list: List[int] = ray.get(
-            [
-                self.sub_to_agent_dict[sub_id].take_action.remote(
-                    transformed_observation=observation
-                )
-                if observation is not None
-                else 0
-                for sub_id, observation in factored_observation.items()
-            ]
+        action_list: list = [
+            self.sub_to_agent_dict[sub_id].take_action.remote(
+                transformed_observation=observation
+            )
+            if observation is not None
+            else 0
+            for sub_id, observation in factored_observation.items()
+        ]
+        actions_accomplished: List[int] = ray.get(
+            [action for action in action_list if action != 0]
         )
+        action_list = [
+            0 if action == 0 else actions_accomplished[idx]
+            for idx, action in enumerate(action_list)
+        ]
         return {
             sub_id: action
             for sub_id, action in zip(factored_observation.keys(), action_list)
@@ -269,7 +274,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         done: bool,
         stop_decay: Dict[Community, bool],
     ) -> None:
-        ray.get(
+        losses = ray.get(
             [
                 self.community_to_manager_dict[community].step.remote(
                     observation=community_to_sub_graphs_dict[community],
@@ -283,6 +288,23 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             ]
         )
 
+        self.log_loss(
+            {
+                manager_name: loss
+                for manager_name, loss in zip(
+                    ray.get(
+                        [
+                            self.community_to_manager_dict[community].get_name.remote()
+                            for community in self.communities
+                        ]
+                    ),
+                    losses,
+                )
+                if loss is not None
+            },
+            self.train_steps,
+        )
+
     def step_agents(
         self,
         factored_observation: Dict[Substation, dgl.DGLHeteroGraph],
@@ -293,6 +315,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         stop_decay: Dict[Substation, bool],
     ) -> None:
         step_promises = []
+        substations = []
         for sub_id, observation in factored_observation.items():
             next_observation: Optional[
                 dgl.DGLHeteroGraph
@@ -308,13 +331,30 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                         stop_decay=stop_decay[sub_id],
                     )
                 )
+                substations.append(sub_id)
             else:
                 print(
                     "Substation '"
                     + str(sub_id)
                     + "' not present in current next_state, related agent is not stepping..."
                 )
-        ray.get(step_promises)
+        losses = ray.get(step_promises)
+        self.log_loss(
+            {
+                agent_name: loss
+                for agent_name, loss in zip(
+                    ray.get(
+                        [
+                            self.sub_to_agent_dict[substation].get_name.remote()
+                            for substation in substations
+                        ]
+                    ),
+                    losses,
+                )
+                if loss is not None
+            },
+            self.train_steps,
+        )
 
     def my_act(
         self,

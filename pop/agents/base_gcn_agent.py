@@ -192,7 +192,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
 
         self.memory.push(observation, action, next_observation, reward, done)
 
-    def learn(self) -> None:
+    def learn(self) -> Optional[float]:
         if len(self.memory) < self.architecture.batch_size:
             return None
         if (
@@ -223,6 +223,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         self.memory.update_priorities(
             memory_indices, td_error.abs().detach().numpy().flatten()
         )
+        return loss.item()
 
     def step(
         self,
@@ -232,7 +233,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         next_observation: DGLHeteroGraph,
         done: bool,
         stop_decay: bool = False,
-    ) -> None:
+    ) -> Optional[float]:
 
         self.train_steps += 1
         if done:
@@ -248,8 +249,10 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
 
             # every so often the agents should learn from experiences
             if self.train_steps % self.architecture.learning_frequency == 0:
-                self.learn()
+                loss: Optional[float] = self.learn()
                 self.learning_steps += 1
+                return loss
+            return None
 
     @staticmethod
     def batch_observations(graphs: List[DGLHeteroGraph]) -> DGLHeteroGraph:

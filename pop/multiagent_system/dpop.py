@@ -103,14 +103,21 @@ class DPOP(BasePOP):
             next_graph, next_manager_actions, next_sub_graphs
         )
 
-        self.head_manager.step.remote(
-            observation=self.summarized_graph,
-            action=action,
-            reward=reward,
-            next_observation=next_summarized_graph,
-            done=done,
-            stop_decay=False,
+        loss = ray.get(
+            self.head_manager.step.remote(
+                observation=self.summarized_graph,
+                action=action,
+                reward=reward,
+                next_observation=next_summarized_graph,
+                done=done,
+                stop_decay=False,
+            )
         )
+
+        if loss is not None:
+            self.log_loss(
+                {ray.get(self.head_manager.get_name.remote()): loss}, self.train_steps
+            )
 
     def get_state(self: "DPOP") -> Dict[str, Any]:
         state: Dict[str, Any] = super().get_state()
