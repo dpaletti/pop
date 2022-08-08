@@ -183,15 +183,23 @@ def factor_action_space(
 def factor_observation(
     obs_graph: nx.Graph, device: str, radius: int = 1
 ) -> Dict[Substation, Optional[dgl.DGLHeteroGraph]]:
+    ego_graphs_dict = {}
+    for node_id, node_data in obs_graph.nodes.data():
+        if node_data["sub_id"] not in ego_graphs_dict:
+            ego_graphs_dict[node_data["sub_id"]] = nx.ego_graph(
+                obs_graph, node_id, radius
+            )
+        else:
+            ego_graphs_dict[node_data["sub_id"]] = nx.compose(
+                ego_graphs_dict[node_data["sub_id"]],
+                nx.ego_graph(obs_graph, node_id, radius),
+            )
 
     return {
         sub_id: BaseGCNAgent.from_networkx_to_dgl(ego_graph, device)
         if ego_graph.number_of_edges() > 0
         else None
-        for sub_id, ego_graph in {
-            node_data["sub_id"]: nx.ego_graph(obs_graph, node_id, radius)
-            for node_id, node_data in obs_graph.nodes.data()
-        }.items()
+        for sub_id, ego_graph in ego_graphs_dict.items()
     }
 
 
