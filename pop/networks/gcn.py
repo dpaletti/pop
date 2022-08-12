@@ -62,12 +62,16 @@ class GCN(nn.Module, SerializableModule):
         if self.edge_features is not None:
             # -> (nodes*batch_size, heads, out_node_features)
             node_embeddings = self.model(
-                g, self._to_tensor(dict(g.ndata)), self._to_tensor(dict(g.edata))
+                g,
+                self._to_tensor(dict(g.ndata), self.node_features),
+                self._to_tensor(dict(g.edata), self.edge_features),
             )
 
         else:
             # -> (nodes*batch_size, heads, out_node_features)
-            node_embeddings = self.model(g, self._to_tensor(dict(g.ndata)))
+            node_embeddings = self.model(
+                g, self._to_tensor(dict(g.ndata), self.node_features)
+            )
 
         if len(node_embeddings.shape) == 3:
             # Mean over heads if multi-headed attention
@@ -107,11 +111,11 @@ class GCN(nn.Module, SerializableModule):
         return gcn
 
     @staticmethod
-    def _to_tensor(d: Dict[Any, Tensor]) -> Tensor:
+    def _to_tensor(d: Dict[Any, Tensor], feature_size: int) -> Tensor:
         features: List[Tensor] = list(d.values())
         if features:
             return th.stack(features).transpose(0, 1).float()
-        return th.empty().float()
+        return th.empty((0, feature_size)).float()
 
     @staticmethod
     def _add_self_loop_to_batched_graph(g: DGLHeteroGraph) -> DGLHeteroGraph:

@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 import dgl
 import networkx as nx
@@ -45,7 +45,7 @@ class DPOP(BasePOP):
         self.head_manager: Optional[Manager] = None
 
         # Initialize Ray
-        ray.init()
+        ray.init(local_mode=True)
 
     def finalize_init_on_first_observation(
         self,
@@ -94,13 +94,17 @@ class DPOP(BasePOP):
         next_substation_to_encoded_action: Dict[Substation, EncodedAction],
         next_graph: nx.Graph,
         done: bool,
+        new_communities: List[Community],
+        new_community_to_manager_dict: Dict[Community, Manager],
     ):
-        # TODO: here a KeyError arises in summarize_graph, solve it.
         try:
             next_community_to_substation: Dict[
                 Community, Substation
             ] = self.get_manager_actions(
-                next_sub_graphs, next_substation_to_encoded_action
+                next_sub_graphs,
+                next_substation_to_encoded_action,
+                new_communities=new_communities,
+                new_community_to_manager_dict=new_community_to_manager_dict,
             )
 
             next_summarized_graph: dgl.DGLHeteroGraph = self._compute_summarized_graph(
@@ -108,6 +112,8 @@ class DPOP(BasePOP):
                 next_sub_graphs,
                 next_substation_to_encoded_action,
                 next_community_to_substation,
+                new_communities=new_communities,
+                new_community_to_manager_dict=new_community_to_manager_dict,
             )
 
             loss = ray.get(

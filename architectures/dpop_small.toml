@@ -1,8 +1,8 @@
 [pop]
 agent_neighbourhood_radius = 1
 decentralized = false
-fixed_communities = true
 epsilon_beta_scheduling = true
+enable_power_supply_modularity = true
 agent_type = "uniform"
 
 [agent]

@@ -37,24 +37,17 @@ class Manager(BaseGCNAgent):
             log_dir=None,
         )
 
-        self.node_embeddings: Optional[Tensor] = None
         self.embedding_size = self.q_network.get_embedding_size()
 
     def get_embedding_size(self):
         return self.embedding_size
 
-    def get_node_embeddings(self) -> Tensor:
-        if self.node_embeddings is None:
-            raise Exception("None embedding in: " + self.name)
-        return self.node_embeddings
+    def get_node_embeddings(self, transformed_observation: DGLHeteroGraph) -> Tensor:
+        return self.q_network.embedding(transformed_observation)
 
     def take_action(
-        self, transformed_observation: DGLHeteroGraph, mask: Optional[List[int]] = None
+        self, transformed_observation: DGLHeteroGraph, mask: List[int] = None
     ) -> int:
-        if mask is None:
-            raise Exception(
-                "Manager '" + self.name + " take_action() invoked with None mask"
-            )
 
         action_list = list(range(self.actions))
 
@@ -64,7 +57,7 @@ class Manager(BaseGCNAgent):
             self.architecture.exploration.epsilon_decay,
         )
 
-        self.node_embeddings = self.q_network.embedding(transformed_observation)
+        node_embeddings = self.get_node_embeddings(transformed_observation)
 
         if self.training:
             # epsilon-greedy Exploration

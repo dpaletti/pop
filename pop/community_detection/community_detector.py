@@ -1,5 +1,5 @@
-from random import Random
-from typing import List, Set, Tuple, Optional, FrozenSet
+from random import Random, sample
+from typing import List, Set, Tuple, Optional, FrozenSet, Union
 
 import networkx as nx
 import networkx.linalg as nx_linalg
@@ -13,11 +13,16 @@ Community = FrozenSet[int]
 
 class CommunityDetector:
     def __init__(
-        self, seed: int, resolution: float = 1.0, threshold: float = 1e-6
+        self,
+        seed: int,
+        resolution: float = 1.0,
+        threshold: float = 1e-6,
+        enable_power_supply_modularity=False,
     ) -> None:
         self.resolution: float = resolution
         self.threshold: float = threshold
         self.seed: int = seed
+        self.enable_power_supply_modularity: bool = False
 
     @staticmethod
     def community_coherence(graph: nx.Graph, community: Set[int]) -> int:
@@ -33,12 +38,7 @@ class CommunityDetector:
         for community_id, community in enumerate(communities):
             if node_1 in community:
                 return community_id
-        raise Exception(
-            "Node: "
-            + str(node_1)
-            + " does not belong to any community\n "
-            + str(communities)
-        )
+        raise Exception("Could not find " + str(node_1) + " in any community")
 
     def initialize_intermediate_community_structure(
         self, graph_t: nx.Graph, graph_t1: nx.Graph, comm_t: List[Set[int]]
@@ -54,55 +54,99 @@ class CommunityDetector:
         - C_1: a set of communities to be separated into singleton communities
         - C_2: a set of two-vertices communities to be created
         """
-        singleton_communities = set()
-        two_verticies_communities = set()
-        added_edges = nx.difference(graph_t1, graph_t).edges
-        removed_edges = nx.difference(graph_t, graph_t1).edges
-        for edge in removed_edges:
-            if belong_to_same_community(edge[0], edge[1], comm_t):
-                singleton_communities.add(
-                    self.get_community(edge[0], comm_t)
-                )  # edge[0] and edge[1] belong to same community
-                for extremity in edge:
-                    for neighbor in graph_t.neighbors(extremity):
-                        singleton_communities.add(self.get_community(neighbor, comm_t))
+        singleton_communities: set = set()  # C1
+        two_verticies_communities: set = set()  # C2
 
-        for edge in added_edges:
-            if belong_to_same_community(edge[0], edge[1], comm_t):
-                two_verticies_communities.add(edge)
-                singleton_communities.add(self.get_community(edge[0], comm_t))
-            else:
-                delta_w = 1  # we deal only with unweighted edges
-                merged_community = set.union(
-                    comm_t[self.get_community(edge[0], comm_t)],
-                    comm_t[self.get_community(edge[1], comm_t)],
-                )
-                coherence_0 = self.community_coherence(
-                    graph_t, comm_t[self.get_community(edge[0], comm_t)]
-                )
-                coherence_1 = self.community_coherence(
-                    graph_t, comm_t[self.get_community(edge[1], comm_t)]
-                )
-                coherence_merged = self.community_coherence(graph_t, merged_community)
+        added_edges: set = set(graph_t1.edges - graph_t.edges)
+        removed_edges: set = set(graph_t.edges - graph_t1.edges)
 
-                degree_0 = self.community_degree(
-                    graph_t, comm_t[self.get_community(edge[0], comm_t)]
-                )
-                degree_1 = self.community_degree(
-                    graph_t, comm_t[self.get_community(edge[1], comm_t)]
-                )
+        added_nodes: set = set(graph_t1.nodes - graph_t.nodes)
+        removed_nodes: set = set(graph_t.nodes - graph_t1.nodes)
 
-                coherence_delta = coherence_0 + coherence_1 - coherence_merged
-                full_degree = degree_0 + degree_1
-                m = len(graph_t.edges)
+        for edge in added_edges.union(removed_edges):
+            for k in edge:
+                if k in removed_nodes:
+                    removed_node_community = self.get_community(k, comm_t)
+                    singleton_communities.add(self.get_community(k, comm_t))
+                    for old_edge in [
+                        e for e in graph_t.edges if e[0] == k or e[1] == k
+                    ]:
+                        singleton_communities.add(
+                            self.get_community(old_edge[1], comm_t)
+                        )
+                    comm_t[removed_node_community].remove(k)
+                if k in added_nodes:
+                    comm_t.append({k})
+                    singleton_communities.add(len(comm_t) - 1)
 
-                delta_1 = 2 * m - coherence_delta - full_degree
-                delta_2 = m * coherence_delta + degree_0 * degree_1
+                    new_edges = [e for e in graph_t1.edges if e[0] == k or e[1] == k]
+                    if new_edges:
+                        # new_outgoing_edges may be empty and induce an exception when sampling
+                        # sampling is used to handle the unweighted case
+                        two_verticies_communities.add(sample(new_edges, 1)[0])
 
-                if 2 * delta_w + delta_1 > np.sqrt(delta_1**2 + 4 * delta_2**2):
-                    singleton_communities.add(self.get_community(edge[0], comm_t))
-                    singleton_communities.add(self.get_community(edge[1], comm_t))
-                    two_verticies_communities.add(edge)
+                    for new_edge in new_edges:
+                        singleton_communities.add(
+                            self.get_community(new_edge[1], comm_t)
+                        )
+            if edge[0] not in removed_nodes.union(added_nodes) and edge[
+                1
+            ] not in removed_nodes.union(added_nodes):
+                if edge in removed_edges:
+                    if belong_to_same_community(edge[0], edge[1], comm_t):
+                        singleton_communities.add(
+                            self.get_community(edge[0], comm_t)
+                        )  # edge[0] and edge[1] belong to same community
+                        for extremity in edge:
+                            for neighbor in graph_t.neighbors(extremity):
+                                singleton_communities.add(
+                                    self.get_community(neighbor, comm_t)
+                                )
+
+                if edge in added_edges:
+                    if belong_to_same_community(edge[0], edge[1], comm_t):
+                        two_verticies_communities.add(edge)
+                        singleton_communities.add(self.get_community(edge[0], comm_t))
+                    else:
+                        delta_w = 1  # we deal only with unweighted edges
+                        merged_community = set.union(
+                            comm_t[self.get_community(edge[0], comm_t)],
+                            comm_t[self.get_community(edge[1], comm_t)],
+                        )
+                        coherence_0 = self.community_coherence(
+                            graph_t, comm_t[self.get_community(edge[0], comm_t)]
+                        )
+                        coherence_1 = self.community_coherence(
+                            graph_t, comm_t[self.get_community(edge[1], comm_t)]
+                        )
+                        coherence_merged = self.community_coherence(
+                            graph_t, merged_community
+                        )
+
+                        degree_0 = self.community_degree(
+                            graph_t, comm_t[self.get_community(edge[0], comm_t)]
+                        )
+                        degree_1 = self.community_degree(
+                            graph_t, comm_t[self.get_community(edge[1], comm_t)]
+                        )
+
+                        coherence_delta = coherence_0 + coherence_1 - coherence_merged
+                        full_degree = degree_0 + degree_1
+                        m = len(graph_t.edges)
+
+                        delta_1 = 2 * m - coherence_delta - full_degree
+                        delta_2 = m * coherence_delta + degree_0 * degree_1
+
+                        if 2 * delta_w + delta_1 > np.sqrt(
+                            delta_1**2 + 4 * delta_2**2
+                        ):
+                            singleton_communities.add(
+                                self.get_community(edge[0], comm_t)
+                            )
+                            singleton_communities.add(
+                                self.get_community(edge[1], comm_t)
+                            )
+                            two_verticies_communities.add(edge)
 
         return singleton_communities, two_verticies_communities
 
@@ -111,7 +155,6 @@ class CommunityDetector:
         graph_t: nx.Graph,
         graph_t1: Optional[nx.Graph] = None,
         comm_t: Optional[List[Set[int]]] = None,
-        enable_power_supply_modularity=False,
         alpha: float = 0.5,
         beta: float = 0.5,
     ) -> List[FrozenSet[int]]:
@@ -131,7 +174,7 @@ class CommunityDetector:
                     resolution=self.resolution,
                     threshold=self.threshold,
                     seed=Random(self.seed),
-                    enable_power_supply_modularity=enable_power_supply_modularity,
+                    enable_power_supply_modularity=self.enable_power_supply_modularity,
                     alpha=alpha,
                     beta=beta,
                 )
@@ -141,6 +184,7 @@ class CommunityDetector:
                 "comm_t and graph_t1 must be either both None or both not None"
             )
 
+        comm_t = [set(community) for community in comm_t]
         (
             singleton_communities,
             two_vertices_communities,
@@ -148,6 +192,7 @@ class CommunityDetector:
         comm_t1: List[Optional[Set[int]]] = [i.copy() for i in comm_t]
 
         for singleton_community in singleton_communities:
+
             comm_t1[singleton_community] = None
             for node in comm_t[singleton_community]:
                 if (
@@ -172,7 +217,7 @@ class CommunityDetector:
                 resolution=self.resolution,
                 threshold=self.threshold,
                 seed=Random(self.seed),
-                enable_power_supply_modularity=enable_power_supply_modularity,
+                enable_power_supply_modularity=self.enable_power_supply_modularity,
                 alpha=alpha,
                 beta=beta,
             )

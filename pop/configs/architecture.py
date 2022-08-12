@@ -10,8 +10,8 @@ from configs.type_aliases import ParsedTOMLDict
 class POPArchitecture:
     agent_neighbourhood_radius: int
     decentralized: bool
-    fixed_communities: bool
     epsilon_beta_scheduling: bool
+    enable_power_supply_modularity: bool
     agent_type: str
 
 

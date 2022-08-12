@@ -21,7 +21,7 @@ from random import choice
 
 class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
 
-    # This names are used to find files in the load directory
+    # These names are used to find files in the load directory
     # When loading an agent
     target_network_name_suffix: str = "_target_network"
     q_network_name_suffix: str = "_q_network"
@@ -157,13 +157,13 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
 
         return loss, td_errors
 
+    def get_memory(self) -> ReplayMemory:
+        return self.memory
+
     def _exponential_decay(self, max_val: float, min_val: float, decay: int) -> float:
         return min_val + (max_val - min_val) * np.exp(-1.0 * self.decay_steps / decay)
 
-    def take_action(
-        self,
-        transformed_observation: DGLHeteroGraph,
-    ) -> int:
+    def take_action(self, transformed_observation: DGLHeteroGraph, *args) -> int:
 
         self.epsilon = self._exponential_decay(
             self.architecture.exploration.max_epsilon,
@@ -261,7 +261,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
     @staticmethod
     def to_dgl(obs: BaseObservation, device: str) -> DGLHeteroGraph:
 
-        # Convert Grid2op graph to a directed (for compatibility reasons) networkx graph
+        # Convert Grid2Op graph to a directed (for compatibility reasons) networkx graph
         net = obs.as_networkx()
         net = net.to_directed()  # Typing error from networkx, ignore it
 

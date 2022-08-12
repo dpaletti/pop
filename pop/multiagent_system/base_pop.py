@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from dataclasses import asdict
-from typing import Optional, List, Tuple, Dict, Union, Any
+from typing import Optional, List, Tuple, Dict, Union, Any, Set
 
 import dgl
 import networkx as nx
@@ -31,6 +31,8 @@ from multiagent_system.space_factorization import (
 from networks.serializable_module import SerializableModule
 from agents.loggable_module import LoggableModule
 import ray
+import itertools
+import numpy as np
 
 
 class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
@@ -98,6 +100,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         self.chosen_community: Optional[Community] = None
         self.chosen_node: Optional[int] = None
         self.substation_to_encoded_action: Optional[Substation, EncodedAction] = None
+        self.old_graph: Optional[nx.Graph] = None
 
         # Agents
         self.action_lookup_table: Optional[Dict[HashableAction, int]] = None
@@ -108,15 +111,12 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         # Managers
         self.community_to_manager_dict: Optional[Dict[Community, Manager]] = None
+        self.manager_hisitory_dict: Dict[Manager, Set[Community]] = {}
 
         # Community Detector Initialization
-        self.community_detector = CommunityDetector(seed)
-        self.fixed_communities = self.architecture.pop.fixed_communities
-        if not self.fixed_communities:
-            # TODO: implement dynamic communities
-            # TODO: each time a new observation is evaluated (both in act() and step())
-            # TODO: communities must be re-computed and Manager dict must be updated consistently
-            raise Exception("Dynamic communities not yet implemented")
+        self.community_detector = CommunityDetector(
+            seed, architecture.pop.enable_power_supply_modularity
+        )
         self.communities: Optional[List[Community]] = None
 
     def finalize_init_on_first_observation(
@@ -214,6 +214,10 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             )
             for idx, community in enumerate(self.communities)
         }
+        self.manager_hisitory_dict = {
+            manager: {community}
+            for community, manager in self.community_to_manager_dict.items()
+        }
 
     def get_agent_actions(
         self, factored_observation: Dict[Substation, Optional[dgl.DGLHeteroGraph]]
@@ -229,38 +233,64 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         actions_accomplished: List[int] = ray.get(
             [action for action in action_list if action != 0]
         )
-        action_list = [
-            0 if action == 0 else actions_accomplished[idx]
-            for idx, action in enumerate(action_list)
-        ]
+
+        if len(action_list) != actions_accomplished:
+            for idx, action_promise in enumerate(action_list):
+                if action_promise == 0:
+                    actions_accomplished.insert(idx, 0)
+
         return {
             sub_id: action
-            for sub_id, action in zip(factored_observation.keys(), action_list)
+            for sub_id, action in zip(factored_observation.keys(), actions_accomplished)
         }
 
     def get_manager_actions(
         self,
         community_to_sub_graphs_dict: Dict[Community, dgl.DGLHeteroGraph],
         substation_to_encoded_action: Dict[Substation, EncodedAction],
+        new_communities: Optional[List[Community]] = None,
+        new_community_to_manager_dict: Optional[Dict[Community, Manager]] = None,
     ) -> Dict[Community, Substation]:
-        action_list: List[Substation] = ray.get(
-            [
-                self.community_to_manager_dict[community].take_action.remote(
-                    transformed_observation=community_to_sub_graphs_dict[community],
-                    mask=frozenset(
-                        [
-                            sub
-                            for sub in community
-                            if sub in list(substation_to_encoded_action.keys())
-                        ]
-                    ),
-                )
-                for community in self.communities
-            ]
+        current_communities = (
+            self.communities if new_communities is None else new_communities
         )
+        current_mapping = (
+            self.community_to_manager_dict
+            if new_community_to_manager_dict is None
+            else new_community_to_manager_dict
+        )
+        no_action_positions_to_add = []
+        action_list: List[Substation] = ray.get(
+            list(
+                filter(
+                    lambda x: x is not None,
+                    [
+                        current_mapping[community].take_action.remote(
+                            transformed_observation=community_to_sub_graphs_dict[
+                                community
+                            ],
+                            mask=frozenset(
+                                [
+                                    sub
+                                    for sub in community
+                                    if sub in list(substation_to_encoded_action.keys())
+                                ]
+                            ),
+                        )
+                        if community_to_sub_graphs_dict[community].num_edges() > 0
+                        else no_action_positions_to_add.append(idx)
+                        for idx, community in enumerate(current_communities)
+                    ],
+                )
+            )
+        )
+
+        for no_action_position in no_action_positions_to_add:
+            action_list.insert(no_action_position, 0)
+
         return {
             community: action
-            for community, action in zip(self.communities, action_list)
+            for community, action in zip(current_communities, action_list)
         }
 
     @abstractmethod
@@ -275,19 +305,55 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         next_community_to_sub_graphs_dict: Dict[Community, dgl.DGLHeteroGraph],
         done: bool,
         stop_decay: Dict[Community, bool],
+        new_community_to_manager_dict: Dict[Community, Manager],
     ) -> None:
+        manager_community_dict: Dict[
+            Manager, Tuple[List[Community], List[Community]]
+        ] = {
+            manager: ([], [])
+            for manager in set(self.community_to_manager_dict.values())
+        }
+        for community, manager in self.community_to_manager_dict.items():
+            manager_community_dict[manager][0].append(community)
+
+        for new_community, manager in new_community_to_manager_dict.items():
+            manager_community_dict[manager][1].append(new_community)
+
         losses = ray.get(
-            [
-                self.community_to_manager_dict[community].step.remote(
-                    observation=community_to_sub_graphs_dict[community],
-                    action=actions[community],
-                    reward=reward,
-                    next_observation=next_community_to_sub_graphs_dict[community],
-                    done=done,
-                    stop_decay=stop_decay[community],
+            list(
+                itertools.chain(
+                    *[
+                        [
+                            manager.step.remote(
+                                observation=community_to_sub_graphs_dict[old_community],
+                                action=actions[old_community],
+                                reward=reward,
+                                next_observation=next_community_to_sub_graphs_dict[
+                                    new_manager_communities[
+                                        np.argmax(
+                                            [
+                                                self._jaccard_distace(
+                                                    old_community,
+                                                    new_community,
+                                                )
+                                                for new_community in new_manager_communities
+                                            ]
+                                        )
+                                    ]
+                                ],
+                                done=done,
+                                stop_decay=stop_decay[old_community],
+                            )
+                            for old_community in old_manager_communities
+                        ]
+                        for manager, (
+                            old_manager_communities,
+                            new_manager_communities,
+                        ) in manager_community_dict.items()
+                        if old_manager_communities and new_manager_communities
+                    ]
                 )
-                for community in self.communities
-            ]
+            )
         )
 
         self.log_loss(
@@ -361,7 +427,10 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         )
 
     def _compute_managers_sub_graphs(
-        self, graph: nx.graph, substation_to_local_action: Dict[Substation, int]
+        self,
+        graph: nx.graph,
+        substation_to_local_action: Dict[Substation, int],
+        new_communities: Optional[List[Community]] = None,
     ) -> Tuple[Dict[Community, dgl.DGLHeteroGraph], Dict[Substation, EncodedAction]]:
         substation_to_encoded_action: Dict[Substation, EncodedAction] = {
             sub_id: self.lookup_local_action(
@@ -382,7 +451,11 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         )
 
         return (
-            split_graph_into_communities(graph, self.communities, str(self.device)),
+            split_graph_into_communities(
+                graph,
+                self.communities if new_communities is None else new_communities,
+                str(self.device),
+            ),
             substation_to_encoded_action,
         )
 
@@ -392,6 +465,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         sub_graphs: Dict[Community, dgl.DGLHeteroGraph],
         substation_to_encoded_action: Dict[Substation, EncodedAction],
         community_to_substation: Dict[Community, Substation],
+        new_communities: Optional[List[Community]] = None,
+        new_community_to_manager_dict: Optional[Dict[Community, Manager]] = None,
     ):
         # The graph is summarized by contracting every community in 1 supernode
         # And storing the embedding of each manager in each supernode as node feature
@@ -403,6 +478,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 for community, substation in community_to_substation.items()
             },
             sub_graphs,
+            new_communities=new_communities,
+            new_community_to_manager_dict=new_community_to_manager_dict,
         ).to(self.device)
 
     def my_act(
@@ -413,14 +490,21 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         reward: float,
         done=False,
     ) -> EncodedAction:
-        graph: nx.Graph
 
+        graph: nx.Graph
         self.factored_observation, graph = transformed_observation
 
-        # Observation as a neighbourhood for each node
+        # Update Communities
+        if self.old_graph is None:
+            self.communities, self.community_to_manager_dict = self._update_communities(
+                graph
+            )
+        else:
+            self.communities, self.community_to_manager_dict = self._update_communities(
+                self.old_graph, graph
+            )
 
-        if self.communities and not self.fixed_communities:
-            raise Exception("\nDynamic Communities are not implemented yet\n")
+        self.old_graph = graph.copy()
 
         # Actions retrieved are encoded with local agent converters
         # need to be remapped to the global converter
@@ -497,9 +581,52 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         next_substation_to_encoded_action: Dict[Substation, EncodedAction],
         next_graph: nx.Graph,
         done: bool,
+        new_communities: List[Community],
+        new_community_to_manager_dict: Dict[Community, Manager],
     ):
         # Override this to extend step()
         pass
+
+    @staticmethod
+    def _jaccard_distace(s1: frozenset, s2: frozenset) -> float:
+        _s1 = set(s1)
+        _s2 = set(s2)
+        return len(_s1.intersection(_s2)) / len(_s1.union(_s2))
+
+    def _update_communities(
+        self, graph: nx.Graph, next_graph: Optional[nx.Graph] = None
+    ) -> Tuple[List[Community], Dict[Community, Manager]]:
+        if next_graph is None:
+            new_communities = self.community_detector.dynamo(graph_t=graph)
+        else:
+            new_communities = self.community_detector.dynamo(
+                graph_t=graph,
+                graph_t1=next_graph,
+                comm_t=self.communities,
+            )
+
+        if set(self.communities) == set(new_communities):
+            return new_communities, self.community_to_manager_dict
+
+        updated_community_to_manager_dict = {}
+        for new_community in new_communities:
+            manager_to_jaccard_dict = {
+                manager: max(
+                    [
+                        self._jaccard_distace(old_community, new_community)
+                        for old_community in communities
+                    ]
+                )
+                for manager, communities in self.manager_hisitory_dict.items()
+            }
+            updated_community_to_manager_dict[new_community] = max(
+                manager_to_jaccard_dict, key=manager_to_jaccard_dict.get
+            )
+
+        for new_community, manager in updated_community_to_manager_dict.items():
+            self.manager_hisitory_dict[manager].add(new_community)
+
+        return new_communities, updated_community_to_manager_dict
 
     def step(
         self,
@@ -509,17 +636,29 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         next_observation: BaseObservation,
         done: bool,
     ):
+        # TODO: communities must be updated before querying managers
+        # TODO: this is because node number may change
+        # TODO: care that self.communities gets updated
+        # TODO: (POSSIBLE SOLUTION) do not update self.communities directly
         if done:
             self.log_alive_steps(self.alive_steps, self.episodes)
             self.train_steps += 1
             self.episodes += 1
             self.alive_steps = 0
+            self.old_graph = (
+                None  # this resets the incremental community detection algorithm
+            )
         else:
             self.log_reward(reward, self.train_steps)
             self.alive_steps += 1
             self.train_steps += 1
 
             next_graph: nx.Graph = next_observation.as_networkx()
+
+            new_communities, new_community_to_manager_dict = self._update_communities(
+                observation.as_networkx(), next_graph
+            )
+
             next_factored_observation: Dict[
                 Substation, Optional[dgl.DGLHeteroGraph]
             ] = factor_observation(
@@ -545,11 +684,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             ) = self._compute_managers_sub_graphs(
                 graph=next_graph,
                 substation_to_local_action=next_substation_to_local_actions,
+                new_communities=new_communities,
             )
-
-            if not self.architecture.pop.fixed_communities:
-                # TODO recompute community clustering for observation and next_observation
-                raise Exception("Dynamic communities not yet implemented.")
 
             manager_stop_decay: Dict[Community, bool] = {
                 community: False if community == self.chosen_community else True
@@ -563,6 +699,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 reward=reward,
                 action=self.chosen_node,
                 done=done,
+                new_communities=new_communities,
+                new_community_to_manager_dict=new_community_to_manager_dict,
             )
 
             self.step_managers(
@@ -572,6 +710,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 next_community_to_sub_graphs_dict=next_sub_graphs,
                 done=done,
                 stop_decay=manager_stop_decay,
+                new_community_to_manager_dict=new_community_to_manager_dict,
             )
 
             self.step_agents(
@@ -614,13 +753,23 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         graph: nx.Graph,
         manager_actions: Dict[Community, EncodedAction],
         sub_graphs: Dict[Community, dgl.DGLHeteroGraph],
+        new_communities: Optional[List[Community]] = None,
+        new_community_to_manager_dict: Optional[Dict[Community, Manager]] = None,
     ) -> dgl.DGLHeteroGraph:
+
+        current_community_to_manager_dict = (
+            self.community_to_manager_dict
+            if new_community_to_manager_dict is None
+            else new_community_to_manager_dict
+        )
 
         # CommunityManager node embedding is assigned to each node
         node_attribute_dict = {}
         for community, sub_graph in sub_graphs.items():
             node_embeddings = ray.get(
-                self.community_to_manager_dict[community].get_node_embeddings.remote()
+                current_community_to_manager_dict[community].get_node_embeddings.remote(
+                    sub_graph
+                )
             )
             sub_graphs[community].ndata["node_embeddings"] = node_embeddings
             for node in community:
@@ -641,7 +790,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         # Graph is summarized by contracting communities into supernodes
         # Manager action is assigned to each supernode
         summarized_graph: nx.graph = graph
-        for community in self.communities:
+        for community in (
+            self.communities if new_communities is None else new_communities
+        ):
             community_list = list(community)
             for node in community_list[1:]:
                 summarized_graph = nx.contracted_nodes(
