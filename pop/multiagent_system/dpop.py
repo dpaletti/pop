@@ -45,7 +45,7 @@ class DPOP(BasePOP):
         self.head_manager: Optional[Manager] = None
 
         # Initialize Ray
-        ray.init(local_mode=True)
+        ray.init()
 
     def _finalize_init_on_first_observation(
         self,

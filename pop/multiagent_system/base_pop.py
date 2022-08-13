@@ -135,8 +135,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         next_substation_to_encoded_action: Dict[Substation, EncodedAction],
         next_graph: nx.Graph,
         done: bool,
-        new_communities: List[Community],
-        new_community_to_manager_dict: Dict[Community, Manager],
+        next_communities: List[Community],
+        next_community_to_manager: Dict[Community, Manager],
     ):
         """
         Override this to add functionalities to the step() method
@@ -308,7 +308,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
             # Community structure is updated and managers are assigned to the new communities
             # By taking the most similar communities wrt the old mappings
-            new_communities, new_community_to_manager_dict = self._update_communities(
+            next_communities, next_community_to_manager = self._update_communities(
                 observation.as_networkx(), next_graph
             )
 
@@ -340,7 +340,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             ) = self._compute_managers_sub_graphs(
                 graph=next_graph,
                 substation_to_local_action=next_substation_to_local_actions,
-                new_communities=new_communities,
+                new_communities=next_communities,
             )
 
             # Stop the decay of the managers whose action has been selected
@@ -358,8 +358,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 reward=reward,
                 action=self.chosen_node,
                 done=done,
-                new_communities=new_communities,
-                new_community_to_manager_dict=new_community_to_manager_dict,
+                next_communities=next_communities,
+                next_community_to_manager=next_community_to_manager,
             )
 
             self._step_managers(
@@ -369,7 +369,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 next_community_to_sub_graphs_dict=next_sub_graphs,
                 done=done,
                 stop_decay=manager_stop_decay,
-                next_community_to_manager=new_community_to_manager_dict,
+                next_community_to_manager=next_community_to_manager,
             )
 
             self._step_agents(
