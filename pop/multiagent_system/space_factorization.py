@@ -190,6 +190,8 @@ def factor_observation(
                 obs_graph, node_id, radius
             )
         else:
+            # Handles the case in which two buses (= two nodes)
+            # belong to the same substation
             ego_graphs_dict[node_data["sub_id"]] = nx.compose(
                 ego_graphs_dict[node_data["sub_id"]],
                 nx.ego_graph(obs_graph, node_id, radius),

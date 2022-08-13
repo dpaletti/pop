@@ -82,7 +82,7 @@ class GCN(nn.Module, SerializableModule):
         return node_embeddings
 
     def get_embedding_dimension(self) -> int:
-        return self.architecture.layers[-1].kwargs["out_feats"]
+        return int(self.architecture.layers[-1].kwargs["out_feats"])
 
     def get_state(self) -> Dict[str, Any]:
         return {
@@ -115,7 +115,7 @@ class GCN(nn.Module, SerializableModule):
         features: List[Tensor] = list(d.values())
         if features:
             return th.stack(features).transpose(0, 1).float()
-        return th.empty((0, feature_size)).float()
+        return th.zeros((0, feature_size)).float()
 
     @staticmethod
     def _add_self_loop_to_batched_graph(g: DGLHeteroGraph) -> DGLHeteroGraph:

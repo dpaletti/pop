@@ -12,6 +12,7 @@ class POPArchitecture:
     decentralized: bool
     epsilon_beta_scheduling: bool
     enable_power_supply_modularity: bool
+    manager_history_size: int
     agent_type: str
 
 

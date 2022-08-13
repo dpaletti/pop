@@ -39,7 +39,7 @@ class Manager(BaseGCNAgent):
 
         self.embedding_size = self.q_network.get_embedding_size()
 
-    def get_embedding_size(self):
+    def get_embedding_size(self) -> int:
         return self.embedding_size
 
     def get_node_embeddings(self, transformed_observation: DGLHeteroGraph) -> Tensor:

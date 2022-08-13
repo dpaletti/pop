@@ -47,14 +47,14 @@ class DPOP(BasePOP):
         # Initialize Ray
         ray.init(local_mode=True)
 
-    def finalize_init_on_first_observation(
+    def _finalize_init_on_first_observation(
         self,
         first_observation: BaseObservation,
         first_observation_graph: nx.Graph,
         pre_initialized=False,
     ):
 
-        super().finalize_init_on_first_observation(
+        super()._finalize_init_on_first_observation(
             first_observation, first_observation_graph, pre_initialized=pre_initialized
         )
         if not self.pre_initialized:
@@ -63,7 +63,7 @@ class DPOP(BasePOP):
                 agent_actions=self.env.n_sub,
                 node_features=int(
                     ray.get(
-                        list(self.community_to_manager_dict.values())[
+                        list(self.community_to_manager.values())[
                             0
                         ].get_embedding_size.remote()
                     )
@@ -94,17 +94,17 @@ class DPOP(BasePOP):
         next_substation_to_encoded_action: Dict[Substation, EncodedAction],
         next_graph: nx.Graph,
         done: bool,
-        new_communities: List[Community],
-        new_community_to_manager_dict: Dict[Community, Manager],
+        next_communities: List[Community],
+        next_community_to_manager: Dict[Community, Manager],
     ):
         try:
             next_community_to_substation: Dict[
                 Community, Substation
-            ] = self.get_manager_actions(
+            ] = self._get_manager_actions(
                 next_sub_graphs,
                 next_substation_to_encoded_action,
-                new_communities=new_communities,
-                new_community_to_manager_dict=new_community_to_manager_dict,
+                next_communities,
+                next_community_to_manager,
             )
 
             next_summarized_graph: dgl.DGLHeteroGraph = self._compute_summarized_graph(
@@ -112,8 +112,8 @@ class DPOP(BasePOP):
                 next_sub_graphs,
                 next_substation_to_encoded_action,
                 next_community_to_substation,
-                new_communities=new_communities,
-                new_community_to_manager_dict=new_community_to_manager_dict,
+                new_communities=next_communities,
+                new_community_to_manager_dict=next_community_to_manager,
             )
 
             loss = ray.get(
@@ -166,13 +166,13 @@ class DPOP(BasePOP):
         dpop.train_steps = checkpoint["train_steps"]
         dpop.edge_features = checkpoint["edge_features"]
         dpop.node_features = checkpoint["node_features"]
-        dpop.sub_to_agent_dict = {
+        dpop.substation_to_agent = {
             sub_id: RayGCNAgent.load(checkpoint_dict=agent_state)
             if "optimizer_state" in list(agent_state.keys())
             else RayShallowGCNAgent.load(checkpoint_dict=agent_state)
             for sub_id, agent_state in checkpoint["agents_state"].items()
         }
-        dpop.community_to_manager_dict = {
+        dpop.community_to_manager = {
             community: Manager.load(checkpoint_dict=manager_state)
             for community, manager_state in checkpoint["managers_state"].items()
         }

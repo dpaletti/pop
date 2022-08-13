@@ -56,7 +56,7 @@ class DuelingNet(nn.Module, SerializableModule):
         )
         self.value_stream_architecture = value_stream_architecture
 
-    def get_embedding_size(self):
+    def get_embedding_size(self) -> int:
         return self.embedding.get_embedding_dimension()
 
     @staticmethod
