@@ -162,15 +162,12 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         self.factored_observation, graph = transformed_observation
 
         # Update Communities
-        if self.old_graph is None:
-            # At each episode the community detection algorithm is reset
-            self.communities, self.community_to_manager = self._update_communities(
-                graph
-            )
-        else:
-            self.communities, self.community_to_manager = self._update_communities(
-                self.old_graph, graph
-            )
+        # At each episode the community detection algorithm is reset by setting old_graph to None
+        self.communities, self.community_to_manager = (
+            self._update_communities(graph)
+            if self.old_graph is None
+            else self._update_communities(self.old_graph, graph)
+        )
 
         self.old_graph = graph.copy()
 
@@ -209,25 +206,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         # The head manager chooses the best action from every community given the summarized graph
         self.chosen_node = self.get_action(self.summarized_graph)
 
-        # Retrieve the chosen_community given the chosen_node
-        self.chosen_community = frozenset(
-            [
-                substation
-                for substation, belongs_to_community in enumerate(
-                    self.summarized_graph.ndata["embedding_action"][self.chosen_node][
-                        -(self.env.n_sub + 1) : -1
-                    ]
-                    .detach()
-                    .tolist()
-                )
-                if belongs_to_community
-            ]
-        )
-
         # Retrieve the chosen_action given the chosen_community
-        self.chosen_action = self.substation_to_encoded_action[
-            self.community_to_substation[self.chosen_community]
-        ]
+        self.chosen_action = graph.nodes[self.chosen_node]["action"]
 
         # Log to Tensorboard
         self.log_system_behaviour(

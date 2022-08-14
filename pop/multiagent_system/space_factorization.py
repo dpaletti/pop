@@ -123,6 +123,8 @@ def factor_action_space(
     full_converter: IdToAct,
     n_substations: int,
 ) -> Tuple[Dict[int, List[int]], Dict[HashableAction, int]]:
+    # TODO: check here if the action space needs to be re-factored during execution
+    # TODO: we should check the action space changes when the some nodes (aka buses) belong to different substations
 
     # Here we retrieve the mappings between objects and buses (aka nodes)
     # actual flow_bus_matrix is ignored, useless in this context
