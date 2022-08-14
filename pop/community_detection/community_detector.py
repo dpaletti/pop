@@ -66,7 +66,8 @@ class CommunityDetector:
         for edge in added_edges.union(removed_edges):
             for k in edge:
                 if k in removed_nodes:
-                    removed_node_community = self.get_community(k, comm_t).remove(k)
+                    removed_node_community = self.get_community(k, comm_t)
+                    removed_node_community.remove(k)
                     singleton_communities.add(frozenset(removed_node_community))
                     for old_edge in [
                         e

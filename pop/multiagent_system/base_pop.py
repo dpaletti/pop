@@ -500,6 +500,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         self.log_action_space_size(agent_converters=self.substation_to_action_converter)
 
         # Managers Initialization
+        print("Initial Community Structure: " + str(self.communities))
         self.community_to_manager: Dict[Community, Manager] = {
             community: Manager.remote(
                 agent_actions=len(first_observation_graph.nodes),
