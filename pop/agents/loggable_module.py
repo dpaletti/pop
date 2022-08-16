@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Optional, List, Dict
 
+import networkx as nx
 from grid2op.Converter import IdToAct
 from matplotlib import pyplot as plt
 from torch import Tensor
@@ -59,7 +60,14 @@ class LoggableModule:
             )
 
     def log_communities(self, communities: List[Community], train_steps: int):
-        self.writer.add_text("Communities/POP ", str(communities), train_steps)
+        self.writer.add_text("Communities/POP", str(communities), train_steps)
+
+    def log_graph(self, graph: nx.Graph, train_steps: int):
+        self.writer.add_scalar(
+            "Graph/POP",
+            "Graph Nodes: " + str(graph.nodes) + "\nGraph Edges: " + str(graph.edges),
+            train_steps,
+        )
 
     def log_agents_embedding_histograms(
         self,

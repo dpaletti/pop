@@ -190,6 +190,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         graph: nx.Graph
         self.factored_observation, graph = transformed_observation
 
+        self.log_graph(graph, self.train_steps)
+
         # Update Communities
         # At each episode the community detection algorithm is reset by setting old_graph to None
         self.communities, self.community_to_manager = (
