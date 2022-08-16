@@ -3,7 +3,7 @@ import hashlib
 import dgl
 from grid2op.Action import BaseAction
 from grid2op.Converter import IdToAct
-from grid2op.Observation import BaseObservation
+from grid2op.Observation import BaseObservation, ObservationSpace
 from typing import List, Tuple, Optional, Dict
 import networkx as nx
 import numpy as np
@@ -118,26 +118,17 @@ def _assign_action(
 
 
 def factor_action_space(
-    observation: BaseObservation,
-    observation_graph: nx.Graph,
+    observation_space: ObservationSpace,
     full_converter: IdToAct,
     n_substations: int,
 ) -> Tuple[Dict[int, List[int]], Dict[HashableAction, int]]:
-    # TODO: check here if the action space needs to be re-factored during execution
-    # TODO: we should check the action space changes when the some nodes (aka buses) belong to different substations
+    # TODO: take storage into account, take that mapping and add it to the action space
 
-    # Here we retrieve the mappings between objects and buses (aka nodes)
-    # actual flow_bus_matrix is ignored, useless in this context
-    _, mappings = observation.flow_bus_matrix()
-
-    # Unpacking the mappings for each object type
-    (
-        load_to_node,
-        generator_to_node,
-        _,  # storage_to_node ignored
-        line_origin_to_node,
-        line_extremity_to_node,
-    ) = mappings
+    # Mappings
+    load_to_node = observation_space.load_to_subid
+    generator_to_node = observation_space.gen_to_subid
+    line_origin_to_node = observation_space.line_or_to_subid
+    line_extremity_to_node = observation_space.line_ex_to_subid
 
     print(
         "WARNING: Storage objects are ignored, check if they are present in the environment"

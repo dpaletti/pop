@@ -8,11 +8,14 @@ from configs.type_aliases import ParsedTOMLDict
 
 @dataclass(frozen=True)
 class POPArchitecture:
+    node_features: int
+    edge_features: int
     agent_neighbourhood_radius: int
     decentralized: bool
     epsilon_beta_scheduling: bool
     enable_power_supply_modularity: bool
     manager_history_size: int
+    manager_initialization_half_life: int
     agent_type: str
 
 

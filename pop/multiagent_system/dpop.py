@@ -3,7 +3,6 @@ from typing import Optional, Dict, Any, List
 import dgl
 import networkx as nx
 from grid2op.Environment import BaseEnv
-from grid2op.Observation import BaseObservation
 from ray.util.client import ray
 
 from agents.manager import Manager
@@ -27,8 +26,10 @@ class DPOP(BasePOP):
         checkpoint_dir: Optional[str] = None,
         tensorboard_dir: Optional[str] = None,
         device: Optional[str] = None,
-        pre_initialized: bool = False,
     ):
+        # Initialize Ray
+        ray.init(ignore_reinit_error=True)
+
         super(DPOP, self).__init__(
             env=env,
             name=name,
@@ -38,43 +39,21 @@ class DPOP(BasePOP):
             checkpoint_dir=checkpoint_dir,
             seed=seed,
             device=device,
-            pre_initialized=pre_initialized,
         )
 
         # Head Manager Initialization
-        self.head_manager: Optional[Manager] = None
-
-        # Initialize Ray
-        ray.init()
-
-    def _finalize_init_on_first_observation(
-        self,
-        first_observation: BaseObservation,
-        first_observation_graph: nx.Graph,
-        pre_initialized=False,
-    ):
-
-        super()._finalize_init_on_first_observation(
-            first_observation, first_observation_graph, pre_initialized=pre_initialized
-        )
-        if not self.pre_initialized:
-            # WARNING: assuming that all managers have the
-            self.head_manager: Manager = Manager.remote(
-                agent_actions=self.env.n_sub,
-                node_features=int(
-                    ray.get(
-                        list(self.community_to_manager.values())[
-                            0
-                        ].get_embedding_size.remote()
-                    )
-                )
-                + self.env.n_sub
-                + 1,  # Manager Node Embedding + Manager Community (1 hot encoded) + selected action
-                architecture=self.architecture.head_manager,
-                name="head_manager_" + self.name,
-                training=self.training,
-                device=str(self.device),
+        self.head_manager: Optional[Manager] = Manager.remote(
+            agent_actions=self.env.n_sub * 2,
+            node_features=int(
+                self.architecture.manager.embedding.layers[-1].kwargs["out_feats"]
             )
+            + self.env.n_sub
+            + 1,  # Manager Node Embedding + Manager Community (1 hot encoded) + selected action
+            architecture=self.architecture.head_manager,
+            name="head_manager_" + self.name,
+            training=self.training,
+            device=str(self.device),
+        )
 
     def get_action(self, graph: dgl.DGLHeteroGraph) -> int:
         chosen_node: int = int(

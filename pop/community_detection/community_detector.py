@@ -66,9 +66,7 @@ class CommunityDetector:
         for edge in added_edges.union(removed_edges):
             for k in edge:
                 if k in removed_nodes:
-                    removed_node_community = self.get_community(k, comm_t)
-                    removed_node_community.remove(k)
-                    singleton_communities.add(frozenset(removed_node_community))
+                    singleton_communities.add(self.get_community(k, comm_t))
                     for old_edge in [
                         e
                         for e in graph_t.edges
@@ -206,21 +204,31 @@ class CommunityDetector:
         ) = self.initialize_intermediate_community_structure(graph_t, graph_t1, comm_t)
         comm_t1: List[Set[int]] = [i.copy() for i in comm_t]
 
-        for singleton_community in singleton_communities:
-            comm_t1 = list(
-                filter(lambda community: singleton_community != community, comm_t1)
+        comm_t1 = list(
+            filter(
+                lambda community: community not in singleton_communities,
+                comm_t1,
             )
+        )
+
+        for singleton_community in singleton_communities:
             for node in singleton_community:
                 comm_t1.append({node})
 
-        for two_vertices_community in two_vertices_communities:
-            comm_t1 = list(
-                filter(
-                    lambda community: two_vertices_community[0] not in community
-                    and two_vertices_community[1] not in community,
-                    comm_t1,
-                )
+        comm_t1 = list(
+            filter(
+                lambda community: all(
+                    [
+                        tv_communities[0] not in community
+                        and tv_communities[1] not in community
+                        for tv_communities in two_vertices_communities
+                    ]
+                ),
+                comm_t1,
             )
+        )
+
+        for two_vertices_community in two_vertices_communities:
             comm_t1.append(set(two_vertices_community))
 
         if len([node for community in comm_t1 for node in community]) != len(

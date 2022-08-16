@@ -11,8 +11,6 @@ from grid2op.Environment import BaseEnv
 import torch as th
 from grid2op.Observation import BaseObservation
 
-from random import choice
-
 from tqdm import tqdm
 
 from agents.manager import Manager
@@ -47,7 +45,6 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         checkpoint_dir: Optional[str] = None,
         tensorboard_dir: Optional[str] = None,
         device: Optional[str] = None,
-        pre_initialized: bool = False,
     ):
         AgentWithConverter.__init__(self, env.action_space, IdToAct)
         SerializableModule.__init__(self, checkpoint_dir, name)
@@ -56,6 +53,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         self.name = name
         self.seed = seed
         self.env = env
+        self.node_features: int = architecture.pop.node_features
+        self.edge_features: int = architecture.pop.edge_features
 
         # Converter
         self.converter = IdToAct(env.action_space)
@@ -74,18 +73,17 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         # Node and edge features
         self.env = env
-        self.node_features: Optional[int] = None
-        self.edge_features: Optional[int] = None
 
         # Training or Evaluation
-        self.pre_initialized = pre_initialized  # skips part of post_init
-        self.initialized = False
         self.training = training
 
         # Logging
         self.train_steps: int = 0
         self.episodes: int = 0
         self.alive_steps: int = 0
+        self.community_update_steps: int = (
+            0  # Updated until manager initialization is over
+        )
 
         # State needed for step()
         # This state is saved so that after my_act()
@@ -110,9 +108,40 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             Dict[Substation, Union[RayGCNAgent, RayShallowGCNAgent]]
         ] = None
 
+        # Agents Initialization
+        substation_to_action_space, self.action_lookup_table = factor_action_space(
+            env.observation_space, self.converter, self.env.n_sub
+        )
+
+        self.substation_to_action_converter: Dict[
+            int, IdToAct
+        ] = self._get_substation_to_agent_mapping(substation_to_action_space)
+
+        self.log_action_space_size(agent_converters=self.substation_to_action_converter)
+
+        # Agents Initialization
+        self.substation_to_agent: Dict[int, Union[RayGCNAgent, RayShallowGCNAgent]] = {
+            sub_id: RayGCNAgent.remote(
+                agent_actions=len(action_space),
+                architecture=self.architecture.agent,
+                node_features=self.node_features,
+                edge_features=self.edge_features,
+                name="agent_" + str(sub_id) + "_" + self.name,
+                training=self.training,
+                device=self.device,
+            )
+            if len(action_space) > 1
+            else RayShallowGCNAgent.remote(
+                name="agent_" + str(sub_id) + "_" + self.name,
+                device=self.device,
+            )
+            for sub_id, action_space in substation_to_action_space.items()
+        }
+
         # Managers
         self.community_to_manager: Optional[Dict[Community, Manager]] = None
         self.managers_history: Dict[Manager, FixedSet[Community]] = {}
+        self.manager_initialization_threshold: int = 1
 
         # Community Detector Initialization
         self.community_detector = CommunityDetector(
@@ -250,14 +279,6 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             str(self.device),
             self.architecture.pop.agent_neighbourhood_radius,
         )
-
-        if not self.initialized:
-            # if this is the first observation received by the agent system
-
-            self._finalize_init_on_first_observation(
-                observation, observation_graph, pre_initialized=self.pre_initialized
-            )
-            self.initialized = True
 
         return factored_observation, observation_graph
 
@@ -419,107 +440,6 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             mapping[sub_id] = conv
         return mapping
 
-    def _finalize_init_on_first_observation(
-        self,
-        first_observation: BaseObservation,
-        first_observation_graph: nx.Graph,
-        pre_initialized=False,
-    ) -> None:
-        """
-        Method called after receiving the first observation to finalize the init process.
-        Here Agents and Managers are initialized.
-        """
-        if pre_initialized:
-            substation_to_action_space, self.action_lookup_table = factor_action_space(
-                first_observation,
-                first_observation_graph,
-                self.converter,
-                self.env.n_sub,
-            )
-            self.substation_to_action_converter: Dict[
-                int, IdToAct
-            ] = self._get_substation_to_agent_mapping(substation_to_action_space)
-
-            substation_to_action_space, self.action_lookup_table = factor_action_space(
-                first_observation,
-                first_observation_graph,
-                self.converter,
-                self.env.n_sub,
-            )
-
-            self.log_action_space_size(
-                agent_converters=self.substation_to_action_converter
-            )
-            return
-
-        # Compute node and edge features
-        self.node_features = len(
-            first_observation_graph.nodes[
-                choice(list(first_observation_graph.nodes))
-            ].keys()
-        )
-        self.edge_features = len(
-            first_observation_graph.edges[
-                choice(list(first_observation_graph.edges))
-            ].keys()
-        )
-
-        # Compute first community structure
-        self.communities = self.community_detector.dynamo(
-            graph_t=first_observation_graph
-        )
-
-        # Agents Initialization
-        substation_to_action_space, self.action_lookup_table = factor_action_space(
-            first_observation, first_observation_graph, self.converter, self.env.n_sub
-        )
-
-        # Agents Initialization
-        self.substation_to_agent: Dict[int, Union[RayGCNAgent, RayShallowGCNAgent]] = {
-            sub_id: RayGCNAgent.remote(
-                agent_actions=len(action_space),
-                architecture=self.architecture.agent,
-                node_features=self.node_features,
-                edge_features=self.edge_features,
-                name="agent_" + str(sub_id) + "_" + self.name,
-                training=self.training,
-                device=self.device,
-            )
-            if len(action_space) > 1
-            else RayShallowGCNAgent.remote(
-                name="agent_" + str(sub_id) + "_" + self.name,
-                device=self.device,
-            )
-            for sub_id, action_space in substation_to_action_space.items()
-        }
-
-        self.substation_to_action_converter: Dict[
-            int, IdToAct
-        ] = self._get_substation_to_agent_mapping(substation_to_action_space)
-
-        self.log_action_space_size(agent_converters=self.substation_to_action_converter)
-
-        # Managers Initialization
-        print("Initial Community Structure: " + str(self.communities))
-        self.community_to_manager: Dict[Community, Manager] = {
-            community: Manager.remote(
-                agent_actions=len(first_observation_graph.nodes),
-                node_features=self.node_features + 1,  # Node Features + Action
-                edge_features=self.edge_features,
-                architecture=self.architecture.manager,
-                name="manager_" + str(idx) + "_" + self.name,
-                training=self.training,
-                device=self.device,
-            )
-            for idx, community in enumerate(self.communities)
-        }
-        self.managers_history = {
-            manager: FixedSet(
-                int(self.architecture.pop.manager_history_size), [community]
-            )
-            for community, manager in self.community_to_manager.items()
-        }
-
     def _get_agent_actions(
         self, factored_observation: Dict[Substation, Optional[dgl.DGLHeteroGraph]]
     ) -> Dict[Substation, int]:
@@ -599,7 +519,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             )
         )
 
-        # no_action is added for each signle node community
+        # no_action is added for each single node community
         for no_action_position in no_action_positions_to_add:
             actions.insert(no_action_position, 0)
 
@@ -662,10 +582,81 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         ).to(self.device)
 
     @staticmethod
-    def _jaccard_distace(s1: frozenset, s2: frozenset) -> float:
+    def _jaccard_distance(s1: frozenset, s2: frozenset) -> float:
         _s1 = set(s1)
         _s2 = set(s2)
         return len(_s1.intersection(_s2)) / len(_s1.union(_s2))
+
+    @staticmethod
+    def exponential_decay(initial_value: float, half_life: float, time: float):
+        return initial_value * 2 ** (-time / half_life)
+
+    def _initialize_new_manager(
+        self, communities: List[Community]
+    ) -> Dict[Community, Manager]:
+        if self.manager_initialization_threshold <= 1 / (self.env.n_sub * 2):
+            # This is the minimum min_max_jaccard, so we skip computation completely when we reach it
+            return {}
+        self.community_update_steps += 1
+        self.manager_initialization_threshold = self.exponential_decay(
+            initial_value=1,  # Start from the maximum jaccard value
+            half_life=self.architecture.pop.manager_initialization_half_life,
+            time=self.community_update_steps,
+        )
+        if not self.managers_history:
+            # If no manager exists create one regardless
+            manager = Manager.remote(
+                agent_actions=self.env.n_sub * 2,
+                node_features=self.node_features + 1,  # Node Features + Action
+                edge_features=self.edge_features,
+                architecture=self.architecture.manager,
+                name="manager_0_" + self.name,
+                training=self.training,
+                device=self.device,
+            )
+
+            self.managers_history[manager] = FixedSet(
+                int(self.architecture.pop.manager_history_size)
+            )
+            return {community: manager for community in communities}
+        else:
+            most_distant_community, min_max_jaccard = min(
+                [
+                    (
+                        community,
+                        max(
+                            [
+                                max(
+                                    [
+                                        self._jaccard_distance(old_community, community)
+                                        for old_community in community_history
+                                    ]
+                                )
+                                for manager, community_history in self.managers_history.items()
+                            ]
+                        ),
+                    )
+                    for community in communities
+                ],
+                key=lambda x: x[1],
+            )
+
+            if min_max_jaccard < self.manager_initialization_threshold:
+                manager = Manager.remote(
+                    agent_actions=self.env.n_sub * 2,
+                    node_features=self.node_features + 1,  # Node Features + Action
+                    edge_features=self.edge_features,
+                    architecture=self.architecture.manager,
+                    name="manager_" + str(len(self.managers_history)) + "_" + self.name,
+                    training=self.training,
+                    device=self.device,
+                )
+                self.managers_history[manager] = FixedSet(
+                    int(self.architecture.pop.manager_history_size)
+                )
+                return {most_distant_community: manager}
+            else:
+                return {}
 
     def _update_communities(
         self, graph: nx.Graph, next_graph: Optional[nx.Graph] = None
@@ -679,15 +670,23 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 comm_t=self.communities,
             )
 
-        if set(self.communities) == set(new_communities):
+        if self.communities and set(self.communities) == set(new_communities):
             return new_communities, self.community_to_manager
 
-        updated_community_to_manager_dict = {}
-        for new_community in new_communities:
+        updated_community_to_manager_dict: Dict[
+            Community, Manager
+        ] = self._initialize_new_manager(new_communities)
+
+        for community, manager in updated_community_to_manager_dict.items():
+            self.managers_history[manager].add(community)
+
+        for new_community in filter(
+            lambda x: x not in updated_community_to_manager_dict.keys(), new_communities
+        ):
             manager_to_jaccard_dict = {
                 manager: max(
                     [
-                        self._jaccard_distace(old_community, new_community)
+                        self._jaccard_distance(old_community, new_community)
                         for old_community in communities
                     ]
                 )
@@ -696,9 +695,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             updated_community_to_manager_dict[new_community] = max(
                 manager_to_jaccard_dict, key=manager_to_jaccard_dict.get
             )
-
-        for new_community, manager in updated_community_to_manager_dict.items():
-            self.managers_history[manager].add(new_community)
+            self.managers_history[updated_community_to_manager_dict[new_community]].add(
+                new_community
+            )
 
         return new_communities, updated_community_to_manager_dict
 
@@ -740,11 +739,15 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                                     new_manager_communities[
                                         np.argmax(
                                             [
-                                                self._jaccard_distace(
+                                                self._jaccard_distance(
                                                     old_community,
                                                     new_community,
                                                 )
                                                 for new_community in new_manager_communities
+                                                if next_community_to_sub_graphs_dict[
+                                                    new_community
+                                                ].num_edges()
+                                                > 0
                                             ]
                                         )
                                     ]
@@ -753,6 +756,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                                 stop_decay=stop_decay[old_community],
                             )
                             for old_community in old_manager_communities
+                            if community_to_sub_graphs_dict[old_community].num_edges()
+                            > 0
                         ]
                         for manager, (
                             old_manager_communities,

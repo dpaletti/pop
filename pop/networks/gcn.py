@@ -115,7 +115,7 @@ class GCN(nn.Module, SerializableModule):
         features: List[Tensor] = list(d.values())
         if features:
             return th.stack(features).transpose(0, 1).float()
-        return th.zeros((0, feature_size)).float()
+        raise Exception("Empty dict passed to _to_tensor")
 
     @staticmethod
     def _add_self_loop_to_batched_graph(g: DGLHeteroGraph) -> DGLHeteroGraph:
