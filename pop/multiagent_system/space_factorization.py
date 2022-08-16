@@ -122,7 +122,7 @@ def factor_action_space(
     full_converter: IdToAct,
     n_substations: int,
 ) -> Tuple[Dict[int, List[int]], Dict[HashableAction, int]]:
-    # TODO: take storage into account, take that mapping and add it to the action space
+    # TODO: take storage into account, take observation_space.storage_to_subid
 
     # Mappings
     load_to_node = observation_space.load_to_subid

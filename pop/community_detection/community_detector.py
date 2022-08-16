@@ -231,13 +231,6 @@ class CommunityDetector:
         for two_vertices_community in two_vertices_communities:
             comm_t1.append(set(two_vertices_community))
 
-        if len([node for community in comm_t1 for node in community]) != len(
-            graph_t1.nodes
-        ) or set([node for community in comm_t1 for node in community]) != set(
-            graph_t1.nodes
-        ):
-            # TODO: remove
-            print("A STOPPING POINT")
         return [
             frozenset(community)
             for community in louvain_communities(
