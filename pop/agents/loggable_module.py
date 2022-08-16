@@ -63,7 +63,7 @@ class LoggableModule:
         self.writer.add_text("Communities/POP", str(communities), train_steps)
 
     def log_graph(self, graph: nx.Graph, train_steps: int):
-        self.writer.add_scalar(
+        self.writer.add_text(
             "Graph/POP",
             "Graph Nodes: " + str(graph.nodes) + "\nGraph Edges: " + str(graph.edges),
             train_steps,
