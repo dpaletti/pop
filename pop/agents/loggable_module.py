@@ -6,6 +6,8 @@ from matplotlib import pyplot as plt
 from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
+from community_detection.community_detector import Community
+
 
 class LoggableModule:
     def __init__(self, tensorboard_dir: Optional[str] = None):
@@ -55,6 +57,9 @@ class LoggableModule:
             self.writer.add_scalar(
                 "Agent Loss/Agent " + str(idx), loss, agent_learning_steps
             )
+
+    def log_communities(self, communities: List[Community], train_steps: int):
+        self.writer.add_text("Communities/POP ", str(communities), train_steps)
 
     def log_agents_embedding_histograms(
         self,
