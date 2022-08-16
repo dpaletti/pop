@@ -640,7 +640,15 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 ],
                 key=lambda x: x[1],
             )
-
+            print("Manager Initialization: ")
+            print("min_max_jaccard: " + str(min_max_jaccard))
+            print(
+                "manager_initialization_threshold: "
+                + str(self.manager_initialization_threshold)
+            )
+            print("most_distant_community: " + str(most_distant_community))
+            print("Communities: " + str(communities))
+            print("History: " + str(self.managers_history))
             if min_max_jaccard < self.manager_initialization_threshold:
                 manager = Manager.remote(
                     agent_actions=self.env.n_sub * 2,
