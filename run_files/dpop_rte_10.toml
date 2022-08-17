@@ -9,21 +9,27 @@ data_dir = "../test_data"
 checkpoint_dir = "<<model_data_dir>>/pop_runs/checkpoint/<<model_name>>"
 
 [training]
-steps = 1e4
-train = false
-tensorboard_dir = "<<model_data_dir>>/pop_runs/tensorboard/<<model_name>>/"
+steps = 10
+train = true
+tensorboard_dir = "<<model_data_dir>>/pop_runs/tensorboard/<<model_name>>"
 curriculum = false
 reset_decay = true
 
 [evaluation]
-episodes = 10
+episodes = 100
 evaluation_dir = "<<model_data_dir>>/evaluation/<<model_name>>"
 
 [loading]
-load = true
+load = false
 load_dir = "<<model_checkpoint_dir>>/<<model_name>>.pt"
 
 [environment]
 name = "rte_case14_realistic"
 
 [environment.reward]
+
+CloseToOverflow = 0.7
+Bridge = 0.5
+Redisp = 0.5
+LinesCapacity = 0.2
+LinesReconnected = 0.2

@@ -202,7 +202,7 @@ class CommunityDetector:
             singleton_communities,
             two_vertices_communities,
         ) = self.initialize_intermediate_community_structure(graph_t, graph_t1, comm_t)
-        comm_t1: List[Set[int]] = [i.copy() for i in comm_t]
+        comm_t1: List[Set[int]] = [community.copy() for community in comm_t]
 
         comm_t1 = list(
             filter(
@@ -213,22 +213,34 @@ class CommunityDetector:
 
         for singleton_community in singleton_communities:
             for node in singleton_community:
-                comm_t1.append({node})
+                if node in graph_t1.nodes:
+                    # Handles the removed node case
+                    # in which a singleton community of a non-existing node would be added otherwise
+                    comm_t1.append({node})
 
         comm_t1 = list(
             filter(
                 lambda community: all(
                     [
-                        tv_communities[0] not in community
-                        and tv_communities[1] not in community
-                        for tv_communities in two_vertices_communities
+                        comm[0] not in community and comm[1] not in community
+                        for comm in two_vertices_communities
                     ]
                 ),
                 comm_t1,
-            )
+            ),
         )
 
-        for two_vertices_community in two_vertices_communities:
+        # Here we deal with a case in which two intersecting two-vertices communities exists e.g. (8, 13), (12, 13)
+        # Which would yield an overlapping community structure (not admissible in this context)
+        merged_to_vertices_communities = set()
+        for tvc in two_vertices_communities:
+            accumulator = set(tvc)
+            for _tvc in filter(lambda comm: comm != tvc, two_vertices_communities):
+                if set(tvc).intersection(set(_tvc)):
+                    accumulator = accumulator.union(set(_tvc))
+            merged_to_vertices_communities.add(frozenset(accumulator))
+
+        for two_vertices_community in merged_to_vertices_communities:
             comm_t1.append(set(two_vertices_community))
 
         return [

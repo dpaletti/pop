@@ -243,6 +243,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         # Log to Tensorboard
         self.log_system_behaviour(
             best_action=self.chosen_action,
+            best_action_str=str(self.converter.all_actions[self.chosen_action]),
             manager_actions={
                 ray.get(self.community_to_manager[community].get_name.remote()).split(
                     "_"
@@ -395,10 +396,10 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         )
 
         managers_state: List[Dict[str, Any]] = ray.get(
-            [
-                manager.get_state.remote()
-                for _, manager in self.community_to_manager.items()
-            ]
+            [manager.get_state.remote() for manager in self.managers_history.keys()]
+        )
+        managers_name: List[str] = ray.get(
+            [manager.get_name.remote() for manager in self.managers_history.keys()]
         )
         return {
             "agents_state": {
@@ -408,9 +409,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 )
             },
             "managers_state": {
-                community: manager_state
-                for community, manager_state in zip(
-                    list(self.community_to_manager.keys()), managers_state
+                manager_name: (state, self.managers_history[manager])
+                for manager, manager_name, state in zip(
+                    list(self.managers_history.keys()), managers_name, managers_state
                 )
             },
             "node_features": self.node_features,
@@ -418,11 +419,12 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             "train_steps": self.train_steps,
             "episodes": self.episodes,
             "alive_steps": self.alive_steps,
+            "community_update_steps": self.community_update_steps,
+            "manager_initialization_threshold": self.manager_initialization_threshold,
             "name": self.name,
             "architecture": asdict(self.architecture),
             "seed": self.seed,
             "device": str(self.device),
-            "communities": self.communities,
         }
 
     def _get_substation_to_agent_mapping(

@@ -145,18 +145,21 @@ class DPOP(BasePOP):
         dpop.train_steps = checkpoint["train_steps"]
         dpop.edge_features = checkpoint["edge_features"]
         dpop.node_features = checkpoint["node_features"]
+        dpop.manager_initialization_threshold = checkpoint[
+            "manager_initialization_threshold"
+        ]
+        dpop.community_update_steps = checkpoint["community_update_steps"]
         dpop.substation_to_agent = {
             sub_id: RayGCNAgent.load(checkpoint_dict=agent_state)
             if "optimizer_state" in list(agent_state.keys())
             else RayShallowGCNAgent.load(checkpoint_dict=agent_state)
             for sub_id, agent_state in checkpoint["agents_state"].items()
         }
-        dpop.community_to_manager = {
-            community: Manager.load(checkpoint_dict=manager_state)
-            for community, manager_state in checkpoint["managers_state"].items()
+        dpop.managers_history = {
+            Manager.load(checkpoint_dict=manager_state): history
+            for _, (manager_state, history) in checkpoint["managers_state"].items()
         }
         dpop.head_manager = Manager.load(
             checkpoint_dict=checkpoint["head_manager_state"]
         )
-        dpop.communities = checkpoint["communities"]
         return dpop

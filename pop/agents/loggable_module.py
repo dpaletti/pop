@@ -60,9 +60,13 @@ class LoggableModule:
             )
 
     def log_communities(self, communities: List[Community], train_steps: int):
+        if not self.is_logging_active():
+            return
         self.writer.add_text("Communities/POP", str(communities), train_steps)
 
     def log_graph(self, graph: nx.Graph, train_steps: int):
+        if not self.is_logging_active():
+            return
         self.writer.add_text(
             "Graph/POP",
             "Graph Nodes: " + str(graph.nodes) + "\nGraph Edges: " + str(graph.edges),
@@ -99,6 +103,7 @@ class LoggableModule:
     def log_system_behaviour(
         self,
         best_action: int,
+        best_action_str: str,
         manager_actions: Dict[int, int],
         agent_actions: Dict[int, int],
         train_steps: int,
@@ -108,6 +113,7 @@ class LoggableModule:
 
         self.log_head_manager_behaviour(
             best_action=best_action,
+            best_action_str=best_action_str,
             train_steps=train_steps,
         )
 
@@ -130,11 +136,15 @@ class LoggableModule:
     def log_head_manager_behaviour(
         self,
         best_action: int,
+        best_action_str: str,
         train_steps: int,
     ) -> None:
         if not self.is_logging_active():
             return
         self.writer.add_scalar("Manager Action/Head Manager", best_action, train_steps)
+        self.writer.add_text(
+            "Manager Action/Head Manager", best_action_str, train_steps
+        )
 
     def log_managers_behaviour(self, actions: Dict[int, int], train_steps: int):
 
