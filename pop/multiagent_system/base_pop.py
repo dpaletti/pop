@@ -600,7 +600,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         return initial_value * 2 ** (-time / half_life)
 
     def _initialize_new_manager(
-        self, communities: List[Community]
+        self, new_communities: List[Community]
     ) -> Dict[Community, Manager]:
         if self.manager_initialization_threshold <= 1 / (self.env.n_sub * 2):
             # This is the minimum min_max_jaccard, so we skip computation completely when we reach it
@@ -612,21 +612,28 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             time=self.community_update_steps,
         )
         if not self.managers_history:
-            # If no manager exists create one regardless
-            manager = Manager.remote(
-                agent_actions=self.env.n_sub * 2,
-                node_features=self.node_features + 1,  # Node Features + Action
-                edge_features=self.edge_features,
-                architecture=self.architecture.manager,
-                name="manager_0_" + self.name,
-                training=self.training,
-                device=self.device,
-            )
+            # If no manager exists create one for each detected community
+            managers = [
+                Manager.remote(
+                    agent_actions=self.env.n_sub * 2,
+                    node_features=self.node_features + 1,  # Node Features + Action
+                    edge_features=self.edge_features,
+                    architecture=self.architecture.manager,
+                    name="manager_" + str(idx) + "_" + self.name,
+                    training=self.training,
+                    device=self.device,
+                )
+                for idx in range(len(new_communities))
+            ]
 
-            self.managers_history[manager] = FixedSet(
-                int(self.architecture.pop.manager_history_size)
-            )
-            return {community: manager for community in communities}
+            self.managers_history = {
+                manager: FixedSet(int(self.architecture.pop.manager_history_size))
+                for manager in managers
+            }
+            return {
+                community: manager
+                for community, manager in zip(new_communities, managers)
+            }
         else:
             most_distant_community, min_max_jaccard = min(
                 [
@@ -644,7 +651,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                             ]
                         ),
                     )
-                    for community in communities
+                    for community in new_communities
                 ],
                 key=lambda x: x[1],
             )
@@ -679,7 +686,13 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         self.log_communities(new_communities, self.train_steps)
 
         if self.communities and set(self.communities) == set(new_communities):
-            return new_communities, self.community_to_manager
+            updated_community_to_manager_dict: Dict[
+                Community, Manager
+            ] = self._initialize_new_manager(new_communities)
+            return new_communities, {
+                **self.community_to_manager,
+                **updated_community_to_manager_dict,
+            }
 
         updated_community_to_manager_dict: Dict[
             Community, Manager
