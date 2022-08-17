@@ -784,7 +784,22 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                             old_manager_communities,
                             new_manager_communities,
                         ) in manager_to_community_transformation.items()
-                        if old_manager_communities and new_manager_communities
+                        if list(
+                            filter(
+                                lambda x: community_to_sub_graphs_dict[x].num_edges()
+                                > 0,
+                                old_manager_communities,
+                            )
+                        )
+                        and list(
+                            filter(
+                                lambda x: next_community_to_sub_graphs_dict[
+                                    x
+                                ].num_edges()
+                                > 0,
+                                new_manager_communities,
+                            )
+                        )
                     ]
                 )
             )
