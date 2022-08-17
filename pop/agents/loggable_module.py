@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Set, Tuple
 
 import networkx as nx
 from grid2op.Converter import IdToAct
@@ -104,20 +104,25 @@ class LoggableModule:
         self,
         best_action: int,
         best_action_str: str,
-        manager_actions: Dict[int, int],
+        head_manager_action: int,
+        manager_actions: Dict[Set[int], Tuple[int, int]],
         agent_actions: Dict[int, int],
         train_steps: int,
     ) -> None:
         if not self.is_logging_active():
             return
 
+        self.writer.add_scalar("POP/Action", best_action, train_steps)
+
         self.log_head_manager_behaviour(
-            best_action=best_action,
+            best_action=head_manager_action,
             best_action_str=best_action_str,
             train_steps=train_steps,
         )
 
-        self.log_managers_behaviour(actions=manager_actions, train_steps=train_steps)
+        self.log_managers_behaviour(
+            actions_communities=manager_actions, train_steps=train_steps
+        )
 
         self.log_agents_behaviour(
             agent_actions=agent_actions,
@@ -146,14 +151,28 @@ class LoggableModule:
             "Manager Action/Head Manager", best_action_str, train_steps
         )
 
-    def log_managers_behaviour(self, actions: Dict[int, int], train_steps: int):
-
-        for action_manager_idx, action in actions.items():
+    def log_managers_behaviour(
+        self, actions_communities: Dict[Set[int], Tuple[int, int]], train_steps: int
+    ):
+        community_manager_str = ""
+        for community, (action, manager_idx) in actions_communities.items():
             self.writer.add_scalar(
-                "Manager Action/Manager " + str(action_manager_idx),
+                "Manager Action/Manager " + str(manager_idx),
                 action,
                 train_steps,
             )
+            community_manager_str += (
+                "Community: "
+                + str(community)
+                + " is managed by Manager "
+                + str(manager_idx)
+                + "\n"
+            )
+        self.writer.add_text(
+            "POP/Manager-Community",
+            self._format_to_md(community_manager_str),
+            train_steps,
+        )
 
     def log_agents_behaviour(
         self,

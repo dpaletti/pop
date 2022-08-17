@@ -244,10 +244,14 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         self.log_system_behaviour(
             best_action=self.chosen_action,
             best_action_str=str(self.converter.all_actions[self.chosen_action]),
+            head_manager_action=self.chosen_node,
             manager_actions={
-                ray.get(self.community_to_manager[community].get_name.remote()).split(
-                    "_"
-                )[1]: action
+                community: (
+                    action,
+                    ray.get(
+                        self.community_to_manager[community].get_name.remote()
+                    ).split("_")[1],
+                )
                 for community, action in self.community_to_substation.items()
             },
             agent_actions={
