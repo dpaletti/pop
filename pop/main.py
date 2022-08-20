@@ -23,7 +23,7 @@ import importlib
 
 import warnings
 
-from multiagent_system.dpop import DPOP
+from pop.multiagent_system.dpop import DPOP
 from pop.multiagent_system.base_pop import train
 
 warnings.filterwarnings("ignore", category=UserWarning)

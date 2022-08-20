@@ -5,14 +5,14 @@ import networkx as nx
 from grid2op.Environment import BaseEnv
 from ray.util.client import ray
 
-from agents.manager import Manager
-from agents.ray_gcn_agent import RayGCNAgent
-from agents.ray_shallow_gcn_agent import RayShallowGCNAgent
+from pop.agents.manager import Manager
+from pop.agents.ray_gcn_agent import RayGCNAgent
+from pop.agents.ray_shallow_gcn_agent import RayShallowGCNAgent
 from community_detection.community_detector import Community
-from configs.architecture import Architecture
-from multiagent_system.base_pop import BasePOP
+from pop.configs.architecture import Architecture
+from pop.multiagent_system.base_pop import BasePOP
 
-from multiagent_system.space_factorization import EncodedAction, Substation
+from pop.multiagent_system.space_factorization import EncodedAction, Substation
 
 
 class DPOP(BasePOP):
