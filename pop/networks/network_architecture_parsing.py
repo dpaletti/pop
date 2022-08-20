@@ -1,6 +1,6 @@
 from typing import Union
 
-from configs.network_architecture import NetworkLayer, NetworkArchitecture
+from pop.configs.network_architecture import NetworkLayer, NetworkArchitecture
 import re
 
 
