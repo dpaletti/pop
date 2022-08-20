@@ -27,7 +27,7 @@ from pop.multiagent_system.space_factorization import (
     Substation,
     EncodedAction,
 )
-from networks.serializable_module import SerializableModule
+from pop.networks.serializable_module import SerializableModule
 from pop.agents.loggable_module import LoggableModule
 import ray
 import itertools
