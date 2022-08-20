@@ -4,9 +4,9 @@ from typing import Dict, Union
 
 import toml
 
-from configs.architecture import Architecture
-from configs.placeholders_handling import replace_backward_reference
-from configs.type_aliases import ParsedTOMLDict
+from pop.configs.architecture import Architecture
+from pop.configs.placeholders_handling import replace_backward_reference
+from pop.configs.type_aliases import ParsedTOMLDict
 
 
 @dataclass(frozen=True)

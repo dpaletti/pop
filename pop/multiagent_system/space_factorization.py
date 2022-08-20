@@ -3,13 +3,13 @@ import hashlib
 import dgl
 from grid2op.Action import BaseAction
 from grid2op.Converter import IdToAct
-from grid2op.Observation import BaseObservation, ObservationSpace
+from grid2op.Observation import ObservationSpace
 from typing import List, Tuple, Optional, Dict
 import networkx as nx
 import numpy as np
 
-from agents.base_gcn_agent import BaseGCNAgent
-from community_detection.community_detector import Community
+from pop.agents.base_gcn_agent import BaseGCNAgent
+from pop.community_detection.community_detector import Community
 
 Substation = int
 EncodedAction = int

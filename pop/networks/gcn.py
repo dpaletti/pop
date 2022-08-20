@@ -8,10 +8,10 @@ from pathlib import Path
 from dgl import DGLHeteroGraph
 from torch import Tensor
 
-from networks.network_architecture_parsing import (
+from pop.networks.network_architecture_parsing import (
     get_network,
 )
-from networks.serializable_module import SerializableModule
+from pop.networks.serializable_module import SerializableModule
 from pop.configs.network_architecture import NetworkArchitecture
 from dataclasses import asdict
 

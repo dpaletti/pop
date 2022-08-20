@@ -3,9 +3,9 @@ from typing import Dict, Any, Optional
 import ray
 from ray import ObjectRef
 
-from agents.base_gcn_agent import BaseGCNAgent
-from configs.agent_architecture import AgentArchitecture
-from networks.dueling_net import DuelingNet
+from pop.agents.base_gcn_agent import BaseGCNAgent
+from pop.configs.agent_architecture import AgentArchitecture
+from pop.networks.dueling_net import DuelingNet
 
 
 @ray.remote

@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from typing import Optional
 
 import toml
-from configs.agent_architecture import AgentArchitecture
-from configs.type_aliases import ParsedTOMLDict
+from pop.configs.agent_architecture import AgentArchitecture
+from pop.configs.type_aliases import ParsedTOMLDict
 
 
 @dataclass(frozen=True)

@@ -8,9 +8,9 @@ import dgl
 from dgl.heterograph import DGLHeteroGraph
 from torch import Tensor, FloatTensor
 
-from configs.network_architecture import NetworkArchitecture
-from networks.network_architecture_parsing import get_network
-from networks.serializable_module import SerializableModule, T
+from pop.configs.network_architecture import NetworkArchitecture
+from pop.networks.network_architecture_parsing import get_network
+from pop.networks.serializable_module import SerializableModule, T
 from pop.networks.gcn import GCN
 
 

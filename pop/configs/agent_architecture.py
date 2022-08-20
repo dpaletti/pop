@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from configs.network_architecture import NetworkArchitecture
-from configs.type_aliases import EventuallyNestedDict
+from pop.configs.network_architecture import NetworkArchitecture
+from pop.configs.type_aliases import EventuallyNestedDict
 
 
 @dataclass(frozen=True)

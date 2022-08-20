@@ -7,11 +7,11 @@ from dgl import DGLHeteroGraph
 from grid2op.Observation import BaseObservation
 from torch import Tensor
 
-from agents.loggable_module import LoggableModule
-from agents.replay_buffer import ReplayMemory, Transition
-from configs.agent_architecture import AgentArchitecture
-from networks.serializable_module import SerializableModule
-from networks.dueling_net import DuelingNet
+from pop.agents.loggable_module import LoggableModule
+from pop.agents.replay_buffer import ReplayMemory, Transition
+from pop.configs.agent_architecture import AgentArchitecture
+from pop.networks.serializable_module import SerializableModule
+from pop.networks.dueling_net import DuelingNet
 import copy
 import numpy as np
 import torch as th

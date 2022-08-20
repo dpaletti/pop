@@ -13,13 +13,13 @@ from grid2op.Observation import BaseObservation
 
 from tqdm import tqdm
 
-from agents.manager import Manager
-from agents.ray_gcn_agent import RayGCNAgent
-from agents.ray_shallow_gcn_agent import RayShallowGCNAgent
-from community_detection.community_detector import CommunityDetector, Community
-from configs.architecture import Architecture
-from multiagent_system.fixed_set import FixedSet
-from multiagent_system.space_factorization import (
+from pop.agents.manager import Manager
+from pop.agents.ray_gcn_agent import RayGCNAgent
+from pop.agents.ray_shallow_gcn_agent import RayShallowGCNAgent
+from pop.community_detection.community_detector import CommunityDetector, Community
+from pop.configs.architecture import Architecture
+from pop.multiagent_system.fixed_set import FixedSet
+from pop.multiagent_system.space_factorization import (
     factor_action_space,
     HashableAction,
     factor_observation,
@@ -28,7 +28,7 @@ from multiagent_system.space_factorization import (
     EncodedAction,
 )
 from networks.serializable_module import SerializableModule
-from agents.loggable_module import LoggableModule
+from pop.agents.loggable_module import LoggableModule
 import ray
 import itertools
 import numpy as np

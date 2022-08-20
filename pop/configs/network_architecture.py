@@ -4,11 +4,11 @@ from typing import Dict, List, Union, Optional
 
 import toml
 
-from configs.placeholders_handling import (
+from pop.configs.placeholders_handling import (
     replace_backward_reference,
     replace_placeholders,
 )
-from configs.type_aliases import ParsedTOMLDict
+from pop.configs.type_aliases import ParsedTOMLDict
 
 
 @dataclass(frozen=True)

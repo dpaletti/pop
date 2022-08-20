@@ -5,8 +5,8 @@ import ray
 from dgl import DGLHeteroGraph
 from ray import ObjectRef
 
-from agents.base_gcn_agent import BaseGCNAgent
-from configs.agent_architecture import AgentArchitecture
+from pop.agents.base_gcn_agent import BaseGCNAgent
+from pop.configs.agent_architecture import AgentArchitecture
 
 
 @ray.remote

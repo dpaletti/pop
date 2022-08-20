@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
-from community_detection.community_detector import Community
+from pop.community_detection.community_detector import Community
 
 
 class LoggableModule:

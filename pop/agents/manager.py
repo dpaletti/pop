@@ -3,8 +3,8 @@ from typing import Optional, List, Dict, Any
 from ray import ObjectRef
 from torch import Tensor
 
-from agents.base_gcn_agent import BaseGCNAgent
-from configs.agent_architecture import AgentArchitecture
+from pop.agents.base_gcn_agent import BaseGCNAgent
+from pop.configs.agent_architecture import AgentArchitecture
 from dgl import DGLHeteroGraph
 import numpy as np
 import torch as th
