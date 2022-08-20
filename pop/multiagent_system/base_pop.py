@@ -32,6 +32,7 @@ from agents.loggable_module import LoggableModule
 import ray
 import itertools
 import numpy as np
+import time
 
 
 class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
@@ -974,15 +975,16 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         )
 
 
-def train(env: BaseEnv, iterations: int, dpop):
+def train(env: BaseEnv, iterations: int, dpop, save_frequency: int = 3600):
 
     training_step: int = 0
-    obs: BaseObservation = (
-        env.reset()
-    )  # Typing issue for env.reset(), returns BaseObservation
+    obs: BaseObservation = env.reset()
     done = False
     reward = env.reward_range[0]
     total_episodes = len(env.chronics_handler.subpaths)
+
+    last_save_time = time.time()
+    print("Model will be checkpointed every " + str(save_frequency) + " seconds")
     with tqdm(total=iterations - training_step) as pbar:
         while training_step < iterations:
             if dpop.episodes % total_episodes == 0:
@@ -1001,8 +1003,17 @@ def train(env: BaseEnv, iterations: int, dpop):
             )
             obs = next_obs
             training_step += 1
+
+            current_time = time.time()
+            if current_time - last_save_time >= save_frequency:
+                # Every Hour Save the model
+                print("Saving Checkpoint")
+                dpop.save()
+                last_save_time = time.time()
+
             pbar.update(1)
 
-    print("\nSaving...\n")
+    print("\nSaving\n")
 
     dpop.save()
+    ray.shutdown()

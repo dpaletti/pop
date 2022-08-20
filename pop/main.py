@@ -4,10 +4,9 @@ from grid2op.Environment import BaseEnv
 from grid2op.Reward import (
     CombinedScaledReward,
     RedispReward,
-    FlatReward,
+    IncreasingFlatReward,
     AlarmReward,
 )
-import grid2op
 from grid2op.Chronics import MultifolderWithCache
 from typing import Union
 import grid2op.Environment
@@ -32,7 +31,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 def set_l2rpn_reward(env, alarm: bool = True):
     combined_reward: CombinedScaledReward = env.get_reward_instance()
-    combined_reward.addReward("Flat", FlatReward(), 0.7)
+    combined_reward.addReward("Flat", IncreasingFlatReward(), 0.7)
     combined_reward.addReward("Redispatching", RedispReward(), 0.7)
     if alarm:
         combined_reward.addReward("Alarm", AlarmReward(), 0.3)
@@ -117,7 +116,7 @@ def main(**kwargs):
     print("Running with seed: " + str(config.reproducibility.seed))
     fix_seed(env_train, env_val, seed=config.reproducibility.seed)
 
-    if config.loading.load:
+    if config.loading.load and Path(config.loading.load_dir).exists():
         agent = DPOP.load(
             log_file=config.loading.load_dir,
             env=env_train if config.training.train else env_val,

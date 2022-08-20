@@ -52,10 +52,7 @@ class RayShallowGCNAgent(BaseGCNAgent):
         )
         return agent
 
-    def take_action(
-        self,
-        transformed_observation: DGLHeteroGraph,
-    ) -> int:
+    def take_action(self, transformed_observation: DGLHeteroGraph, *args) -> int:
         return 0  # Always no-action
 
     def step(

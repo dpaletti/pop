@@ -15,7 +15,8 @@ class LoggableModule:
         self.tensorboard_dir: Optional[str] = tensorboard_dir
         self.writer: Optional[SummaryWriter] = None
         if tensorboard_dir is not None:
-            Path(tensorboard_dir).mkdir(parents=True, exist_ok=False)
+            if not Path(tensorboard_dir).exists():
+                Path(tensorboard_dir).mkdir(parents=True, exist_ok=False)
             self.writer = SummaryWriter(log_dir=tensorboard_dir)
 
     def is_logging_active(self) -> bool:

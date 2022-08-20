@@ -1,5 +1,6 @@
 from abc import ABC
-from typing import Optional, Tuple, List
+from dataclasses import asdict
+from typing import Optional, Tuple, List, Dict, Any, OrderedDict
 
 import networkx as nx
 from dgl import DGLHeteroGraph
@@ -253,6 +254,47 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
                 self.learning_steps += 1
                 return loss
             return None
+
+    def get_state(
+        self,
+    ) -> Dict[str, Any]:
+        return {
+            "optimizer_state": self.optimizer.state_dict(),
+            "q_network_state": self.q_network.state_dict(),
+            "target_network_state": self.target_network.state_dict(),
+            "memory": self.memory.get_state(),
+            "decay_steps": self.decay_steps,
+            "alive_steps": self.alive_steps,
+            "train_steps": self.train_steps,
+            "learning_steps": self.learning_steps,
+            "agent_actions": self.actions,
+            "node_features": self.node_features,
+            "edge_features": self.edge_features,
+            "architecture": asdict(self.architecture),
+            "name": self.name,
+            "training": self.training,
+            "device": self.device,
+        }
+
+    def load_state(
+        self,
+        optimizer_state: dict,
+        q_network_state: OrderedDict[str, Tensor],
+        target_network_state: OrderedDict[str, Tensor],
+        memory: dict,
+        decay_steps: int,
+        alive_steps: int,
+        train_steps: int,
+        learning_steps: int,
+    ) -> None:
+        self.decay_steps = decay_steps
+        self.alive_steps = alive_steps
+        self.train_steps = train_steps
+        self.learning_steps = learning_steps
+        self.optimizer.load_state_dict(optimizer_state)
+        self.q_network.load_state_dict(q_network_state)
+        self.target_network.load_state_dict(target_network_state)
+        self.memory.load(memory)
 
     @staticmethod
     def batch_observations(graphs: List[DGLHeteroGraph]) -> DGLHeteroGraph:

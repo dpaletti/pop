@@ -1,6 +1,7 @@
 from collections import namedtuple
 import numpy as np
 from typing import Tuple, List, Any
+import pandas as pd
 
 Transition = namedtuple(
     "Transition", ("observation", "action", "next_observation", "reward", "done")
@@ -82,3 +83,28 @@ class ReplayMemory(object):
 
     def __len__(self) -> int:
         return self.buffer_length
+
+    def get_state(self) -> dict:
+        return {
+            "capacity": self.capacity,
+            "alpha": self.alpha,
+            "buffer_length": self.buffer_length,
+            "memory": pd.DataFrame(self.memory).to_dict(),
+        }
+
+    @staticmethod
+    def load(state_dict: dict) -> "ReplayMemory":
+        replay_memory = ReplayMemory(
+            capacity=state_dict["capacity"], alpha=state_dict["alpha"]
+        )
+        replay_memory.buffer_length = state_dict["buffer_length"]
+
+        for idx, (priority, transition) in enumerate(
+            zip(
+                state_dict["memory"]["priority"].values(),
+                state_dict["memory"]["transition"].values(),
+            )
+        ):
+            replay_memory.memory[idx] = (priority, transition)
+
+        return replay_memory
