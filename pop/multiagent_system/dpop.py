@@ -108,7 +108,11 @@ class DPOP(BasePOP):
 
             if loss is not None:
                 self.log_loss(
-                    {ray.get(self.head_manager.get_name.remote()): loss},
+                    {
+                        "_".join(
+                            ray.get(self.head_manager.get_name.remote()).split("_")[0:2]
+                        ): loss
+                    },
                     self.train_steps,
                 )
         except KeyError as e:

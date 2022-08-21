@@ -57,6 +57,8 @@ class TrainingParameters:
 class EvaluationParameters:
     episodes: int
     evaluation_dir: str
+    generate_grid2viz_data: str
+    compute_score: str
 
 
 @dataclass(frozen=True)
@@ -87,6 +89,17 @@ class EnvironmentParameters:
         )
 
 
+def replace_all_backward_references(run_config_dict: ParsedTOMLDict):
+    run_config_full_dict = {}
+    for section_name, section_param_dict in run_config_dict.items():
+        run_config_full_dict[section_name] = {}
+        for param_name, param_value in section_param_dict.items():
+            run_config_full_dict[section_name][param_name] = replace_backward_reference(
+                run_config_full_dict, param_value, evaluate_expressions=False
+            )
+    return run_config_dict
+
+
 @dataclass(frozen=True)
 class RunConfiguration:
     reproducibility: Reproducibility
@@ -98,17 +111,7 @@ class RunConfiguration:
 
     def __init__(self, path: str):
         run_config_dict: ParsedTOMLDict = toml.load(open(path))
-
-        # No List comprehension allows length > 1 bacward references
-        run_config_full_dict = {}
-        for section_name, section_param_dict in run_config_dict.items():
-            run_config_full_dict[section_name] = {}
-            for param_name, param_value in section_param_dict.items():
-                run_config_full_dict[section_name][
-                    param_name
-                ] = replace_backward_reference(
-                    run_config_full_dict, param_value, evaluate_expressions=False
-                )
+        run_config_full_dict = replace_all_backward_references(run_config_dict)
 
         object.__setattr__(
             self,

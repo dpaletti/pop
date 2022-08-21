@@ -249,16 +249,20 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             manager_actions={
                 community: (
                     action,
-                    ray.get(
-                        self.community_to_manager[community].get_name.remote()
-                    ).split("_")[1],
+                    "_".join(
+                        ray.get(
+                            self.community_to_manager[community].get_name.remote()
+                        ).split("_")[0:2]
+                    ),
                 )
                 for community, action in self.community_to_substation.items()
             },
             agent_actions={
-                ray.get(self.substation_to_agent[sub_id].get_name.remote()).split("_")[
-                    1
-                ]: action
+                "_".join(
+                    ray.get(self.substation_to_agent[sub_id].get_name.remote()).split(
+                        "_"
+                    )[0:2]
+                ): action
                 for sub_id, action in self.substation_to_local_action.items()
             },
             train_steps=self.train_steps,
@@ -809,7 +813,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         # Log the loss to tensorboard
         self.log_loss(
             {
-                manager_name: loss
+                "_".join(manager_name.split("_")[0:2]): loss
                 for manager_name, loss in zip(
                     ray.get(
                         [
@@ -871,7 +875,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         # Log losses to tensorboard
         self.log_loss(
             {
-                agent_name: loss
+                "_".join(agent_name.split("_")[0:2]): loss
                 for agent_name, loss in zip(
                     ray.get(
                         [

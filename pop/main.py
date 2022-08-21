@@ -17,6 +17,8 @@ import numpy as np
 import dgl
 import os
 
+from grid2op.utils import ScoreL2RPN2022
+
 from configs.run_config import RunConfiguration
 import argparse
 import importlib
@@ -25,6 +27,7 @@ import warnings
 
 from pop.multiagent_system.dpop import DPOP
 from pop.multiagent_system.base_pop import train
+import pandas as pd
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -57,6 +60,7 @@ def set_reward(env, config: RunConfiguration):
 
 
 def evaluate(
+    config: RunConfiguration,
     env: Union[
         grid2op.Environment.Environment, grid2op.Environment.MultiMixEnvironment
     ],
@@ -66,16 +70,28 @@ def evaluate(
     nb_process: int = 1,
     sequential: bool = False,
 ):
-    Path(path_save).mkdir(parents=True, exist_ok=False)
-    if sequential:
-        os.environ[Runner.FORCE_SEQUENTIAL] = "1"
-        nb_process = 1
-    params = env.get_params_for_runner()
-    params["verbose"] = True
-    runner = Runner(**params, agentInstance=agent, agentClass=None)
-    runner.run(
-        nb_episode=nb_episode, nb_process=nb_process, path_save=path_save, pbar=True
-    )
+    if not Path(path_save).exists():
+        Path(path_save).mkdir(parents=True, exist_ok=False)
+    if config.evaluation.compute_score:
+        csv_path = Path(path_save, "l2rpn_2022_score.csv")
+        if csv_path.exists():
+            return pd.read_csv(csv_path)
+        score = ScoreL2RPN2022(env, nb_scenario=nb_episode, verbose=1)
+        agent_score = score.get(agent)
+        agent_score_df = pd.DataFrame(agent_score).transpose()
+        agent_score_df.columns = ["all_scores", "ts_survived", "total_ts"]
+        agent_score_df.to_csv(csv_path)
+
+    if config.evaluation.generate_grid2viz_data:
+        if sequential:
+            os.environ[Runner.FORCE_SEQUENTIAL] = "1"
+            nb_process = 1
+        params = env.get_params_for_runner()
+        params["verbose"] = True
+        runner = Runner(**params, agentInstance=agent, agentClass=None)
+        runner.run(
+            nb_episode=nb_episode, nb_process=nb_process, path_save=path_save, pbar=True
+        )
 
 
 def fix_seed(env_train: BaseEnv, env_val: BaseEnv, seed: int = 0):

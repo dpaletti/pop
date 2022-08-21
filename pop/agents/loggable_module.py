@@ -51,15 +51,6 @@ class LoggableModule:
         if self.is_logging_active():
             self.writer.add_scalar("POP/Steps Alive per Episode", alive_steps, episodes)
 
-    def log_agents_loss(self, losses: List[float], agent_learning_steps: int):
-        if not self.is_logging_active():
-            return
-
-        for idx, loss in enumerate(losses):
-            self.writer.add_scalar(
-                "Agent Loss/Agent " + str(idx), loss, agent_learning_steps
-            )
-
     def log_communities(self, communities: List[Community], train_steps: int):
         if not self.is_logging_active():
             return
@@ -147,7 +138,7 @@ class LoggableModule:
     ) -> None:
         if not self.is_logging_active():
             return
-        self.writer.add_scalar("Manager Action/Head Manager", best_action, train_steps)
+        self.writer.add_scalar("Manager Action/head_manager", best_action, train_steps)
         self.writer.add_text(
             "Manager Action/Head Manager", best_action_str, train_steps
         )
@@ -158,14 +149,14 @@ class LoggableModule:
         community_manager_str = ""
         for community, (action, manager_idx) in actions_communities.items():
             self.writer.add_scalar(
-                "Manager Action/Manager " + str(manager_idx),
+                "Manager Action/" + str(manager_idx),
                 action,
                 train_steps,
             )
             community_manager_str += (
                 "Community: "
                 + str(community)
-                + " is managed by Manager "
+                + " is managed by "
                 + str(manager_idx)
                 + "\n"
             )
@@ -182,9 +173,7 @@ class LoggableModule:
     ):
 
         for idx, action in agent_actions.items():
-            self.writer.add_scalar(
-                "Agent Action/Agent " + str(idx), action, train_steps
-            )
+            self.writer.add_scalar("Agent Action/" + str(idx), action, train_steps)
 
     def log_reward(self, reward: float, train_steps: int):
         if self.is_logging_active():

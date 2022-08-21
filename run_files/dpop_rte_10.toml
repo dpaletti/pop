@@ -18,6 +18,8 @@ reset_decay = true
 [evaluation]
 episodes = 100
 evaluation_dir = "<<model_data_dir>>/evaluation/<<model_name>>"
+generate_grid2viz_data = false
+compute_score = true
 
 [loading]
 load = false
