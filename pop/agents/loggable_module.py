@@ -51,6 +51,15 @@ class LoggableModule:
         if self.is_logging_active():
             self.writer.add_scalar("POP/Steps Alive per Episode", alive_steps, episodes)
 
+    def log_agents_loss(self, losses: List[float], agent_learning_steps: int):
+        if not self.is_logging_active():
+            return
+
+        for idx, loss in enumerate(losses):
+            self.writer.add_scalar(
+                "Agent Loss/Agent " + str(idx), loss, agent_learning_steps
+            )
+
     def log_communities(self, communities: List[Community], train_steps: int):
         if not self.is_logging_active():
             return

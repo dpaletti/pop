@@ -97,7 +97,7 @@ def replace_all_backward_references(run_config_dict: ParsedTOMLDict):
             run_config_full_dict[section_name][param_name] = replace_backward_reference(
                 run_config_full_dict, param_value, evaluate_expressions=False
             )
-    return run_config_dict
+    return run_config_full_dict
 
 
 @dataclass(frozen=True)
