@@ -76,12 +76,14 @@ class RewardSpecification:
 class EnvironmentParameters:
     name: str
     reward: RewardSpecification
+    difficulty: Union[int, str]
 
     def __init__(
         self,
         environment_dict: Dict[str, Union[str, bool, int, float, Dict[str, float]]],
     ):
         object.__setattr__(self, "name", environment_dict["name"])
+        object.__setattr__(self, "difficulty", environment_dict["difficulty"])
         object.__setattr__(
             self,
             "reward",

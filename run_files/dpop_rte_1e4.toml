@@ -28,6 +28,7 @@ load_dir = "<<model_checkpoint_dir>>/<<model_name>>.pt"
 
 [environment]
 name = "rte_case14_realistic"
+difficulty = 0 # Available difficulties: 0, 1, 2, "competition"
 
 [environment.reward]
 

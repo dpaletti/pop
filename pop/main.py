@@ -108,14 +108,19 @@ def fix_seed(env_train: BaseEnv, env_val: BaseEnv, seed: int = 0):
 def main(**kwargs):
     config = RunConfiguration(kwargs["run_file"])
 
-    print("Running with env: " + config.environment.name)
+    print(
+        "Running with env: "
+        + config.environment.name
+        + " with difficulty "
+        + str(config.environment.difficulty)
+    )
 
     # Train Environment
     env_train = grid2op.make(
         config.environment.name + "_train80",
         reward_class=CombinedScaledReward,
         chronics_class=MultifolderWithCache,
-        difficulty="competition",
+        difficulty=config.environment.difficulty,
     )
     set_reward(env_train, config)
 
@@ -124,7 +129,7 @@ def main(**kwargs):
     env_val = grid2op.make(
         config.environment.name + "_val10",
         reward_class=CombinedScaledReward,
-        difficulty="competition",
+        difficulty=config.environment.difficulty,
     )
     set_l2rpn_reward(env_val, alarm=False)
 
@@ -132,7 +137,7 @@ def main(**kwargs):
     print("Running with seed: " + str(config.reproducibility.seed))
     fix_seed(env_train, env_val, seed=config.reproducibility.seed)
 
-    if config.loading.load and Path(config.loading.load_dir).exists():
+    if config.loading.load and Path(config.loading.load_dir).parents[0].exists():
         agent = DPOP.load(
             log_file=config.loading.load_dir,
             env=env_train if config.training.train else env_val,
