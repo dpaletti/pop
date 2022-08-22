@@ -73,7 +73,9 @@ def evaluate(
     if not Path(path_save).exists():
         Path(path_save).mkdir(parents=True, exist_ok=False)
     if config.evaluation.compute_score:
-        csv_path = Path(path_save, "l2rpn_2022_score.csv")
+        csv_path = Path(
+            path_save, "l2rpn_2022_score_" + str(config.environment.difficulty) + ".csv"
+        )
         if csv_path.exists():
             return pd.read_csv(csv_path)
         score = ScoreL2RPN2022(env, nb_scenario=nb_episode, verbose=1)
