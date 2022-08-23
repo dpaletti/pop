@@ -164,9 +164,12 @@ def main(**kwargs):
         )
 
     if config.training.train:
+        print("Training...")
         train(env_train, iterations=config.training.steps, dpop=agent)
     else:
+        print("Evaluating...")
         evaluate(
+            config=config,
             env=env_val,
             agent=agent,
             path_save=config.evaluation.evaluation_dir,
