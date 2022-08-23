@@ -71,11 +71,11 @@ class SerializableModule(ABC):
     def load(
         cls,
         log_file: Optional[str] = None,
-        checkpoint_dict: Optional[Dict[str, Any]] = None,
+        checkpoint: Optional[Dict[str, Any]] = None,
         **kwargs
     ) -> T:
         checkpoint: Dict[str, Any] = SerializableModule._load_checkpoint(
-            log_file, checkpoint_dict
+            log_file, checkpoint
         )
         return cls.factory(checkpoint, **kwargs)
 

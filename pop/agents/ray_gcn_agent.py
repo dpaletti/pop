@@ -49,7 +49,7 @@ class RayGCNAgent(BaseGCNAgent):
             node_features=checkpoint["node_features"],
             architecture=AgentArchitecture(load_from_dict=checkpoint["architecture"]),
             name=checkpoint["name"],
-            training=checkpoint["training"],
+            training=bool(kwargs.get("training")),
             device=checkpoint["device"],
             edge_features=checkpoint["edge_features"],
         )

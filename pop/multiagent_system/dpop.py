@@ -14,6 +14,7 @@ from pop.multiagent_system.base_pop import BasePOP
 from tqdm import tqdm
 
 from pop.multiagent_system.space_factorization import EncodedAction, Substation
+import psutil
 
 
 class DPOP(BasePOP):
@@ -29,7 +30,7 @@ class DPOP(BasePOP):
         device: Optional[str] = None,
     ):
         # Initialize Ray
-        ray.init(ignore_reinit_error=True)
+        ray.init(num_cpus=psutil.cpu_count(logical=False))
 
         super(DPOP, self).__init__(
             env=env,
@@ -154,23 +155,29 @@ class DPOP(BasePOP):
             "manager_initialization_threshold"
         ]
         dpop.community_update_steps = checkpoint["community_update_steps"]
-        print("Loading Agents")
         dpop.substation_to_agent = {
-            sub_id: RayGCNAgent.load(checkpoint_dict=agent_state)
+            sub_id: RayGCNAgent.load(
+                checkpoint=agent_state,
+                training=training,
+            )
             if "optimizer_state" in list(agent_state.keys())
-            else RayShallowGCNAgent.load(checkpoint_dict=agent_state)
+            else RayShallowGCNAgent.load(checkpoint=agent_state)
             for sub_id, agent_state in tqdm(checkpoint["agents_state"].items())
         }
         print("Loading Managers")
         dpop.managers_history = {
-            Manager.load(checkpoint_dict=manager_state): history
+            Manager.load(
+                checkpoint=manager_state,
+                training=training,
+            ): history
             for _, (manager_state, history) in tqdm(
                 checkpoint["managers_state"].items()
             )
         }
         print("Loading Head Manager")
         dpop.head_manager = Manager.load(
-            checkpoint_dict=checkpoint["head_manager_state"]
+            checkpoint=checkpoint["head_manager_state"],
+            training=training,
         )
         print("Loading is over")
         return dpop
