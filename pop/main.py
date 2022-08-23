@@ -140,6 +140,7 @@ def main(**kwargs):
     fix_seed(env_train, env_val, seed=config.reproducibility.seed)
 
     if config.loading.load and Path(config.loading.load_dir).parents[0].exists():
+        print("Loading model from last checkpoint...")
         agent = DPOP.load(
             log_file=config.loading.load_dir,
             env=env_train if config.training.train else env_val,

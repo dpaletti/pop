@@ -19,7 +19,7 @@ matplotlib = "^3.5.1"
 tensorboard = "^2.8.0"
 joblib = "^1.1.0"
 pathos = "^0.2.8"
-ray = {extras = ["rllib"], version = "^1.12.1"}
+ray = {version = "1.13", extras = ["rrlib"]}
 dm-tree = "^0.1.7"
 pydantic = "^1.9.1"
 numexpr = "^2.8.3"
