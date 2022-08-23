@@ -10,6 +10,7 @@ import numpy as np
 
 from pop.agents.base_gcn_agent import BaseGCNAgent
 from pop.community_detection.community_detector import Community
+from tqdm import tqdm
 
 Substation = int
 EncodedAction = int
@@ -133,6 +134,7 @@ def factor_action_space(
     print(
         "WARNING: Storage objects are ignored, check if they are present in the environment"
     )
+    print("Factoring Action Space")
 
     # Factoring Action Lookup Table
     owners, actions, encoded_actions = zip(
@@ -147,7 +149,9 @@ def factor_action_space(
                     line_extremity_to_node,
                     encoded_action,
                 )
-                for encoded_action, action in enumerate(full_converter.all_actions[1:])
+                for encoded_action, action in tqdm(
+                    enumerate(full_converter.all_actions[1:])
+                )
             ]
             if action_assignment is not None
         ]
