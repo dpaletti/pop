@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 from typing import Optional, Any, Dict, TypeVar
 import torch as th
 from pathlib import Path
-import os
 
 T = TypeVar("T")
 

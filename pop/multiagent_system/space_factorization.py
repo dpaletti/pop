@@ -149,8 +149,8 @@ def factor_action_space(
                     line_extremity_to_node,
                     encoded_action,
                 )
-                for encoded_action, action in tqdm(
-                    enumerate(full_converter.all_actions[1:])
+                for encoded_action, action in enumerate(
+                    tqdm(full_converter.all_actions[1:])
                 )
             ]
             if action_assignment is not None
