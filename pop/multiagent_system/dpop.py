@@ -11,6 +11,7 @@ from pop.agents.ray_shallow_gcn_agent import RayShallowGCNAgent
 from pop.community_detection.community_detector import Community
 from pop.configs.architecture import Architecture
 from pop.multiagent_system.base_pop import BasePOP
+from tqdm import tqdm
 
 from pop.multiagent_system.space_factorization import EncodedAction, Substation
 
@@ -153,17 +154,23 @@ class DPOP(BasePOP):
             "manager_initialization_threshold"
         ]
         dpop.community_update_steps = checkpoint["community_update_steps"]
+        print("Loading Agents")
         dpop.substation_to_agent = {
             sub_id: RayGCNAgent.load(checkpoint_dict=agent_state)
             if "optimizer_state" in list(agent_state.keys())
             else RayShallowGCNAgent.load(checkpoint_dict=agent_state)
-            for sub_id, agent_state in checkpoint["agents_state"].items()
+            for sub_id, agent_state in tqdm(checkpoint["agents_state"].items())
         }
+        print("Loading Managers")
         dpop.managers_history = {
             Manager.load(checkpoint_dict=manager_state): history
-            for _, (manager_state, history) in checkpoint["managers_state"].items()
+            for _, (manager_state, history) in tqdm(
+                checkpoint["managers_state"].items()
+            )
         }
+        print("Loading Head Manager")
         dpop.head_manager = Manager.load(
             checkpoint_dict=checkpoint["head_manager_state"]
         )
+        print("Loading is over")
         return dpop
