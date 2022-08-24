@@ -6,6 +6,8 @@ from grid2op.Reward import (
     RedispReward,
     IncreasingFlatReward,
     AlarmReward,
+    CombinedReward,
+    EpisodeDurationReward,
 )
 from grid2op.Chronics import MultifolderWithCache
 from typing import Union
@@ -30,6 +32,17 @@ from pop.multiagent_system.base_pop import train
 import pandas as pd
 
 warnings.filterwarnings("ignore", category=UserWarning)
+
+
+def set_experimental_reward(env):
+    combined_reward: CombinedReward = env.get_reward_instance()
+    combined_reward.addReward(
+        "redisp",
+        RedispReward.generate_class_custom_params(alpha_redisph=1, min_reward=-1)(),
+    )
+    combined_reward.addReward("episode", EpisodeDurationReward(per_timestep=2))
+    combined_reward.addReward("flat", IncreasingFlatReward(per_timestep=0.1))
+    combined_reward.initialize(env)
 
 
 def set_l2rpn_reward(env, alarm: bool = True):
@@ -117,14 +130,24 @@ def main(**kwargs):
         + str(config.environment.difficulty)
     )
 
+    reward_class = (
+        CombinedReward
+        if list(config.environment.reward.reward_components.items())[0][0]
+        == "Experimental"
+        else CombinedScaledReward
+    )
+
     # Train Environment
     env_train = grid2op.make(
         config.environment.name + "_train80",
-        reward_class=CombinedScaledReward,
+        reward_class=reward_class,
         chronics_class=MultifolderWithCache,
         difficulty=config.environment.difficulty,
     )
-    set_reward(env_train, config)
+    if reward_class == CombinedScaledReward:
+        set_reward(env_train, config)
+    else:
+        set_experimental_reward(env_train)
 
     # Validation Environment
     # WARNING: chronics_class bugs the runner, don't set it in env_val
