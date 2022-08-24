@@ -38,10 +38,10 @@ def set_experimental_reward(env):
     combined_reward: CombinedReward = env.get_reward_instance()
     combined_reward.addReward(
         "redisp",
-        RedispReward.generate_class_custom_params(alpha_redisph=1, min_reward=-1)(),
+        RedispReward.generate_class_custom_params(alpha_redisph=10, min_reward=-1)(),
     )
-    combined_reward.addReward("episode", EpisodeDurationReward(per_timestep=2))
-    combined_reward.addReward("flat", IncreasingFlatReward(per_timestep=0.1))
+    combined_reward.addReward("episode", EpisodeDurationReward(per_timestep=1000))
+    combined_reward.addReward("flat", IncreasingFlatReward(per_timestep=1))
     combined_reward.initialize(env)
 
 
