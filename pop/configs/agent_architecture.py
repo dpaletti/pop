@@ -18,6 +18,7 @@ class ReplayMemoryParameters:
     max_beta: float
     min_beta: float
     beta_decay: int
+    capacity: int
 
 
 @dataclass(frozen=True)

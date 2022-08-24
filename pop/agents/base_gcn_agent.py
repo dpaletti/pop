@@ -94,7 +94,8 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
 
         # Replay Buffer
         self.memory: ReplayMemory = ReplayMemory(
-            int(1e5), self.architecture.replay_memory.alpha
+            int(self.architecture.replay_memory.capacity),
+            self.architecture.replay_memory.alpha,
         )
 
         # Training or Evaluation
