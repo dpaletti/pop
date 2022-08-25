@@ -78,6 +78,11 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         # Training or Evaluation
         self.training = training
 
+        # Heuristics
+        # Never take twice the same action unless it's no_action
+        # If an action is taken twice the second one becomes no action
+        self.previous_action: int = -1
+
         # Logging
         self.train_steps: int = 0
         self.episodes: int = 0
@@ -240,6 +245,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         # Retrieve the chosen_action given the chosen_community
         self.chosen_action = graph.nodes[self.chosen_node]["action"]
+        if self.chosen_action == self.previous_action:
+            self.chosen_action = 0
+        self.previous_action = self.chosen_action
 
         # Log to Tensorboard
         self.log_system_behaviour(
@@ -601,8 +609,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         return len(_s1.intersection(_s2)) / len(_s1.union(_s2))
 
     @staticmethod
-    def exponential_decay(initial_value: float, half_life: float, time: float):
-        return initial_value * 2 ** (-time / half_life)
+    def exponential_decay(initial_value: float, half_life: float, t: float):
+        return initial_value * 2 ** (-t / half_life)
 
     def _initialize_new_manager(
         self, new_communities: List[Community]
@@ -614,7 +622,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         self.manager_initialization_threshold = self.exponential_decay(
             initial_value=1,  # Start from the maximum jaccard value
             half_life=self.architecture.pop.manager_initialization_half_life,
-            time=self.community_update_steps,
+            t=self.community_update_steps,
         )
         if not self.managers_history:
             # If no manager exists create one for each detected community

@@ -1,4 +1,7 @@
 from pathlib import Path
+
+from grid2op import Environment
+from grid2op.Action import BaseAction
 from grid2op.Agent import BaseAgent
 from grid2op.Environment import BaseEnv
 from grid2op.Reward import (
@@ -10,7 +13,7 @@ from grid2op.Reward import (
     EpisodeDurationReward,
 )
 from grid2op.Chronics import MultifolderWithCache
-from typing import Union
+from typing import Union, Optional
 import grid2op.Environment
 from grid2op.Runner import Runner
 import torch as th
@@ -34,13 +37,38 @@ import pandas as pd
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
+class NoActionRedispReward(RedispReward):
+    def __init__(self, logger=None):
+        super(NoActionRedispReward, self).__init__(logger=logger)
+        self.previous_action: Optional[BaseAction] = None
+
+    def __call__(
+        self,
+        action: BaseAction,
+        env: Environment,
+        has_error: bool,
+        is_done: bool,
+        is_illegal: bool,
+        is_ambiguous: bool,
+    ):
+        reward = super().__call__(
+            action=action,
+            env=env,
+            has_error=has_error,
+            is_done=is_done,
+            is_illegal=is_illegal,
+            is_ambiguous=is_ambiguous,
+        )
+        return reward
+
+
 def set_experimental_reward(env):
     combined_reward: CombinedReward = env.get_reward_instance()
     combined_reward.addReward(
         "redisp",
         RedispReward.generate_class_custom_params(alpha_redisph=10, min_reward=-1)(),
     )
-    combined_reward.addReward("episode", EpisodeDurationReward(per_timestep=1000))
+    # combined_reward.addReward("episode", EpisodeDurationReward(per_timestep=1000))
     combined_reward.addReward("flat", IncreasingFlatReward(per_timestep=1))
     combined_reward.initialize(env)
 

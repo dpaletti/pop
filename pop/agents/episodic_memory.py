@@ -1,6 +1,7 @@
-from typing import Optional
+from typing import Optional, Tuple
 
 import dgl
+from torch import Tensor
 
 from agents.random_network_distiller import RandomNetworkDistiller
 from collections import deque
@@ -10,7 +11,8 @@ from numpy.linalg import norm
 import torch.nn as nn
 from sklearn.neighbors import NearestNeighbors
 
-from networks.inverse_model import InverseModel
+from networks.gcn import GCN
+from networks.network_architecture_parsing import get_network
 
 
 class EpisodicMemory(nn.Module):
@@ -26,7 +28,14 @@ class EpisodicMemory(nn.Module):
         super(EpisodicMemory, self).__init__()
         self.memory = deque(maxlen=architecture.pop.episodic_memory_size)
         self.n_neighbors = architecture.n_neighbors
-        self.inverse_model = InverseModel(...)
+        self.exploration_bonus_limit = architecture.alpha
+        self.inverse_model = self.InverseNetwork(
+            node_features=node_features,
+            edge_features=edge_features,
+            architecture=architecture.inverse_model,
+            name=name + "_inverse_model",
+            log_dir=None,
+        )
         self.k_squared_distance_running_mean = self.RunningMean()
         self.random_network_distiller = RandomNetworkDistiller(
             node_features=node_features,
@@ -37,6 +46,22 @@ class EpisodicMemory(nn.Module):
         self.distiller_error_running_mean = self.RunningMean()
         self.distiller_error_running_standard_deviation = (
             self.RunningStandardDeviation()
+        )
+
+    def forward(
+        self,
+        current_state: dgl.DGLHeteroGraph,
+        next_state: dgl.DGLHeteroGraph,
+        action: int,
+    ):
+        predicted_action, current_state_embedding = self.inverse_model(
+            current_state, next_state
+        )
+        self.inverse_model.learn(action, predicted_action)
+        episodic_reward = self._episodic_reward(current_state_embedding)
+        exploration_bonus = self._exploration_bonus(current_state)
+        return episodic_reward * th.clip(
+            exploration_bonus, 1, self.exploration_bonus_limit
         )
 
     def _episodic_reward(
@@ -80,12 +105,44 @@ class EpisodicMemory(nn.Module):
             + epsilon
         )
 
-    def forward(self, current_state: dgl.DGLHeteroGraph):
-        # Inverse Model outputs the predicted action given current state and next state
-        # We then take the embedding and compare it with the ones already stored (care for the initial edge case)
-        # Compute r^episodic
-        # ... (now alpha)
-        embedding = self.inverse_model_embedding(current_state)
+    class InverseNetwork(nn.Module):
+        def __init__(
+            self,
+            node_features: int,
+            edge_features: Optional[int],
+            architecture: ...,
+            name: str,
+            log_dir: Optional[str] = None,
+        ):
+            super(self.__class__, self).__init__()
+            self.embedding_network = GCN(
+                node_features=node_features,
+                edge_features=edge_features,
+                architecture=architecture.embedding,
+                name=name + "_current_state_embedding",
+                log_dir=log_dir,
+            )
+
+            self.action_prediction_stream: nn.Sequential = get_network(
+                self,
+                architecture=architecture.action_prediction_stream,
+                is_graph_network=False,
+            )
+            self.loss = nn.CrossEntropyLoss()
+
+        def forward(
+            self, current_state: dgl.DGLHeteroGraph, next_state: dgl.DGLHeteroGraph
+        ) -> Tuple[Tensor, Tensor]:
+            current_state_embedding: th.Tensor = self.embedding_network(current_state)
+            next_state_embedding: th.Tensor = self.embedding_network(next_state)
+            predicted_action = self.action_prediction_stream(
+                th.stack((current_state_embedding, next_state_embedding))
+            )
+            return predicted_action, current_state_embedding
+
+        def learn(self, action: int, predicted_action: th.Tensor):
+            self.loss(action, predicted_action)
+            self.loss.backward()
 
     class RunningMean:
         def __init__(self):

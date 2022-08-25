@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pop.networks.gcn import GCN
     from networks.dueling_net import DuelingNet
-    from networks.inverse_model import InverseModel
 
 # Necessary imports (with aliases) for parsing
 import torch.nn as nn
@@ -18,7 +17,7 @@ import pop.networks.custom_layers as cl  # pylint: disable=unused-import
 
 
 def get_network(
-    self: Union["GCN", "DuelingNet", "InverseModel"],
+    self: Union["GCN", "DuelingNet", "InverseNetwork"],
     architecture: NetworkArchitecture,
     is_graph_network: bool,
 ) -> dgl_nn.Sequential:

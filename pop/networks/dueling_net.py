@@ -130,7 +130,7 @@ class DuelingNet(nn.Module, SerializableModule):
         }
 
     @staticmethod
-    def factory(checkpoint: Dict[str, Any]) -> "DuelingNet":
+    def factory(checkpoint: Dict[str, Any], **kwargs) -> "DuelingNet":
         dueling_net: "DuelingNet" = DuelingNet(
             action_space_size=checkpoint["action_space_size"],
             node_features=checkpoint["embedding_state"]["node_features"],
