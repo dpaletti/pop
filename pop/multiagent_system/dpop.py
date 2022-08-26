@@ -14,7 +14,6 @@ from pop.multiagent_system.base_pop import BasePOP
 from tqdm import tqdm
 
 from pop.multiagent_system.space_factorization import EncodedAction, Substation
-import psutil
 
 
 class DPOP(BasePOP):
@@ -29,9 +28,7 @@ class DPOP(BasePOP):
         tensorboard_dir: Optional[str] = None,
         device: Optional[str] = None,
     ):
-        # Initialize Ray
-        ray.init(num_cpus=psutil.cpu_count(logical=False))
-
+        ray.init()
         super(DPOP, self).__init__(
             env=env,
             name=name,

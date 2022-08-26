@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import yappi
 from grid2op import Environment
 from grid2op.Action import BaseAction
 from grid2op.Agent import BaseAgent
@@ -216,17 +217,11 @@ def main(**kwargs):
 
     if config.training.train:
         print("Training...")
-        cProfile.runctx(
-            "train(env_train, iterations=config.training.steps, dpop=agent)",
-            {
-                "train": train,
-                "env_train": env_train,
-                "config": config,
-                "agent": agent,
-            },
-            {},
-            filename="profile_results",
-        )
+        yappi.set_clock_type("cpu")
+        yappi.start(builtins=True)
+        train(env_train, iterations=config.training.steps, dpop=agent)
+        stats = yappi.get_func_stats()
+        stats.save("yappi_out", type="callgrind")
     else:
         print("Evaluating...")
         evaluate(

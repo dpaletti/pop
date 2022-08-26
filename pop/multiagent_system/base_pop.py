@@ -139,49 +139,6 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             )
             for sub_id, action_space in substation_to_action_space.items()
         }
-
-        # Agents are parallelized above 4 cores each
-        # e.g. if we have 8 cores we parallelize two agents with 4 cores each
-        # e.g. if we have 7 cores we run one agent at the time
-        # TODO: shallow gcn agent may probably be grouped together and ran all together
-        # TODO: they are probably negligible anyways
-        parallelization_degree = 4
-        self.available_cpus = psutil.Process().cpu_affinity()
-        self.max_concurrent_agents = min(
-            int(len(self.available_cpus) / parallelization_degree),
-            len(self.substation_to_agent),
-        )
-        if self.max_concurrent_agents <= 0:
-            raise Exception(
-                "Parallelization degree ("
-                + str(parallelization_degree)
-                + ") larger than number of cpus ("
-                + str(len(self.available_cpus))
-                + ")"
-            )
-
-        for idx, agent in enumerate(self.substation_to_agent.values()):
-            agent.set_cpu_affinity.remote(
-                self.available_cpus[
-                    int(
-                        math.fmod(
-                            idx * parallelization_degree,
-                            len(self.available_cpus),
-                        )
-                    ) : int(
-                        math.fmod(
-                            (idx + 1) * parallelization_degree,
-                            len(self.available_cpus),
-                        )
-                    )
-                    if math.fmod(
-                        (idx + 1) * parallelization_degree, len(self.available_cpus)
-                    )
-                    != 0
-                    else None
-                ],
-            )
-
         # Managers
         self.community_to_manager: Optional[Dict[Community, Manager]] = None
         self.managers_history: Dict[Manager, FixedSet[Community]] = {}
@@ -514,23 +471,22 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         # In such case no_action (id = 0) is selected
         # Each agent returns an action for its associated Substation
 
-        action_promises = list(
-            filter(
-                lambda x: x is not None,
-                [
-                    self.substation_to_agent[sub_id].take_action.remote(
-                        observation,
-                    )
-                    if observation is not None
-                    else no_action_positions_to_add.append(idx)
-                    for idx, (sub_id, observation) in enumerate(
-                        factored_observation.items()
-                    )
-                ],
+        actions = ray.get(
+            list(
+                filter(
+                    lambda x: x is not None,
+                    [
+                        self.substation_to_agent[sub_id].take_action.remote(
+                            observation,
+                        )
+                        if observation is not None
+                        else no_action_positions_to_add.append(idx)
+                        for idx, (sub_id, observation) in enumerate(
+                            factored_observation.items()
+                        )
+                    ],
+                )
             )
-        )
-        actions: List[int] = self.retrieve_promises_batched(
-            action_promises, self.max_concurrent_agents
         )
 
         # no_action is added for each None neighbourhood
@@ -921,9 +877,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 )
 
         # Step the agents
-        losses = self.retrieve_promises_batched(
-            step_promises, self.max_concurrent_agents
-        )
+        losses = ray.get(step_promises)
 
         # Log losses to tensorboard
         self.log_loss(
