@@ -217,7 +217,7 @@ def main(**kwargs):
     if config.training.train:
         print("Training...")
         cProfile.run(
-            train(env_train, iterations=config.training.steps, dpop=agent),
+            "train(env_train, iterations=config.training.steps, dpop=agent)",
             filename="profile_results",
         )
     else:
