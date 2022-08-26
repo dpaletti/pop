@@ -100,6 +100,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
 
         # Training or Evaluation
         self.training: bool = training
+        self.last_action: Optional[int] = None
 
     def get_name(self):
         return self.name
@@ -176,12 +177,16 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         if self.training:
             # epsilon-greedy Exploration
             if np.random.rand() <= self.epsilon:
+                self.last_action = None
                 return np.random.choice(action_list)
 
         # -> (actions)
         advantages: Tensor = self.q_network.advantage(transformed_observation)
+        action = int(th.argmax(advantages).item())
+        action = action if action != self.last_action else 0
+        self.last_action = action
 
-        return int(th.argmax(advantages).item())
+        return action
 
     def update_mem(
         self,

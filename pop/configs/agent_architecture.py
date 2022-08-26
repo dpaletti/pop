@@ -1,15 +1,59 @@
+import abc
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, ClassVar
 
 from pop.configs.network_architecture import NetworkArchitecture
 from pop.configs.type_aliases import EventuallyNestedDict
 
 
 @dataclass(frozen=True)
-class ExplorationParameters:
+class ExplorationParameters(abc.ABC):
+    method: ClassVar[str]
+
+
+@dataclass(frozen=True)
+class InverseModelArchitecture:
+    embedding: NetworkArchitecture
+    action_prediction_stream: NetworkArchitecture
+
+
+@dataclass(frozen=True)
+class EpisodicMemoryArchitecture(ExplorationParameters):
+    method: ClassVar[str] = "episodic memory"
+    size: int
+    neighbors: int
+    exploration_bonus_limit: int
+    inverse_model: InverseModelArchitecture
+    random_network_distiller: NetworkArchitecture
+
+
+@dataclass(frozen=True)
+class EpsilonGreedyParameters(ExplorationParameters):
+    method: ClassVar[str] = "epsilon greedy"
+
     max_epsilon: float
     min_epsilon: float
-    epsilon_decay: int
+    epsilon_decay: float
+
+    def __post_init__(self):
+        if self.max_epsilon < 0 or self.max_epsilon > 1:
+            raise Exception(
+                "Invalid value encountered for max_epsilon: "
+                + str(self.max_epsilon)
+                + "\n max_epsilon must be in [0, 1]"
+            )
+        if self.min_epsilon < 0 or self.min_epsilon > 1:
+            raise Exception(
+                "Invalid value encountered for min_epsilon: "
+                + str(self.max_epsilon)
+                + "\n min_epsilon must be in [0, 1]"
+            )
+        if self.epsilon_decay < 0:
+            raise Exception(
+                "Invalid value encountered for epsilon_decay: "
+                + str(self.epsilon_decay)
+                + "\n epsilon_decay must be greater than 0"
+            )
 
 
 @dataclass(frozen=True)
@@ -89,9 +133,34 @@ class AgentArchitecture:
                 ),
             )
 
+        exploration_method = agent_dict["exploration"].get("method")
+        available_exploration_methods = [
+            subclass for subclass in ExplorationParameters.__subclasses__()
+        ]
+        if exploration_method is None:
+            raise Exception(
+                "Invalid method in exploration_section (may be missing): "
+                + str([subclass.method for subclass in available_exploration_methods])
+                + "\nAvailable methods are: "
+                + str(available_exploration_methods)
+            )
         object.__setattr__(
-            self, "exploration", ExplorationParameters(**agent_dict["exploration"])
+            self,
+            "exploration",
+            next(
+                filter(
+                    lambda subclass: subclass.method == exploration_method,
+                    available_exploration_methods,
+                )
+            )(
+                **{
+                    parameter: parameter_value
+                    for parameter, parameter_value in agent_dict["exploration"].items()
+                    if parameter != "method"
+                }
+            ),
         )
+
         object.__setattr__(
             self, "replay_memory", ReplayMemoryParameters(**agent_dict["replay_memory"])
         )

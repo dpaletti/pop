@@ -78,11 +78,6 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         # Training or Evaluation
         self.training = training
 
-        # Heuristics
-        # Never take twice the same action unless it's no_action
-        # If an action is taken twice the second one becomes no action
-        self.previous_action: int = -1
-
         # Logging
         self.train_steps: int = 0
         self.episodes: int = 0
@@ -125,7 +120,6 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         self.log_action_space_size(agent_converters=self.substation_to_action_converter)
 
-        # Agents Initialization
         self.substation_to_agent: Dict[int, Union[RayGCNAgent, RayShallowGCNAgent]] = {
             sub_id: RayGCNAgent.remote(
                 agent_actions=len(action_space),
@@ -245,9 +239,6 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         # Retrieve the chosen_action given the chosen_community
         self.chosen_action = graph.nodes[self.chosen_node]["action"]
-        if self.chosen_action == self.previous_action:
-            self.chosen_action = 0
-        self.previous_action = self.chosen_action
 
         # Log to Tensorboard
         self.log_system_behaviour(

@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 import ray
 from ray import ObjectRef
@@ -19,6 +19,7 @@ class RayGCNAgent(BaseGCNAgent):
         training: bool,
         device: str,
         edge_features: Optional[int] = None,
+        cpu_affinity: Optional[List[int]] = None,
     ):
         BaseGCNAgent.__init__(
             self,

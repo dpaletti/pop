@@ -10,7 +10,6 @@ from grid2op.Reward import (
     IncreasingFlatReward,
     AlarmReward,
     CombinedReward,
-    EpisodeDurationReward,
 )
 from grid2op.Chronics import MultifolderWithCache
 from typing import Union, Optional
@@ -33,6 +32,7 @@ import warnings
 from pop.multiagent_system.dpop import DPOP
 from pop.multiagent_system.base_pop import train
 import pandas as pd
+import cProfile
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -216,7 +216,7 @@ def main(**kwargs):
 
     if config.training.train:
         print("Training...")
-        train(env_train, iterations=config.training.steps, dpop=agent)
+        cProfile.run(train(env_train, iterations=config.training.steps, dpop=agent))
     else:
         print("Evaluating...")
         evaluate(

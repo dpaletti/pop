@@ -11,10 +11,13 @@ from numpy.linalg import norm
 import torch.nn as nn
 from sklearn.neighbors import NearestNeighbors
 
+from configs.agent_architecture import EpisodicMemoryArchitecture
 from networks.gcn import GCN
 from networks.network_architecture_parsing import get_network
 
 
+# TODO: Make this an ExplorationModule
+# TODO: Refactor BaseAgent to have ExplorationModules instead of normal Exploration
 class EpisodicMemory(nn.Module):
 
     # TODO: choose architecture
@@ -22,13 +25,15 @@ class EpisodicMemory(nn.Module):
         self,
         node_features: int,
         edge_features: Optional[int],
-        architecture: ...,
+        architecture: EpisodicMemoryArchitecture,
         name: str,
     ):
         super(EpisodicMemory, self).__init__()
-        self.memory = deque(maxlen=architecture.pop.episodic_memory_size)
-        self.n_neighbors = architecture.n_neighbors
-        self.exploration_bonus_limit = architecture.alpha
+
+        self.memory = deque(maxlen=architecture.size)
+        self.neighbors = architecture.neighbors
+        self.exploration_bonus_limit = architecture.exploration_bonus_limit
+
         self.inverse_model = self.InverseNetwork(
             node_features=node_features,
             edge_features=edge_features,
@@ -37,10 +42,11 @@ class EpisodicMemory(nn.Module):
             log_dir=None,
         )
         self.k_squared_distance_running_mean = self.RunningMean()
+
         self.random_network_distiller = RandomNetworkDistiller(
             node_features=node_features,
             edge_features=edge_features,
-            architecture=architecture.distiller,
+            architecture=architecture.random_network_distiller,
             name=name + "_distiller",
         )
         self.distiller_error_running_mean = self.RunningMean()
@@ -72,7 +78,7 @@ class EpisodicMemory(nn.Module):
 
         # Compute K nearest neighbors wrt inverse kernel from memory
         neighbors_model = NearestNeighbors(
-            n_neighbors=self.n_neighbors, metric=self._inverse_kernel
+            n_neighbors=self.neighbors, metric=self._inverse_kernel
         )
         memory_array = np.array(self.memory)
         neighbors_model.fit(memory_array)

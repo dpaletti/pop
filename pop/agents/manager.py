@@ -22,6 +22,7 @@ class Manager(BaseGCNAgent):
         training: bool,
         device: str,
         edge_features: Optional[int] = None,
+        cpu_affinity: Optional[List[int]] = None,
     ):
         BaseGCNAgent.__init__(
             self,
