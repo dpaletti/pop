@@ -160,6 +160,28 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 + ")"
             )
 
+        for idx, agent in enumerate(self.substation_to_agent.values()):
+            agent.set_cpu_affinity.remote(
+                self.available_cpus[
+                    int(
+                        math.fmod(
+                            idx * parallelization_degree,
+                            len(self.available_cpus),
+                        )
+                    ) : int(
+                        math.fmod(
+                            (idx + 1) * parallelization_degree,
+                            len(self.available_cpus),
+                        )
+                    )
+                    if math.fmod(
+                        (idx + 1) * parallelization_degree, len(self.available_cpus)
+                    )
+                    != 0
+                    else None
+                ],
+            )
+
         # Managers
         self.community_to_manager: Optional[Dict[Community, Manager]] = None
         self.managers_history: Dict[Manager, FixedSet[Community]] = {}
@@ -474,6 +496,12 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             mapping[sub_id] = conv
         return mapping
 
+    def retrieve_promises_batched(self, promises: list, batch_size: int) -> list:
+        answers: list = []
+        for i in range(0, len(promises), batch_size):
+            answers.extend(ray.get(promises[i : i + batch_size]))
+        return answers
+
     def _get_agent_actions(
         self, factored_observation: Dict[Substation, Optional[dgl.DGLHeteroGraph]]
     ) -> Dict[Substation, int]:
@@ -485,24 +513,13 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         # Observations are None in case the neighbourhood is empty (e.g. isolated nodes)
         # In such case no_action (id = 0) is selected
         # Each agent returns an action for its associated Substation
+
         action_promises = list(
             filter(
                 lambda x: x is not None,
                 [
                     self.substation_to_agent[sub_id].take_action.remote(
                         observation,
-                        self.available_cpus[
-                            int(math.fmod(idx, len(self.available_cpus))) : int(
-                                math.fmod(
-                                    idx
-                                    + (
-                                        len(self.available_cpus)
-                                        / self.max_concurrent_agents
-                                    ),
-                                    len(self.available_cpus),
-                                )
-                            )
-                        ],
                     )
                     if observation is not None
                     else no_action_positions_to_add.append(idx)
@@ -512,9 +529,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 ],
             )
         )
-        actions: List[int] = []
-        for i in range(0, len(action_promises), self.max_concurrent_agents):
-            actions.extend(ray.get(action_promises[i : i + self.max_concurrent_agents]))
+        actions: List[int] = self.retrieve_promises_batched(
+            action_promises, self.max_concurrent_agents
+        )
 
         # no_action is added for each None neighbourhood
         for no_action_position in no_action_positions_to_add:
@@ -904,7 +921,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 )
 
         # Step the agents
-        losses = ray.get(step_promises)
+        losses = self.retrieve_promises_batched(
+            step_promises, self.max_concurrent_agents
+        )
 
         # Log losses to tensorboard
         self.log_loss(

@@ -106,6 +106,9 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
     def get_name(self):
         return self.name
 
+    def set_cpu_affinity(self, cpus: List[int]):
+        psutil.Process().cpu_affinity(cpus)
+
     def compute_loss(
         self, transitions_batch: Transition, sampling_weights: Tensor
     ) -> Tuple[Tensor, Tensor]:
@@ -168,8 +171,6 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         return min_val + (max_val - min_val) * np.exp(-1.0 * self.decay_steps / decay)
 
     def take_action(self, transformed_observation: DGLHeteroGraph, *args) -> int:
-        if len(args) > 0:
-            psutil.Process().cpu_affinity(args[0])
 
         self.epsilon = self._exponential_decay(
             self.architecture.exploration.max_epsilon,
