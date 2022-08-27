@@ -11,7 +11,7 @@ import torch as th
 import ray
 
 
-@ray.remote
+@ray.remote(num_cpus=2)
 class Manager(BaseGCNAgent):
     def __init__(
         self,

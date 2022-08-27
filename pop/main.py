@@ -1,4 +1,5 @@
 from pathlib import Path
+import torch as th
 
 import yappi
 from grid2op import Environment
@@ -150,6 +151,7 @@ def fix_seed(env_train: BaseEnv, env_val: BaseEnv, seed: int = 0):
 
 
 def main(**kwargs):
+
     config = RunConfiguration(kwargs["run_file"])
 
     print(
@@ -217,11 +219,11 @@ def main(**kwargs):
 
     if config.training.train:
         print("Training...")
-        yappi.set_clock_type("cpu")
-        yappi.start(builtins=True)
+        # yappi.set_clock_type("cpu")
+        # yappi.start(builtins=True)
         train(env_train, iterations=config.training.steps, dpop=agent)
-        stats = yappi.get_func_stats()
-        stats.save("yappi_out", type="callgrind")
+        # stats = yappi.get_func_stats()
+        # stats.save("yappi_out", type="callgrind")
     else:
         print("Evaluating...")
         evaluate(

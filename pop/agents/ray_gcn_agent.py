@@ -8,7 +8,7 @@ from pop.configs.agent_architecture import AgentArchitecture
 from pop.networks.dueling_net import DuelingNet
 
 
-@ray.remote
+@ray.remote(num_cpus=1)
 class RayGCNAgent(BaseGCNAgent):
     def __init__(
         self,
