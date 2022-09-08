@@ -5,6 +5,7 @@ import re
 
 
 from typing import TYPE_CHECKING
+import numexpr as ne
 
 if TYPE_CHECKING:
     from pop.networks.gcn import GCN
@@ -63,6 +64,13 @@ def _parse_layer(self: Union["GCN", "DuelingNet"], layer: NetworkLayer) -> str:
 def _replace_dynamic_placeholder(
     self: Union["GCN", "DuelingNet"], placeholder: str
 ) -> str:
-    if not re.match(r"<\w*>", placeholder):
-        return placeholder
-    return str(self.__getattribute__(re.sub(r"[<>]", "", placeholder)))
+    while re.match(r"<\w*>", placeholder):
+        open_bracket = placeholder.find("<")
+        closed_bracket = placeholder.find(">")
+        attribute = placeholder[open_bracket + 1 : closed_bracket]
+        attribute_value = self.__getattribute__(attribute)
+        placeholder = placeholder.replace(
+            placeholder[open_bracket : closed_bracket + 1], str(attribute_value)
+        )
+
+    return str(ne.evaluate(placeholder))

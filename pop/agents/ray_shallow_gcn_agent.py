@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Tuple
 
 import networkx as nx
 import ray
@@ -52,7 +52,9 @@ class RayShallowGCNAgent(BaseGCNAgent):
         )
         return agent
 
-    def take_action(self, transformed_observation: DGLHeteroGraph, *args) -> int:
+    def take_action(
+        self, transformed_observation: DGLHeteroGraph, mask: List[int] = None
+    ) -> int:
         return 0  # Always no-action
 
     def step(
@@ -63,5 +65,5 @@ class RayShallowGCNAgent(BaseGCNAgent):
         next_observation: nx.Graph,
         done: bool,
         stop_decay: bool = False,
-    ) -> None:
-        return
+    ) -> Tuple[None, float]:
+        return None, reward

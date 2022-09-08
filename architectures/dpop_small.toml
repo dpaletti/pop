@@ -22,7 +22,7 @@ batch_size = 4
 
 
 [agent.exploration]
-method = "epsilon greedy"
+method = "epsilon_greedy"
 max_epsilon = 1.0
 min_epsilon = 0.01
 epsilon_decay = 200
@@ -46,7 +46,7 @@ huber_loss_delta = 1.0
 batch_size = 4
 
 [manager.exploration]
-method = "epsilon greedy"
+method = "epsilon_greedy"
 max_epsilon = 1.0
 min_epsilon = 0.01
 epsilon_decay = 200
@@ -70,7 +70,7 @@ huber_loss_delta = 1.0
 batch_size = 4
 
 [head_manager.exploration]
-method = "epsilon greedy"
+method = "epsilon_greedy"
 max_epsilon = 1.0
 min_epsilon = 0.01
 epsilon_decay = 200

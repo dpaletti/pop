@@ -43,7 +43,10 @@ class DuelingNet(nn.Module, SerializableModule):
             log_dir=None,
         )
 
+        # This attribute is used for reflection
+        # Do not remove it
         self.embedding_size: int = self.embedding.get_embedding_dimension()
+
         self._node_embeddings: Optional[Tensor] = None
 
         self.advantage_stream: nn.Sequential = get_network(

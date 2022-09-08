@@ -1,7 +1,11 @@
 from collections import namedtuple
+from dataclasses import asdict
+
 import numpy as np
-from typing import Tuple, List, Any
+from typing import Tuple, List, Any, Optional
 import pandas as pd
+
+from configs.agent_architecture import ReplayMemoryParameters
 
 Transition = namedtuple(
     "Transition", ("observation", "action", "next_observation", "reward", "done")
@@ -9,17 +13,19 @@ Transition = namedtuple(
 
 
 class ReplayMemory(object):
-    def __init__(
-        self,
-        capacity: int,
-        alpha: float,
-    ) -> None:
+    def __init__(self, architecture: ReplayMemoryParameters) -> None:
+        self.capacity = architecture.capacity
         self.memory = np.empty(
-            capacity, dtype=[("priority", np.float32), ("transition", Transition)]
+            self.capacity, dtype=[("priority", np.float32), ("transition", Transition)]
         )
-        self.capacity = capacity
-        self.alpha = alpha
-        self.buffer_length = 0
+        self.architecture: ReplayMemoryParameters = architecture
+        self.alpha: float = architecture.alpha
+        self.buffer_length: int = 0
+        self.steps: int = 0
+        self.max_beta: float = architecture.max_beta
+        self.min_beta: float = architecture.min_beta
+        self.half_life: float = architecture.beta_decay
+        self.beta: float = self.max_beta
 
     def push(
         self,
@@ -57,8 +63,14 @@ class ReplayMemory(object):
     def is_full(self) -> bool:
         return self.buffer_length == self.capacity
 
+    def update(self):
+        self.steps += 1
+        self.beta = self.min_beta + (self.max_beta - self.min_beta) * np.exp(
+            -1.0 * self.steps / self.half_life
+        )
+
     def sample(
-        self, batch_size: int, beta: float
+        self, batch_size: int
     ) -> Tuple[List[int], List[Transition], List[float]]:
 
         priorities = self.memory[: self.buffer_length]["priority"]
@@ -73,7 +85,7 @@ class ReplayMemory(object):
             p=sampling_probabilities,
         )
         transitions = self.memory["transition"][indices]
-        weights = (self.buffer_length * sampling_probabilities[indices]) ** -beta
+        weights = (self.buffer_length * sampling_probabilities[indices]) ** -self.beta
         normalized_weights = weights / weights.max()
 
         return list(indices), list(transitions), list(normalized_weights)
@@ -86,18 +98,17 @@ class ReplayMemory(object):
 
     def get_state(self) -> dict:
         return {
-            "capacity": self.capacity,
-            "alpha": self.alpha,
+            "architecture": asdict(self.architecture),
+            "beta": self.beta,
             "buffer_length": self.buffer_length,
             "memory": pd.DataFrame(self.memory).to_dict(),
         }
 
     @staticmethod
     def load(state_dict: dict) -> "ReplayMemory":
-        replay_memory = ReplayMemory(
-            capacity=state_dict["capacity"], alpha=state_dict["alpha"]
-        )
+        replay_memory = ReplayMemory(state_dict["architecture"])
         replay_memory.buffer_length = state_dict["buffer_length"]
+        replay_memory.beta = state_dict["beta"]
 
         for idx, (priority, transition) in enumerate(
             zip(

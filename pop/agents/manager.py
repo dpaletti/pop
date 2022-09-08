@@ -6,7 +6,6 @@ from torch import Tensor
 from pop.agents.base_gcn_agent import BaseGCNAgent
 from pop.configs.agent_architecture import AgentArchitecture
 from dgl import DGLHeteroGraph
-import numpy as np
 import torch as th
 import ray
 
@@ -22,7 +21,6 @@ class Manager(BaseGCNAgent):
         training: bool,
         device: str,
         edge_features: Optional[int] = None,
-        cpu_affinity: Optional[List[int]] = None,
     ):
         BaseGCNAgent.__init__(
             self,
@@ -45,29 +43,12 @@ class Manager(BaseGCNAgent):
     def get_node_embeddings(self, transformed_observation: DGLHeteroGraph) -> Tensor:
         return self.q_network.embedding(transformed_observation)
 
-    def take_action(
+    def _take_action(
         self, transformed_observation: DGLHeteroGraph, mask: List[int] = None
     ) -> int:
+        # Mask must be not None, we do not check this for performance reasons
 
         action_list = list(range(self.actions))
-
-        self.epsilon = self._exponential_decay(
-            self.architecture.exploration.max_epsilon,
-            self.architecture.exploration.min_epsilon,
-            self.architecture.exploration.epsilon_decay,
-        )
-
-        node_embeddings = self.get_node_embeddings(transformed_observation)
-
-        if self.training:
-            # epsilon-greedy Exploration
-            if np.random.rand() <= self.epsilon:
-                return np.random.choice(
-                    action_list,
-                    p=[
-                        1 / len(mask) if action in mask else 0 for action in action_list
-                    ],
-                )
 
         # -> (actions)
         advantages: Tensor = self.q_network.advantage(transformed_observation)

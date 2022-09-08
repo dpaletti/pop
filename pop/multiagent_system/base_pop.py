@@ -759,80 +759,83 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         # Step the managers
         # For each community before applying the action
         # Find the most similar community among the ones managed after applying the action
-        losses = ray.get(
-            list(
-                itertools.chain(
-                    *[
-                        [
-                            manager.step.remote(
-                                observation=community_to_sub_graphs_dict[old_community],
-                                action=actions[old_community],
-                                reward=reward,
-                                next_observation=next_community_to_sub_graphs_dict[
-                                    new_manager_communities[
-                                        np.argmax(
-                                            [
-                                                self._jaccard_distance(
-                                                    old_community,
-                                                    new_community,
-                                                )
-                                                for new_community in new_manager_communities
-                                                if next_community_to_sub_graphs_dict[
-                                                    new_community
-                                                ].num_edges()
-                                                > 0
-                                            ]
-                                        )
-                                    ]
-                                ],
-                                done=done,
-                                stop_decay=stop_decay[old_community],
-                            )
-                            for old_community in old_manager_communities
-                            if community_to_sub_graphs_dict[old_community].num_edges()
-                            > 0
-                        ]
-                        for manager, (
-                            old_manager_communities,
-                            new_manager_communities,
-                        ) in manager_to_community_transformation.items()
-                        if list(
-                            filter(
-                                lambda x: community_to_sub_graphs_dict[x].num_edges()
-                                > 0,
-                                old_manager_communities,
-                            )
-                        )
-                        and list(
-                            filter(
-                                lambda x: next_community_to_sub_graphs_dict[
-                                    x
+        losses, rewards = zip(
+            *ray.get(
+                list(
+                    itertools.chain(
+                        *[
+                            [
+                                manager.step.remote(
+                                    observation=community_to_sub_graphs_dict[
+                                        old_community
+                                    ],
+                                    action=actions[old_community],
+                                    reward=reward,
+                                    next_observation=next_community_to_sub_graphs_dict[
+                                        new_manager_communities[
+                                            np.argmax(
+                                                [
+                                                    self._jaccard_distance(
+                                                        old_community,
+                                                        new_community,
+                                                    )
+                                                    for new_community in new_manager_communities
+                                                    if next_community_to_sub_graphs_dict[
+                                                        new_community
+                                                    ].num_edges()
+                                                    > 0
+                                                ]
+                                            )
+                                        ]
+                                    ],
+                                    done=done,
+                                    stop_decay=stop_decay[old_community],
+                                )
+                                for old_community in old_manager_communities
+                                if community_to_sub_graphs_dict[
+                                    old_community
                                 ].num_edges()
-                                > 0,
+                                > 0
+                            ]
+                            for manager, (
+                                old_manager_communities,
                                 new_manager_communities,
+                            ) in manager_to_community_transformation.items()
+                            if list(
+                                filter(
+                                    lambda x: community_to_sub_graphs_dict[
+                                        x
+                                    ].num_edges()
+                                    > 0,
+                                    old_manager_communities,
+                                )
                             )
-                        )
-                    ]
+                            and list(
+                                filter(
+                                    lambda x: next_community_to_sub_graphs_dict[
+                                        x
+                                    ].num_edges()
+                                    > 0,
+                                    new_manager_communities,
+                                )
+                            )
+                        ]
+                    )
                 )
             )
         )
+        names = ray.get(
+            [
+                self.community_to_manager[community].get_name.remote()
+                for community in self.communities
+            ]
+        )
 
-        # Log the loss to tensorboard
-        self.log_loss(
-            {
-                "_".join(manager_name.split("_")[0:2]): loss
-                for manager_name, loss in zip(
-                    ray.get(
-                        [
-                            self.community_to_manager[community].get_name.remote()
-                            for community in self.communities
-                        ]
-                    ),
-                    losses,
-                )
-                if loss is not None
-            },
-            self.train_steps,
+        self.log_step(
+            losses=losses,
+            implicit_rewards=[full_reward - reward for full_reward in rewards],
+            names=names,
+            train_steps=self.train_steps,
         )
 
     def _step_agents(
@@ -877,24 +880,18 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 )
 
         # Step the agents
-        losses = ray.get(step_promises)
-
-        # Log losses to tensorboard
-        self.log_loss(
-            {
-                "_".join(agent_name.split("_")[0:2]): loss
-                for agent_name, loss in zip(
-                    ray.get(
-                        [
-                            self.substation_to_agent[substation].get_name.remote()
-                            for substation in substations
-                        ]
-                    ),
-                    losses,
-                )
-                if loss is not None
-            },
-            self.train_steps,
+        losses, rewards = zip(*ray.get(step_promises))
+        names = ray.get(
+            [
+                self.substation_to_agent[substation].get_name.remote()
+                for substation in substations
+            ]
+        )
+        self.log_step(
+            losses=losses,
+            implicit_rewards=[full_reward - reward for full_reward in rewards],
+            names=names,
+            train_steps=self.train_steps,
         )
 
     def _lookup_local_action(self, action: BaseAction):

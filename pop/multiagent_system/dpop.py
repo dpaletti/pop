@@ -28,7 +28,7 @@ class DPOP(BasePOP):
         tensorboard_dir: Optional[str] = None,
         device: Optional[str] = None,
     ):
-        ray.init()
+        ray.init(local_mode=True)
         super(DPOP, self).__init__(
             env=env,
             name=name,
@@ -94,7 +94,7 @@ class DPOP(BasePOP):
                 new_community_to_manager_dict=next_community_to_manager,
             )
 
-            loss = ray.get(
+            loss, full_reward = ray.get(
                 self.head_manager.step.remote(
                     observation=self.summarized_graph,
                     action=action,
@@ -105,15 +105,13 @@ class DPOP(BasePOP):
                 )
             )
 
-            if loss is not None:
-                self.log_loss(
-                    {
-                        "_".join(
-                            ray.get(self.head_manager.get_name.remote()).split("_")[0:2]
-                        ): loss
-                    },
-                    self.train_steps,
-                )
+            self.log_step(
+                losses=[loss],
+                implicit_rewards=[full_reward - reward],
+                names=[self.name],
+                train_steps=self.train_steps,
+            )
+
         except KeyError as e:
             print("...")
             raise e

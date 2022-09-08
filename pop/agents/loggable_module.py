@@ -22,10 +22,42 @@ class LoggableModule:
     def is_logging_active(self) -> bool:
         return self.tensorboard_dir is not None
 
-    def log_loss(self, losses: Dict[str, float], train_steps: int):
+    def log_simple_scalar(
+        self, losses: Dict[str, float], train_steps: int, scalar_name: str = "Loss"
+    ):
         if self.is_logging_active():
             for iid, loss in losses.items():
-                self.writer.add_scalar("Loss/" + iid, loss, train_steps)
+                self.writer.add_scalar(scalar_name + "/" + iid, loss, train_steps)
+
+    def log_step(
+        self,
+        losses: List[Optional[float]],
+        implicit_rewards: List[float],
+        names: List[str],
+        train_steps: int,
+    ):
+        # Log losses to tensorboard
+        self.log_simple_scalar(
+            {
+                "_".join(agent_name.split("_")[0:2]): loss
+                for agent_name, loss in zip(
+                    names,
+                    losses,
+                )
+                if loss is not None
+            },
+            train_steps,
+            "Loss",
+        )
+
+        self.log_simple_scalar(
+            {
+                "_".join(agent_name.split("_")[0:2]): implicit_reward
+                for agent_name, implicit_reward in zip(names, implicit_rewards)
+            },
+            train_steps,
+            "Implicit Reward",
+        )
 
     def log_action_space_size(self, agent_converters: Dict[int, IdToAct]) -> None:
         if not self.is_logging_active():

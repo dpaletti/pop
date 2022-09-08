@@ -1,7 +1,4 @@
 from pathlib import Path
-import torch as th
-
-import yappi
 from grid2op import Environment
 from grid2op.Action import BaseAction
 from grid2op.Agent import BaseAgent
@@ -34,7 +31,6 @@ import warnings
 from pop.multiagent_system.dpop import DPOP
 from pop.multiagent_system.base_pop import train
 import pandas as pd
-import cProfile
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -193,7 +189,11 @@ def main(**kwargs):
     print("Running with seed: " + str(config.reproducibility.seed))
     fix_seed(env_train, env_val, seed=config.reproducibility.seed)
 
-    if config.loading.load and Path(config.loading.load_dir).parents[0].exists():
+    if (
+        config.loading.load
+        and Path(config.loading.load_dir).parents[0].exists()
+        and len(list(Path(config.loading.load_dir).parents[0].iterdir())) > 0
+    ):
         print("Loading model from last checkpoint...")
         agent = DPOP.load(
             log_file=config.loading.load_dir,

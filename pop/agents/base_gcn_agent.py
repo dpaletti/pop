@@ -7,13 +7,14 @@ from dgl import DGLHeteroGraph
 from grid2op.Observation import BaseObservation
 from torch import Tensor
 
+from agents.exploration.exploration_module import ExplorationModule
+from agents.exploration.exploration_module_factory import get_exploration_module
 from pop.agents.loggable_module import LoggableModule
 from pop.agents.replay_buffer import ReplayMemory, Transition
 from pop.configs.agent_architecture import AgentArchitecture
 from pop.networks.serializable_module import SerializableModule
 from pop.networks.dueling_net import DuelingNet
 import copy
-import numpy as np
 import torch as th
 import torch.nn as nn
 import dgl
@@ -76,12 +77,10 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         self.target_network: DuelingNet = copy.deepcopy(self.q_network)
 
         # Logging
-        self.decay_steps: int = 0
         self.train_steps: int = 0
         self.episodes: int = 0
         self.alive_steps: int = 0
         self.learning_steps: int = 0
-        self.epsilon: float = self.architecture.exploration.max_epsilon
 
         # Optimizer
         self.optimizer: th.optim.Optimizer = th.optim.Adam(
@@ -94,14 +93,13 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         )
 
         # Replay Buffer
-        self.memory: ReplayMemory = ReplayMemory(
-            int(self.architecture.replay_memory.capacity),
-            self.architecture.replay_memory.alpha,
-        )
+        self.memory: ReplayMemory = ReplayMemory(self.architecture.replay_memory)
 
         # Training or Evaluation
         self.training: bool = training
         self.last_action: Optional[int] = None
+
+        self.exploration: ExplorationModule = get_exploration_module(self)
 
     def get_name(self):
         return self.name
@@ -167,30 +165,31 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
     def get_memory(self) -> ReplayMemory:
         return self.memory
 
-    def _exponential_decay(self, max_val: float, min_val: float, decay: int) -> float:
-        return min_val + (max_val - min_val) * np.exp(-1.0 * self.decay_steps / decay)
-
-    def take_action(self, transformed_observation: DGLHeteroGraph, *args) -> int:
-
-        self.epsilon = self._exponential_decay(
-            self.architecture.exploration.max_epsilon,
-            self.architecture.exploration.min_epsilon,
-            self.architecture.exploration.epsilon_decay,
-        )
-        action_list = list(range(self.actions))
-        if self.training:
-            # epsilon-greedy Exploration
-            if np.random.rand() <= self.epsilon:
-                self.last_action = None
-                return np.random.choice(action_list)
+    def _take_action(
+        self, transformed_observation: DGLHeteroGraph, mask: List[int] = None
+    ) -> int:
 
         # -> (actions)
         advantages: Tensor = self.q_network.advantage(transformed_observation)
         action = int(th.argmax(advantages).item())
-        action = action if action != self.last_action else 0
+        action = action
+        # TODO: implement a switch
+        # TODO: to turn on
+        # action = action if action != last_action else 0
+        # TODO: this policy helped a bit but it is not very elegant
         self.last_action = action
 
         return action
+
+    def take_action(
+        self, transformed_observation: DGLHeteroGraph, mask: List[int] = None
+    ) -> int:
+        if self.training:
+            return self.exploration.action_exploration(self._take_action)(
+                transformed_observation, mask=mask
+            )
+        else:
+            return self._take_action(transformed_observation, mask=mask)
 
     def update_mem(
         self,
@@ -213,13 +212,9 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
             self.target_network.parameters = self.q_network.parameters
 
         # Sample from Replay Memory and unpack
+
         memory_indices, transitions, sampling_weights = self.memory.sample(
-            self.architecture.batch_size,
-            self._exponential_decay(
-                self.architecture.replay_memory.max_beta,
-                self.architecture.replay_memory.min_beta,
-                self.architecture.replay_memory.beta_decay,
-            ),
+            self.architecture.batch_size
         )
         transitions = Transition(*zip(*transitions))
 
@@ -236,7 +231,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         )
         return loss.item()
 
-    def step(
+    def _step(
         self,
         observation: DGLHeteroGraph,
         action: int,
@@ -244,7 +239,8 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         next_observation: DGLHeteroGraph,
         done: bool,
         stop_decay: bool = False,
-    ) -> Optional[float]:
+    ) -> Tuple[Optional[float], float]:
+        # This method is redefined by ExplorationModule.apply_intrinsic_reward() at runtime if training=True
 
         self.train_steps += 1
         if done:
@@ -256,14 +252,44 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
             self.alive_steps += 1
 
             if not stop_decay and self.training:
-                self.decay_steps += 1
+                self.exploration.update(action)
+                self.memory.update()
 
             # every so often the agents should learn from experiences
             if self.train_steps % self.architecture.learning_frequency == 0:
                 loss: Optional[float] = self.learn()
                 self.learning_steps += 1
-                return loss
-            return None
+                return loss, reward
+        return None, reward
+
+    def step(
+        self,
+        observation: DGLHeteroGraph,
+        action: int,
+        reward: float,
+        next_observation: DGLHeteroGraph,
+        done: bool,
+        stop_decay: bool = False,
+    ) -> Tuple[Optional[float], float]:
+        if self.training:
+            return self.exploration.apply_intrinsic_reward(self._step)(
+                self,
+                observation,
+                action,
+                reward,
+                next_observation,
+                done,
+                stop_decay=stop_decay,
+            )
+        else:
+            return self._step(
+                observation,
+                action,
+                reward,
+                next_observation,
+                done,
+                stop_decay=stop_decay,
+            )
 
     def get_state(
         self,
@@ -273,7 +299,6 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
             "q_network_state": self.q_network.state_dict(),
             "target_network_state": self.target_network.state_dict(),
             "memory": self.memory.get_state(),
-            "decay_steps": self.decay_steps,
             "alive_steps": self.alive_steps,
             "train_steps": self.train_steps,
             "learning_steps": self.learning_steps,
@@ -292,12 +317,10 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         q_network_state: OrderedDict[str, Tensor],
         target_network_state: OrderedDict[str, Tensor],
         memory: dict,
-        decay_steps: int,
         alive_steps: int,
         train_steps: int,
         learning_steps: int,
     ) -> None:
-        self.decay_steps = decay_steps
         self.alive_steps = alive_steps
         self.train_steps = train_steps
         self.learning_steps = learning_steps

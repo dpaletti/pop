@@ -1,6 +1,7 @@
 import abc
 from dataclasses import dataclass
-from typing import Optional, ClassVar
+from functools import reduce
+from typing import Optional, ClassVar, List, Type, Any
 
 from pop.configs.network_architecture import NetworkArchitecture
 from pop.configs.type_aliases import EventuallyNestedDict
@@ -10,50 +11,78 @@ from pop.configs.type_aliases import EventuallyNestedDict
 class ExplorationParameters(abc.ABC):
     method: ClassVar[str]
 
+    def __init__(self, d: dict):
+        ...
+
+    @staticmethod
+    @abc.abstractmethod
+    def network_architecture_fields() -> List[List[str]]:
+        ...
+
 
 @dataclass(frozen=True)
 class InverseModelArchitecture:
     embedding: NetworkArchitecture
     action_prediction_stream: NetworkArchitecture
+    learning_rate: int
 
 
 @dataclass(frozen=True)
-class EpisodicMemoryArchitecture(ExplorationParameters):
-    method: ClassVar[str] = "episodic memory"
+class RandomNetworkDistillerArchitecture:
+    network: NetworkArchitecture
+    learning_rate: int
+
+
+@dataclass(frozen=True)
+class EpisodicMemoryParameters(ExplorationParameters):
+    method: ClassVar[str] = "episodic_memory"
     size: int
     neighbors: int
     exploration_bonus_limit: int
+    random_network_distiller: RandomNetworkDistillerArchitecture
     inverse_model: InverseModelArchitecture
-    random_network_distiller: NetworkArchitecture
+
+    @staticmethod
+    def network_architecture_fields() -> List[List[str]]:
+        return [
+            ["random_network_distiller", "network"],
+            ["inverse_model", "embedding"],
+            ["inverse_model", "action_prediction_stream"],
+        ]
+
+    def __init__(self, d: dict):
+        super(EpisodicMemoryParameters, self).__init__(d)
+        object.__setattr__(self, "size", d["size"])
+        object.__setattr__(self, "neighbors", d["neighbors"])
+        object.__setattr__(
+            self, "exploration_bonus_limit", d["exploration_bonus_limit"]
+        )
+        object.__setattr__(
+            self, "inverse_model", InverseModelArchitecture(**d["inverse_model"])
+        )
+        object.__setattr__(
+            self,
+            "random_network_distiller",
+            RandomNetworkDistillerArchitecture(**d["random_network_distiller"]),
+        )
 
 
 @dataclass(frozen=True)
 class EpsilonGreedyParameters(ExplorationParameters):
-    method: ClassVar[str] = "epsilon greedy"
-
+    method: ClassVar[str] = "epsilon_greedy"
     max_epsilon: float
     min_epsilon: float
     epsilon_decay: float
 
-    def __post_init__(self):
-        if self.max_epsilon < 0 or self.max_epsilon > 1:
-            raise Exception(
-                "Invalid value encountered for max_epsilon: "
-                + str(self.max_epsilon)
-                + "\n max_epsilon must be in [0, 1]"
-            )
-        if self.min_epsilon < 0 or self.min_epsilon > 1:
-            raise Exception(
-                "Invalid value encountered for min_epsilon: "
-                + str(self.max_epsilon)
-                + "\n min_epsilon must be in [0, 1]"
-            )
-        if self.epsilon_decay < 0:
-            raise Exception(
-                "Invalid value encountered for epsilon_decay: "
-                + str(self.epsilon_decay)
-                + "\n epsilon_decay must be greater than 0"
-            )
+    def __init__(self, d: dict):
+        super(EpsilonGreedyParameters, self).__init__(d)
+        object.__setattr__(self, "max_epsilon", d["max_epsilon"])
+        object.__setattr__(self, "min_epsilon", d["min_epsilon"])
+        object.__setattr__(self, "epsilon_decay", d["epsilon_decay"])
+
+    @staticmethod
+    def network_architecture_fields() -> List[List[str]]:
+        return []
 
 
 @dataclass(frozen=True)
@@ -144,20 +173,38 @@ class AgentArchitecture:
                 + "\nAvailable methods are: "
                 + str(available_exploration_methods)
             )
+        exploration_module_cls: Type[ExplorationParameters] = next(
+            filter(
+                lambda subclass: subclass.method == exploration_method,
+                available_exploration_methods,
+            )
+        )
+
+        for (
+            network_architecture_keys
+        ) in exploration_module_cls.network_architecture_fields():
+            network_architecture = self._deep_get(
+                agent_dict["exploration"], network_architecture_keys
+            )
+            parsed_network_architecture = NetworkArchitecture(
+                network=network_architecture,
+                implementation_folder_path=network_architecture_implementation_folder_path,
+                frame_folder_path=network_architecture_frame_folder_path,
+            )
+            self._deep_update(
+                agent_dict["exploration"],
+                network_architecture_keys,
+                parsed_network_architecture,
+            )
         object.__setattr__(
             self,
             "exploration",
-            next(
-                filter(
-                    lambda subclass: subclass.method == exploration_method,
-                    available_exploration_methods,
-                )
-            )(
-                **{
+            exploration_module_cls(
+                {
                     parameter: parameter_value
                     for parameter, parameter_value in agent_dict["exploration"].items()
                     if parameter != "method"
-                }
+                },
             ),
         )
 
@@ -174,3 +221,16 @@ class AgentArchitecture:
         object.__setattr__(self, "gamma", agent_dict["gamma"])
         object.__setattr__(self, "huber_loss_delta", agent_dict["huber_loss_delta"])
         object.__setattr__(self, "batch_size", agent_dict["batch_size"])
+
+    @staticmethod
+    def _deep_get(di: dict, keys: List[str]):
+        return reduce(lambda d, key: d.get(key) if d else None, keys, di)
+
+    @staticmethod
+    def _deep_update(mapping: dict, keys: List[str], value: Any) -> dict:
+        k = keys[0]
+        if k in mapping and isinstance(mapping[k], dict) and len(keys) > 1:
+            mapping[k] = AgentArchitecture._deep_update(mapping[k], keys[1:], value)
+        else:
+            mapping[k] = value
+            return mapping
