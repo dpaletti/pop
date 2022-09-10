@@ -4,7 +4,15 @@
 poetry.lock
 README.rst
 
-.idea
+# Testing Directories
+run_files/
+profiling/
+test_data/
+tests/
+
+
+# Pycharm
+.idea/
 # Ignoring Tests, used only for development purposes for now
 tests/
 

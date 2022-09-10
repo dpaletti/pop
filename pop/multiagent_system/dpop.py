@@ -28,7 +28,7 @@ class DPOP(BasePOP):
         tensorboard_dir: Optional[str] = None,
         device: Optional[str] = None,
     ):
-        ray.init(local_mode=True)
+        ray.init(local_mode=False)
         super(DPOP, self).__init__(
             env=env,
             name=name,
@@ -39,13 +39,21 @@ class DPOP(BasePOP):
             seed=seed,
             device=device,
         )
+        try:
+            node_features = self.architecture.manager.embedding.layers[-1].kwargs[
+                "out_feats"
+            ]
+        except KeyError:
+            # If last layer is an activation one
+            # Should make this general
+            node_features = self.architecture.manager.embedding.layers[-2].kwargs[
+                "out_feats"
+            ]
 
         # Head Manager Initialization
         self.head_manager: Optional[Manager] = Manager.remote(
             agent_actions=self.env.n_sub * 2,
-            node_features=int(
-                self.architecture.manager.embedding.layers[-1].kwargs["out_feats"]
-            )
+            node_features=int(node_features)
             + self.env.n_sub
             + 1,  # Manager Node Embedding + Manager Community (1 hot encoded) + selected action
             architecture=self.architecture.head_manager,

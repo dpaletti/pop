@@ -10,10 +10,6 @@ allow_zero_in_degree = "..."
 bias = "..."
 share_weights = "..."
 
-[activation1]
-type = "ReLU"
-module = "pytorch"
-
 [flatten1]
 type = "GATFlatten"
 module = "custom_layers"
@@ -29,7 +25,3 @@ activation = "..."
 allow_zero_in_degree = "..."
 bias = "..."
 share_weights = "..."
-
-[activation2]
-type = "ReLU"
-module = "pytorch"

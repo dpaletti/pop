@@ -82,7 +82,11 @@ class GCN(nn.Module, SerializableModule):
         return node_embeddings
 
     def get_embedding_dimension(self) -> int:
-        return int(self.architecture.layers[-1].kwargs["out_feats"])
+        try:
+            return int(self.architecture.layers[-1].kwargs["out_feats"])
+        except KeyError:
+            # Case in which last layer is an activation layer
+            return int(self.architecture.layers[-2].kwargs["out_feats"])
 
     def get_state(self) -> Dict[str, Any]:
         return {

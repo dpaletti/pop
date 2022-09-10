@@ -4,8 +4,8 @@ device = "cpu"
 
 [model]
 name = "dpop_rte_curiosity"
-architecture_path = "../architectures/dpop_small_curiosity.toml"
-data_dir = "../test_data"
+architecture_path = "architectures/dpop_small_curiosity.toml"
+data_dir = "test_data/"
 checkpoint_dir = "<<model_data_dir>>/pop_runs/checkpoint/<<model_name>>"
 
 [training]
@@ -14,7 +14,6 @@ train = true
 tensorboard_dir = "<<model_data_dir>>/pop_runs/tensorboard/<<model_name>>"
 curriculum = false
 reset_decay = true
-
 
 [evaluation]
 episodes = 100
@@ -31,5 +30,4 @@ name = "rte_case14_realistic"
 difficulty = 0
 
 [environment.reward]
-
 Experimental = 1

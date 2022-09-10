@@ -8,10 +8,6 @@ out_edge_feats = "..."
 num_heads = "..."
 bias = "..."
 
-[activation1]
-type = "ReLU"
-module = "pytorch"
-
 [flatten1]
 type = "EGATFlatten"
 module = "custom_layers"
@@ -25,11 +21,6 @@ out_node_feats = "..."
 out_edge_feats = "..."
 num_heads = "..."
 bias = "..."
-
-[activation2]
-type = "ReLU"
-module = "pytorch"
-
 
 [flatten2]
 type = "EGATFlatten"
@@ -57,3 +48,4 @@ out_feats = "..."
 bias = "..."
 weight = "..."
 allow_zero_in_degree = "..."
+
