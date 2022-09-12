@@ -28,7 +28,7 @@ class DPOP(BasePOP):
         tensorboard_dir: Optional[str] = None,
         device: Optional[str] = None,
     ):
-        ray.init(local_mode=True, include_dashboard=False)
+        ray.init(local_mode=False, include_dashboard=False)
         super(DPOP, self).__init__(
             env=env,
             name=name,
