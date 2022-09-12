@@ -1,6 +1,6 @@
 import abc
 import functools
-from typing import Callable
+from typing import Any, Callable, Dict
 
 import dgl
 
@@ -10,17 +10,28 @@ class ExplorationModule(abc.ABC):
     def update(self, *args, **kwargs) -> None:
         ...
 
-    @abc.abstractmethod
     def action_exploration(self, action_function: Callable) -> Callable:
-        ...
+        @functools.wraps(action_function)
+        def wrap(wrapped_self, transformed_observation: dgl.DGLHeteroGraph, **kwargs):
+            return action_function(transformed_observation, kwargs.get("mask"))
 
-    @abc.abstractmethod
+        return wrap
+
     def compute_intrinsic_reward(
         self,
         observation: dgl.DGLHeteroGraph,
         next_observation: dgl.DGLHeteroGraph,
         action: int,
     ) -> float:
+        return 0
+
+    @abc.abstractmethod
+    def get_state(self) -> Dict[str, Any]:
+        ...
+
+    @staticmethod
+    @abc.abstractmethod
+    def load_state(state: Dict[str, Any]):
         ...
 
     def apply_intrinsic_reward(

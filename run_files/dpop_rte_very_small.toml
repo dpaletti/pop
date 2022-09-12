@@ -4,12 +4,12 @@ device = "cpu"
 
 [model]
 name = "dpop_rte_very_small"
-architecture_path = "../architectures/dpop_very_small.toml"
-data_dir = "../test_data"
+architecture_path = "architectures/dpop_very_small.toml"
+data_dir = "test_data/"
 checkpoint_dir = "<<model_data_dir>>/pop_runs/checkpoint/<<model_name>>"
 
 [training]
-steps = 100
+steps = 10
 train = true
 tensorboard_dir = "<<model_data_dir>>/pop_runs/tensorboard/<<model_name>>"
 curriculum = false

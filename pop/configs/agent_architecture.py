@@ -9,14 +9,19 @@ from pop.configs.type_aliases import EventuallyNestedDict
 
 @dataclass(frozen=True)
 class ExplorationParameters(abc.ABC):
-    method: ClassVar[str]
-
+    # WARNING: method attribute must be present in all children
+    # TODO: find a way to enforce this in a sane way, python 3.10 should be needed to do this cleanly
     def __init__(self, d: dict):
         ...
 
     @staticmethod
     @abc.abstractmethod
     def network_architecture_fields() -> List[List[str]]:
+        ...
+
+    @staticmethod
+    @abc.abstractmethod
+    def get_method() -> str:
         ...
 
 
@@ -35,12 +40,16 @@ class RandomNetworkDistillerArchitecture:
 
 @dataclass(frozen=True)
 class EpisodicMemoryParameters(ExplorationParameters):
-    method: ClassVar[str] = "episodic_memory"
+    method: str
     size: int
     neighbors: int
     exploration_bonus_limit: int
     random_network_distiller: RandomNetworkDistillerArchitecture
     inverse_model: InverseModelArchitecture
+
+    @staticmethod
+    def get_method() -> str:
+        return "episodic_memory"
 
     @staticmethod
     def network_architecture_fields() -> List[List[str]]:
@@ -52,6 +61,7 @@ class EpisodicMemoryParameters(ExplorationParameters):
 
     def __init__(self, d: dict):
         super(EpisodicMemoryParameters, self).__init__(d)
+        object.__setattr__(self, "method", d["method"])
         object.__setattr__(self, "size", d["size"])
         object.__setattr__(self, "neighbors", d["neighbors"])
         object.__setattr__(
@@ -69,13 +79,18 @@ class EpisodicMemoryParameters(ExplorationParameters):
 
 @dataclass(frozen=True)
 class EpsilonGreedyParameters(ExplorationParameters):
-    method: ClassVar[str] = "epsilon_greedy"
+    method: str
     max_epsilon: float
     min_epsilon: float
     epsilon_decay: float
 
+    @staticmethod
+    def get_method() -> str:
+        return "epsilon_greedy"
+
     def __init__(self, d: dict):
         super(EpsilonGreedyParameters, self).__init__(d)
+        object.__setattr__(self, "method", d["method"])
         object.__setattr__(self, "max_epsilon", d["max_epsilon"])
         object.__setattr__(self, "min_epsilon", d["min_epsilon"])
         object.__setattr__(self, "epsilon_decay", d["epsilon_decay"])
@@ -131,6 +146,14 @@ class AgentArchitecture:
                 "value_stream",
                 NetworkArchitecture(load_from_dict=load_from_dict["value_stream"]),
             )
+
+            exploration_module_cls = AgentArchitecture._get_exploration_module_cls(
+                load_from_dict["exploration"]
+            )
+            AgentArchitecture._parse_network_architectures(
+                d=load_from_dict["exploration"],
+                exploration_module_cls=exploration_module_cls,
+            )
             agent_dict = load_from_dict
 
         else:
@@ -162,50 +185,21 @@ class AgentArchitecture:
                 ),
             )
 
-        exploration_method = agent_dict["exploration"].get("method")
-        available_exploration_methods = [
-            subclass for subclass in ExplorationParameters.__subclasses__()
-        ]
-        if exploration_method is None:
-            raise Exception(
-                "Invalid method in exploration_section (may be missing): "
-                + str([subclass.method for subclass in available_exploration_methods])
-                + "\nAvailable methods are: "
-                + str(available_exploration_methods)
+            exploration_module_cls = AgentArchitecture._get_exploration_module_cls(
+                agent_dict["exploration"]
             )
-        exploration_module_cls: Type[ExplorationParameters] = next(
-            filter(
-                lambda subclass: subclass.method == exploration_method,
-                available_exploration_methods,
-            )
-        )
 
-        for (
-            network_architecture_keys
-        ) in exploration_module_cls.network_architecture_fields():
-            network_architecture = self._deep_get(
-                agent_dict["exploration"], network_architecture_keys
-            )
-            parsed_network_architecture = NetworkArchitecture(
-                network=network_architecture,
+            AgentArchitecture._parse_network_architectures(
+                d=agent_dict["exploration"],
+                exploration_module_cls=exploration_module_cls,
                 implementation_folder_path=network_architecture_implementation_folder_path,
                 frame_folder_path=network_architecture_frame_folder_path,
             )
-            self._deep_update(
-                agent_dict["exploration"],
-                network_architecture_keys,
-                parsed_network_architecture,
-            )
+
         object.__setattr__(
             self,
             "exploration",
-            exploration_module_cls(
-                {
-                    parameter: parameter_value
-                    for parameter, parameter_value in agent_dict["exploration"].items()
-                    if parameter != "method"
-                },
-            ),
+            exploration_module_cls(agent_dict["exploration"]),
         )
 
         object.__setattr__(
@@ -221,6 +215,60 @@ class AgentArchitecture:
         object.__setattr__(self, "gamma", agent_dict["gamma"])
         object.__setattr__(self, "huber_loss_delta", agent_dict["huber_loss_delta"])
         object.__setattr__(self, "batch_size", agent_dict["batch_size"])
+
+    @staticmethod
+    def _parse_network_architectures(
+        d: dict,
+        exploration_module_cls: Type[ExplorationParameters],
+        implementation_folder_path: Optional[str] = None,
+        frame_folder_path: Optional[str] = None,
+    ) -> None:
+
+        for (
+            network_architecture_keys
+        ) in exploration_module_cls.network_architecture_fields():
+            network_architecture = AgentArchitecture._deep_get(
+                d, network_architecture_keys
+            )
+            parsed_network_architecture = (
+                NetworkArchitecture(
+                    network=network_architecture,
+                    implementation_folder_path=implementation_folder_path,
+                    frame_folder_path=frame_folder_path,
+                )
+                if implementation_folder_path and frame_folder_path
+                else NetworkArchitecture(load_from_dict=network_architecture)
+            )
+            AgentArchitecture._deep_update(
+                d,
+                network_architecture_keys,
+                parsed_network_architecture,
+            )
+
+    @staticmethod
+    def _get_exploration_module_cls(d: dict) -> Type[ExplorationParameters]:
+        exploration_method = d.get("method")
+        available_exploration_methods = [
+            subclass for subclass in ExplorationParameters.__subclasses__()
+        ]
+        if exploration_method is None:
+            raise Exception(
+                "Invalid method in exploration_section (may be missing): "
+                + str(
+                    [
+                        subclass.get_method()
+                        for subclass in available_exploration_methods
+                    ]
+                )
+                + "\nAvailable methods are: "
+                + str(available_exploration_methods)
+            )
+        return next(
+            filter(
+                lambda subclass: subclass.get_method() == exploration_method,
+                available_exploration_methods,
+            )
+        )
 
     @staticmethod
     def _deep_get(di: dict, keys: List[str]):

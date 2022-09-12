@@ -54,7 +54,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         LoggableModule.__init__(self, tensorboard_dir)
 
         self.name = name
-        self.seed = seed
+        self.seed: int = seed
         self.env = env
         self.node_features: int = architecture.pop.node_features
         self.edge_features: int = architecture.pop.edge_features

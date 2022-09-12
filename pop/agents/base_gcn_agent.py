@@ -166,7 +166,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         return self.memory
 
     def _take_action(
-        self, transformed_observation: DGLHeteroGraph, mask: List[int] = None
+        self, transformed_observation: DGLHeteroGraph, mask: Optional[List[int]] = None
     ) -> int:
 
         # -> (actions)
@@ -182,11 +182,11 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         return action
 
     def take_action(
-        self, transformed_observation: DGLHeteroGraph, mask: List[int] = None
+        self, transformed_observation: DGLHeteroGraph, mask: Optional[List[int]] = None
     ) -> int:
         if self.training:
             return self.exploration.action_exploration(self._take_action)(
-                transformed_observation, mask=mask
+                self, transformed_observation, mask=mask
             )
         else:
             return self._take_action(transformed_observation, mask=mask)
@@ -299,6 +299,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
             "q_network_state": self.q_network.state_dict(),
             "target_network_state": self.target_network.state_dict(),
             "memory": self.memory.get_state(),
+            "exploration": self.exploration.get_state(),
             "alive_steps": self.alive_steps,
             "train_steps": self.train_steps,
             "learning_steps": self.learning_steps,
@@ -317,6 +318,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         q_network_state: OrderedDict[str, Tensor],
         target_network_state: OrderedDict[str, Tensor],
         memory: dict,
+        exploration: dict,
         alive_steps: int,
         train_steps: int,
         learning_steps: int,
@@ -327,7 +329,8 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         self.optimizer.load_state_dict(optimizer_state)
         self.q_network.load_state_dict(q_network_state)
         self.target_network.load_state_dict(target_network_state)
-        self.memory.load(memory)
+        self.memory.load_state(memory)
+        self.exploration.load_state(exploration)
 
     @staticmethod
     def batch_observations(graphs: List[DGLHeteroGraph]) -> DGLHeteroGraph:

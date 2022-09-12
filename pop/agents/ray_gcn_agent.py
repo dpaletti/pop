@@ -58,7 +58,7 @@ class RayGCNAgent(BaseGCNAgent):
             q_network_state=checkpoint["q_network_state"],
             target_network_state=checkpoint["target_network_state"],
             memory=checkpoint["memory"],
-            decay_steps=checkpoint["decay_steps"],
+            exploration=checkpoint["exploration"],
             alive_steps=checkpoint["alive_steps"],
             train_steps=checkpoint["train_steps"],
             learning_steps=checkpoint["learning_steps"],

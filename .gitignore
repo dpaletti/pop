@@ -4,11 +4,17 @@
 poetry.lock
 README.rst
 
+# Emacs
+.dir-locals.el
+.projectile
+.debugger_configs
+
 # Testing Directories
 run_files/
 profiling/
 test_data/
 tests/
+
 
 
 # Pycharm

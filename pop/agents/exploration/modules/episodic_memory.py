@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Callable, Any
+from typing import Dict, Optional, Tuple, Callable, Any
 
 import dgl
 from torch import Tensor
@@ -20,6 +20,7 @@ from configs.agent_architecture import (
 from networks.gcn import GCN
 from networks.network_architecture_parsing import get_network
 from typing import cast
+import pandas as pd
 
 
 class EpisodicMemory(nn.Module, ExplorationModule):
@@ -29,22 +30,24 @@ class EpisodicMemory(nn.Module, ExplorationModule):
     ):
         super(EpisodicMemory, self).__init__()
 
-        exploration_parameters: EpisodicMemoryParameters = cast(
+        self.exploration_parameters: EpisodicMemoryParameters = cast(
             EpisodicMemoryParameters, agent.architecture.exploration
         )
         node_features = agent.node_features
         edge_features = agent.edge_features
         name = agent.name + "_episodic_memory"
 
-        self.memory = deque(maxlen=exploration_parameters.size)
-        self.neighbors = exploration_parameters.neighbors
-        self.exploration_bonus_limit = exploration_parameters.exploration_bonus_limit
+        self.memory = deque(maxlen=self.exploration_parameters.size)
+        self.neighbors = self.exploration_parameters.neighbors
+        self.exploration_bonus_limit = (
+            self.exploration_parameters.exploration_bonus_limit
+        )
 
         self.inverse_model = self.InverseNetwork(
             node_features=node_features,
             edge_features=edge_features,
             actions=agent.actions,
-            architecture=exploration_parameters.inverse_model,
+            architecture=self.exploration_parameters.inverse_model,
             name=name + "_inverse_model",
             log_dir=None,
         )
@@ -53,7 +56,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
         self.random_network_distiller = RandomNetworkDistiller(
             node_features=node_features,
             edge_features=edge_features,
-            architecture=exploration_parameters.random_network_distiller,
+            architecture=self.exploration_parameters.random_network_distiller,
             name=name + "_distiller",
         )
         self.distiller_error_running_mean = self.RunningMean()
@@ -68,11 +71,6 @@ class EpisodicMemory(nn.Module, ExplorationModule):
         self.random_network_distiller.learn()
         self.inverse_model.learn(action, self.last_predicted_action)
 
-    def action_exploration(
-        self, action_function: Callable[[Any], int]
-    ) -> Callable[[Any], int]:
-        return action_function
-
     def compute_intrinsic_reward(self, current_state, next_state, action):
         self.last_predicted_action, current_state_embedding = self.inverse_model(
             current_state, next_state
@@ -82,6 +80,32 @@ class EpisodicMemory(nn.Module, ExplorationModule):
         return episodic_reward * th.clip(
             th.Tensor(exploration_bonus), 1, self.exploration_bonus_limit
         )
+
+    def get_state(self) -> Dict[str, Any]:
+        return {
+            "memory": pd.Series(self.memory).to_dict(),
+            "inverse_model": self.inverse_model.state_dict(),
+            "k_squared_distance_running_mean": self.k_squared_distance_running_mean.get_state(),
+            "random_network_distiller": self.random_network_distiller.state_dict(),
+            "distiller_error_running_mean": self.distiller_error_running_mean.get_state(),
+            "distiller_error_running_standard_deviation": self.distiller_error_running_standard_deviation.get_state(),
+            "last_predicted_action": self.last_predicted_action,
+        }
+
+    def load_state(self, state: Dict[str, Any]) -> None:
+        self.memory = deque(state["memory"].values())
+        self.inverse_model.load_state_dict(state["inverse_model"])
+        self.k_squared_distance_running_mean.load_state(
+            state["k_squared_distance_running_mean"]
+        )
+        self.random_network_distiller.load_state_dict(state["random_network_distiller"])
+        self.distiller_error_running_mean.load_state(
+            state["distiller_error_running_mean"]
+        )
+        self.distiller_error_running_standard_deviation.load_state(
+            state["distiller_error_running_standard_deviation"]
+        )
+        self.last_predicted_action = state["last_predicted_action"]
 
     def _episodic_reward(
         self, current_embedding: th.Tensor, denominator_constant: float = 1e-5
@@ -207,6 +231,16 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             self.running_sum += value_to_add
             self.running_count += 1
 
+        def get_state(self) -> Dict[str, Any]:
+            return {
+                "running_sum": self.running_sum,
+                "running_count": self.running_count,
+            }
+
+        def load_state(self, state: Dict[str, Any]) -> None:
+            self.running_sum = state["running_sum"]
+            self.running_count = state["running_count"]
+
     class RunningStandardDeviation:
         def __init__(self):
             self.running_sum: float = 0
@@ -224,3 +258,15 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             self.running_sum += value_to_add
             self.running_sum_of_squares += value_to_add**2
             self.running_count += 1
+
+        def get_state(self) -> Dict[str, Any]:
+            return {
+                "running_sum": self.running_sum,
+                "running_sum_of_squares": self.running_sum_of_squares,
+                "running_count": self.running_count,
+            }
+
+        def load_state(self, state: Dict[str, Any]):
+            self.running_sum = state["running_sum"]
+            self.running_sum_of_squares = state["running_sum_of_squares"]
+            self.running_count = state["running_count"]

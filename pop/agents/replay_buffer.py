@@ -104,11 +104,9 @@ class ReplayMemory(object):
             "memory": pd.DataFrame(self.memory).to_dict(),
         }
 
-    @staticmethod
-    def load(state_dict: dict) -> "ReplayMemory":
-        replay_memory = ReplayMemory(state_dict["architecture"])
-        replay_memory.buffer_length = state_dict["buffer_length"]
-        replay_memory.beta = state_dict["beta"]
+    def load_state(self, state_dict: dict) -> None:
+        self.buffer_length = state_dict["buffer_length"]
+        self.beta = state_dict["beta"]
 
         for idx, (priority, transition) in enumerate(
             zip(
@@ -116,6 +114,4 @@ class ReplayMemory(object):
                 state_dict["memory"]["transition"].values(),
             )
         ):
-            replay_memory.memory[idx] = (priority, transition)
-
-        return replay_memory
+            self.memory[idx] = (priority, transition)
