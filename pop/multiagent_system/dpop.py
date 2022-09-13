@@ -14,6 +14,7 @@ from pop.multiagent_system.base_pop import BasePOP
 from tqdm import tqdm
 
 from pop.multiagent_system.space_factorization import EncodedAction, Substation
+import psutil
 
 
 class DPOP(BasePOP):
@@ -28,7 +29,10 @@ class DPOP(BasePOP):
         tensorboard_dir: Optional[str] = None,
         device: Optional[str] = None,
     ):
-        ray.init(local_mode=False, num_cpus=8)
+        process = psutil.Process()
+        process.cpu_affinity(list(range(0, 15)))
+        print("Running on cores: " + str(process.cpu_affinity()))
+        ray.init(local_mode=False, num_cpus=len(process.cpu_affinity())*2)
         super(DPOP, self).__init__(
             env=env,
             name=name,

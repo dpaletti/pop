@@ -8,10 +8,15 @@ from pop.configs.agent_architecture import AgentArchitecture
 from dgl import DGLHeteroGraph
 import torch as th
 import ray
+import logging
+import warnings
+logging.getLogger("lightning").addHandler(logging.NullHandler())
+logging.getLogger("lightning").propagate = False
+
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
-# @ray.remote(num_cpus=2)
-@ray.remote
+@ray.remote(num_cpus=2, scheduling_strategy="SPREAD")
 class Manager(BaseGCNAgent):
     def __init__(
         self,

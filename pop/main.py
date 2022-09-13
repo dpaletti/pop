@@ -32,7 +32,15 @@ from pop.multiagent_system.dpop import DPOP
 from pop.multiagent_system.base_pop import train
 import pandas as pd
 
+import logging
+
+logging.getLogger("lightning").addHandler(logging.NullHandler())
+logging.getLogger("lightning").propagate = False
+
 warnings.filterwarnings("ignore", category=UserWarning)
+import ptvsd
+
+ptvsd.enable_attach("a not so secret secret", address=("131.175.120.196", 16008))
 
 
 class NoActionRedispReward(RedispReward):
@@ -194,7 +202,7 @@ def main(**kwargs):
         and Path(config.loading.load_dir).parents[0].exists()
         and len(list(Path(config.loading.load_dir).parents[0].iterdir())) > 0
     ):
-        print("Loading "+ config.model.name +" from " + config.loading.load_dir)
+        print("Loading " + config.model.name + " from " + config.loading.load_dir)
         agent = DPOP.load(
             log_file=config.loading.load_dir,
             env=env_train if config.training.train else env_val,
