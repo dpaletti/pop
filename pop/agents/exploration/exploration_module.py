@@ -22,6 +22,7 @@ class ExplorationModule(abc.ABC):
         observation: dgl.DGLHeteroGraph,
         next_observation: dgl.DGLHeteroGraph,
         action: int,
+        done: bool,
     ) -> float:
         return 0
 
@@ -49,7 +50,7 @@ class ExplorationModule(abc.ABC):
             stop_decay,
         ):
             intrinsic_reward = self.compute_intrinsic_reward(
-                observation, next_observation, action
+                observation, next_observation, action, done
             )
             return step_function(
                 observation,

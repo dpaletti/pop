@@ -71,7 +71,9 @@ class EpisodicMemory(nn.Module, ExplorationModule):
         self.random_network_distiller.learn()
         self.inverse_model.learn(action, self.last_predicted_action)
 
-    def compute_intrinsic_reward(self, current_state, next_state, action):
+    def compute_intrinsic_reward(self, current_state, next_state, action, done):
+        if done:
+            return 0
         self.last_predicted_action, current_state_embedding = self.inverse_model(
             current_state, next_state
         )
@@ -133,8 +135,10 @@ class EpisodicMemory(nn.Module, ExplorationModule):
 
     def _exploration_bonus(self, current_state: dgl.DGLHeteroGraph):
         distiller_error: th.Tensor = self.random_network_distiller(current_state)
-        self.distiller_error_running_mean.update(distiller_error.data)
-        self.distiller_error_running_standard_deviation.update(distiller_error.data)
+        self.distiller_error_running_mean.update(float(distiller_error.data))
+        self.distiller_error_running_standard_deviation.update(
+            float(distiller_error.data)
+        )
         return (
             (
                 1
@@ -148,7 +152,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
     def _inverse_kernel(self, x: np.array, y: np.array, epsilon: float = 1e-5) -> float:
         # x <- current_state_embedding as computed by the inverse model
         # y <- K nearest neighbors to x in M (all Ks, then the outputs of the kernels are summed)
-        squared_euclidean_distance = norm(x - y) ** 2
+        squared_euclidean_distance = float(norm(x - y) ** 2)
         self.k_squared_distance_running_mean.update(squared_euclidean_distance)
         return epsilon / (
             (squared_euclidean_distance / self.k_squared_distance_running_mean.value)
