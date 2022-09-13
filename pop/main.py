@@ -194,7 +194,7 @@ def main(**kwargs):
         and Path(config.loading.load_dir).parents[0].exists()
         and len(list(Path(config.loading.load_dir).parents[0].iterdir())) > 0
     ):
-        print("Loading model from last checkpoint...")
+        print("Loading "+ config.model.name +" from " + config.loading.load_dir)
         agent = DPOP.load(
             log_file=config.loading.load_dir,
             env=env_train if config.training.train else env_val,
@@ -218,14 +218,14 @@ def main(**kwargs):
         )
 
     if config.training.train:
-        print("Training...")
+        print("Training " + str(config.model.name))
         # yappi.set_clock_type("cpu")
         # yappi.start(builtins=True)
         train(env_train, iterations=config.training.steps, dpop=agent)
         # stats = yappi.get_func_stats()
         # stats.save("yappi_out", type="callgrind")
     else:
-        print("Evaluating...")
+        print("Evaluating " + str(config.model.name))
         evaluate(
             config=config,
             env=env_val,
