@@ -17,7 +17,7 @@ class ActionDetector:
         if self.loop_length < 1:
             return False
 
-       copied_action_graph_memory: nx.DiGraph = self.action_graph_memory.copy()
+        copied_action_graph_memory: nx.DiGraph = self.action_graph_memory.copy()
         copied_action_graph_memory.add_edge(self.last_action, action)
         if any(
             filter(
