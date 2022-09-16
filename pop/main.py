@@ -104,26 +104,26 @@ def evaluate(
     path_save: str,
     nb_episode: int = 1,
     nb_process: int = 1,
-    sequential: bool = False,
+    sequential: bool = True,
 ):
     if not Path(path_save).exists():
         Path(path_save).mkdir(parents=True, exist_ok=False)
+    if sequential:
+        os.environ[Runner.FORCE_SEQUENTIAL] = "1"
+        nb_process = 1
     if config.evaluation.compute_score:
         csv_path = Path(
             path_save, "l2rpn_2022_score_" + str(config.environment.difficulty) + ".csv"
         )
         if csv_path.exists():
             return pd.read_csv(csv_path)
-        score = ScoreL2RPN2022(env, nb_scenario=nb_episode, verbose=1)
+        score = ScoreL2RPN2022(env, nb_scenario=nb_episode, verbose=2)
         agent_score = score.get(agent)
         agent_score_df = pd.DataFrame(agent_score).transpose()
         agent_score_df.columns = ["all_scores", "ts_survived", "total_ts"]
         agent_score_df.to_csv(csv_path)
 
     if config.evaluation.generate_grid2viz_data:
-        if sequential:
-            os.environ[Runner.FORCE_SEQUENTIAL] = "1"
-            nb_process = 1
         params = env.get_params_for_runner()
         params["verbose"] = True
         runner = Runner(**params, agentInstance=agent, agentClass=None)
