@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional, List, Dict, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 import networkx as nx
 from grid2op.Converter import IdToAct
@@ -8,6 +8,7 @@ from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
 from pop.community_detection.community_detector import Community
+from pop.multiagent_system.fixed_set import FixedSet
 
 
 class LoggableModule:
@@ -138,7 +139,7 @@ class LoggableModule:
         best_action: int,
         best_action_str: str,
         head_manager_action: int,
-        manager_actions: Dict[Set[int], Tuple[int, int]],
+        manager_actions: Dict[FixedSet, Tuple[int, int]],
         agent_actions: Dict[int, int],
         train_steps: int,
     ) -> None:

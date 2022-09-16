@@ -1,25 +1,26 @@
+import copy
 from abc import ABC
 from dataclasses import asdict
-from typing import Optional, Tuple, List, Dict, Any, OrderedDict
+from random import choice
+from typing import Any, Dict, List, Optional, OrderedDict, Tuple
 
+import dgl
 import networkx as nx
+import psutil
+import torch as th
+import torch.nn as nn
+from agents.exploration.exploration_module import ExplorationModule
+from agents.exploration.exploration_module_factory import \
+    get_exploration_module
 from dgl import DGLHeteroGraph
 from grid2op.Observation import BaseObservation
 from torch import Tensor
 
-from agents.exploration.exploration_module import ExplorationModule
-from agents.exploration.exploration_module_factory import get_exploration_module
 from pop.agents.loggable_module import LoggableModule
 from pop.agents.replay_buffer import ReplayMemory, Transition
 from pop.configs.agent_architecture import AgentArchitecture
-from pop.networks.serializable_module import SerializableModule
 from pop.networks.dueling_net import DuelingNet
-import copy
-import torch as th
-import torch.nn as nn
-import dgl
-from random import choice
-import psutil
+from pop.networks.serializable_module import SerializableModule
 
 
 class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
@@ -173,10 +174,6 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         advantages: Tensor = self.q_network.advantage(transformed_observation)
         action = int(th.argmax(advantages).item())
         action = action
-        # TODO: implement a switch
-        # TODO: to turn on
-        # action = action if action != last_action else 0
-        # TODO: this policy helped a bit but it is not very elegant
         self.last_action = action
 
         return action

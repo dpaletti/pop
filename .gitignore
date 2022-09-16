@@ -8,6 +8,7 @@ README.rst
 .dir-locals.el
 .projectile
 .debugger_configs
+.pydocstyle
 
 # Testing Directories
 run_files/

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import toml
+
 from pop.configs.agent_architecture import AgentArchitecture
 from pop.configs.type_aliases import ParsedTOMLDict
 
@@ -17,6 +18,7 @@ class POPArchitecture:
     manager_history_size: int
     manager_initialization_half_life: int
     agent_type: str
+    disabled_action_loops_length: int
 
 
 @dataclass(frozen=True)

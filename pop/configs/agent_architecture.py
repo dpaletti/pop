@@ -1,7 +1,7 @@
 import abc
 from dataclasses import dataclass
 from functools import reduce
-from typing import Optional, ClassVar, List, Type, Any
+from typing import Any, ClassVar, List, Optional, Type
 
 from pop.configs.network_architecture import NetworkArchitecture
 from pop.configs.type_aliases import EventuallyNestedDict
@@ -9,8 +9,6 @@ from pop.configs.type_aliases import EventuallyNestedDict
 
 @dataclass(frozen=True)
 class ExplorationParameters(abc.ABC):
-    # WARNING: method attribute must be present in all children
-    # TODO: find a way to enforce this in a sane way, python 3.10 should be needed to do this cleanly
     def __init__(self, d: dict):
         ...
 

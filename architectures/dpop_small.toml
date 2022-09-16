@@ -8,6 +8,7 @@ enable_power_supply_modularity = true # rte community detection works only this 
 manager_history_size = 1e5
 manager_initialization_half_life = 26 # 2 * substations
 agent_type = "uniform"
+disabled_action_loops_length = 1
 
 [agent]
 embedding = "egat_architecture_small"

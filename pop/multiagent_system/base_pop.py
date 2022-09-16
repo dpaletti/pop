@@ -1,5 +1,4 @@
 import itertools
-import math
 import time
 from abc import abstractmethod
 from dataclasses import asdict
@@ -8,7 +7,6 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import dgl
 import networkx as nx
 import numpy as np
-import psutil
 import ray
 import torch as th
 from grid2op.Action import BaseAction
@@ -25,6 +23,7 @@ from pop.agents.ray_shallow_gcn_agent import RayShallowGCNAgent
 from pop.community_detection.community_detector import (Community,
                                                         CommunityDetector)
 from pop.configs.architecture import Architecture
+from pop.multiagent_system.action_detector import ActionDetector
 from pop.multiagent_system.fixed_set import FixedSet
 from pop.multiagent_system.space_factorization import (
     EncodedAction, HashableAction, Substation, factor_action_space,
@@ -60,12 +59,11 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         self.converter.seed(seed)
 
         # Setting the device
+        self.device: th.device
         if device is None:
-            self.device: th.device = th.device(
-                "cuda:0" if th.cuda.is_available() else "cpu"
-            )
+            self.device = th.device("cuda:0" if th.cuda.is_available() else "cpu")
         else:
-            self.device: th.device = th.device(device)
+            self.device = th.device(device)
 
         self.architecture: Architecture = architecture
 
@@ -96,7 +94,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         self.factored_observation: Optional[Dict[Substation, dgl.DGLHeteroGraph]] = None
         self.chosen_community: Optional[Community] = None
         self.chosen_node: Optional[int] = None
-        self.substation_to_encoded_action: Optional[Substation, EncodedAction] = None
+        self.substation_to_encoded_action: Optional[
+            Dict[Substation, EncodedAction]
+        ] = None
         self.old_graph: Optional[nx.Graph] = None
 
         # Agents
@@ -111,13 +111,13 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             env.observation_space, self.converter, self.env.n_sub
         )
 
-        self.substation_to_action_converter: Dict[
-            int, IdToAct
-        ] = self._get_substation_to_agent_mapping(substation_to_action_space)
+        self.substation_to_action_converter = self._get_substation_to_agent_mapping(
+            substation_to_action_space
+        )
 
         self.log_action_space_size(agent_converters=self.substation_to_action_converter)
 
-        self.substation_to_agent: Dict[int, Union[RayGCNAgent, RayShallowGCNAgent]] = {
+        self.substation_to_agent = {
             sub_id: RayGCNAgent.remote(
                 agent_actions=len(action_space),
                 architecture=self.architecture.agent,
@@ -136,7 +136,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         }
         # Managers
         self.community_to_manager: Optional[Dict[Community, Manager]] = None
-        self.managers_history: Dict[Manager, FixedSet[Community]] = {}
+        self.managers_history: Dict[Manager, FixedSet] = {}
         self.manager_initialization_threshold: int = 1
 
         # Community Detector Initialization
@@ -144,6 +144,11 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             seed, architecture.pop.enable_power_supply_modularity
         )
         self.communities: Optional[List[Community]] = None
+
+        self.action_detector: ActionDetector = ActionDetector(
+            n_actions=len(self.converter.all_actions),
+            loop_length=self.architecture.pop.disabled_action_loops_length,
+        )
 
     @abstractmethod
     def get_action(self, observation: dgl.DGLHeteroGraph) -> int:
@@ -200,9 +205,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         # Actions retrieved are encoded with local agent converters
         # need to be remapped to the global converter
-        self.substation_to_local_action: Dict[
-            Substation, int
-        ] = self._get_agent_actions(self.factored_observation)
+        self.substation_to_local_action = self._get_agent_actions(
+            self.factored_observation
+        )
 
         # Split graph into communities
         (
@@ -213,9 +218,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         )
 
         # Managers chooses the best substation for each community they handle
-        self.community_to_substation: Dict[
-            Community, Substation
-        ] = self._get_manager_actions(
+        self.community_to_substation = self._get_manager_actions(
             self.sub_graphs,
             self.substation_to_encoded_action,
             self.communities,
@@ -264,6 +267,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             train_steps=self.train_steps,
         )
 
+        if self.action_detector.is_repeated(self.chosen_action):
+            self.chosen_action = 0
         return self.chosen_action
 
     def convert_obs(
@@ -352,8 +357,6 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 new_communities=next_communities,
             )
 
-            # TODO: check if the logic here is correct
-            # TODO: this may inhibit managers from learning
             # Stop the decay of the managers whose action has been selected
             # In case no-action is selected multiple agents may have their decay stopped
             manager_stop_decay: Dict[Community, bool] = {
