@@ -1,9 +1,11 @@
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 import dgl
 import networkx as nx
+import psutil
 from grid2op.Environment import BaseEnv
 from ray.util.client import ray
+from tqdm import tqdm
 
 from pop.agents.manager import Manager
 from pop.agents.ray_gcn_agent import RayGCNAgent
@@ -11,10 +13,7 @@ from pop.agents.ray_shallow_gcn_agent import RayShallowGCNAgent
 from pop.community_detection.community_detector import Community
 from pop.configs.architecture import Architecture
 from pop.multiagent_system.base_pop import BasePOP
-from tqdm import tqdm
-
 from pop.multiagent_system.space_factorization import EncodedAction, Substation
-import psutil
 
 
 class DPOP(BasePOP):
@@ -32,7 +31,7 @@ class DPOP(BasePOP):
         process = psutil.Process()
         process.cpu_affinity(list(range(0, 15)))
         print("Running on cores: " + str(process.cpu_affinity()))
-        ray.init(local_mode=False, num_cpus=len(process.cpu_affinity())*2)
+        ray.init(local_mode=True, num_cpus=len(process.cpu_affinity()) * 2)
         super(DPOP, self).__init__(
             env=env,
             name=name,

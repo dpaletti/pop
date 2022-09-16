@@ -1,46 +1,35 @@
+import argparse
+import importlib
+import logging
+import os
+import random
+import warnings
 from pathlib import Path
+from typing import Optional, Union
+
+import dgl
+import grid2op.Environment
+import numpy as np
+import pandas as pd
+import torch as th
+from configs.run_config import RunConfiguration
 from grid2op import Environment
 from grid2op.Action import BaseAction
 from grid2op.Agent import BaseAgent
-from grid2op.Environment import BaseEnv
-from grid2op.Reward import (
-    CombinedScaledReward,
-    RedispReward,
-    IncreasingFlatReward,
-    AlarmReward,
-    CombinedReward,
-)
 from grid2op.Chronics import MultifolderWithCache
-from typing import Union, Optional
-import grid2op.Environment
+from grid2op.Environment import BaseEnv
+from grid2op.Reward import (AlarmReward, CombinedReward, CombinedScaledReward,
+                            IncreasingFlatReward, RedispReward)
 from grid2op.Runner import Runner
-import torch as th
-import random
-import numpy as np
-import dgl
-import os
-
 from grid2op.utils import ScoreL2RPN2022
 
-from configs.run_config import RunConfiguration
-import argparse
-import importlib
-
-import warnings
-
-from pop.multiagent_system.dpop import DPOP
 from pop.multiagent_system.base_pop import train
-import pandas as pd
-
-import logging
+from pop.multiagent_system.dpop import DPOP
 
 logging.getLogger("lightning").addHandler(logging.NullHandler())
 logging.getLogger("lightning").propagate = False
 
 warnings.filterwarnings("ignore", category=UserWarning)
-import ptvsd
-
-ptvsd.enable_attach("a not so secret secret", address=("131.175.120.196", 16008))
 
 
 class NoActionRedispReward(RedispReward):

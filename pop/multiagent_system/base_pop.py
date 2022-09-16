@@ -1,40 +1,35 @@
+import itertools
 import math
+import time
 from abc import abstractmethod
 from dataclasses import asdict
-from typing import Optional, List, Tuple, Dict, Union, Any
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dgl
 import networkx as nx
+import numpy as np
+import psutil
+import ray
+import torch as th
 from grid2op.Action import BaseAction
 from grid2op.Agent import AgentWithConverter
 from grid2op.Converter import IdToAct
 from grid2op.Environment import BaseEnv
-import torch as th
 from grid2op.Observation import BaseObservation
-
 from tqdm import tqdm
 
+from pop.agents.loggable_module import LoggableModule
 from pop.agents.manager import Manager
 from pop.agents.ray_gcn_agent import RayGCNAgent
 from pop.agents.ray_shallow_gcn_agent import RayShallowGCNAgent
-from pop.community_detection.community_detector import CommunityDetector, Community
+from pop.community_detection.community_detector import (Community,
+                                                        CommunityDetector)
 from pop.configs.architecture import Architecture
 from pop.multiagent_system.fixed_set import FixedSet
 from pop.multiagent_system.space_factorization import (
-    factor_action_space,
-    HashableAction,
-    factor_observation,
-    split_graph_into_communities,
-    Substation,
-    EncodedAction,
-)
+    EncodedAction, HashableAction, Substation, factor_action_space,
+    factor_observation, split_graph_into_communities)
 from pop.networks.serializable_module import SerializableModule
-from pop.agents.loggable_module import LoggableModule
-import ray
-import itertools
-import numpy as np
-import time
-import psutil
 
 
 class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
@@ -237,9 +232,10 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         # The head manager chooses the best action from every community given the summarized graph
         self.chosen_node = self.get_action(self.summarized_graph)
-
-        # Retrieve the chosen_action given the chosen_community
         self.chosen_action = graph.nodes[self.chosen_node]["action"]
+        self.chosen_community = next(
+            filter(lambda community: self.chosen_node in community, self.communities)
+        )
 
         # Log to Tensorboard
         self.log_system_behaviour(
@@ -356,6 +352,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 new_communities=next_communities,
             )
 
+            # TODO: check if the logic here is correct
+            # TODO: this may inhibit managers from learning
             # Stop the decay of the managers whose action has been selected
             # In case no-action is selected multiple agents may have their decay stopped
             manager_stop_decay: Dict[Community, bool] = {
