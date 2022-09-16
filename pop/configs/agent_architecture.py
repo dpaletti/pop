@@ -251,13 +251,7 @@ class AgentArchitecture:
         ]
         if exploration_method is None:
             raise Exception(
-                "Invalid method in exploration_section (may be missing): "
-                + str(
-                    [
-                        subclass.get_method()
-                        for subclass in available_exploration_methods
-                    ]
-                )
+                "Missing Exploration method."
                 + "\nAvailable methods are: "
                 + str(available_exploration_methods)
             )

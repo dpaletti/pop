@@ -11,6 +11,12 @@ from torch import Tensor
 from pop.agents.base_gcn_agent import BaseGCNAgent
 from pop.configs.agent_architecture import AgentArchitecture
 
+from dgl import DGLHeteroGraph
+import torch as th
+import ray
+import logging
+import warnings
+
 logging.getLogger("lightning").addHandler(logging.NullHandler())
 logging.getLogger("lightning").propagate = False
 

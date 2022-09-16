@@ -9,6 +9,9 @@ from pop.agents.base_gcn_agent import BaseGCNAgent
 from pop.configs.agent_architecture import AgentArchitecture
 from pop.networks.dueling_net import DuelingNet
 
+import logging
+import warnings
+
 logging.getLogger("lightning").addHandler(logging.NullHandler())
 logging.getLogger("lightning").propagate = False
 

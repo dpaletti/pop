@@ -99,6 +99,7 @@ class SerializableModule(ABC):
             checkpoint_to_load = SerializableModule._add_counter_to_file_path(
                 log_file, last_saved_checkpoint
             )
+            print("Loaded Last Checkpoint: " + str(checkpoint_to_load))
             while last_saved_checkpoint >= 0:
                 try:
                     return th.load(checkpoint_to_load)
