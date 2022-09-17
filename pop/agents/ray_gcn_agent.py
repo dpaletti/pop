@@ -18,7 +18,7 @@ logging.getLogger("lightning").propagate = False
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-@ray.remote(num_cpus=0.5, scheduling_strategy="SPREAD")
+@ray.remote(num_cpus=1)
 class RayGCNAgent(BaseGCNAgent):
     def __init__(
         self,

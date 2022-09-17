@@ -18,8 +18,13 @@ from grid2op.Action import BaseAction
 from grid2op.Agent import BaseAgent
 from grid2op.Chronics import MultifolderWithCache
 from grid2op.Environment import BaseEnv
-from grid2op.Reward import (AlarmReward, CombinedReward, CombinedScaledReward,
-                            IncreasingFlatReward, RedispReward)
+from grid2op.Reward import (
+    AlarmReward,
+    CombinedReward,
+    CombinedScaledReward,
+    IncreasingFlatReward,
+    RedispReward,
+)
 from grid2op.Runner import Runner
 from grid2op.utils import ScoreL2RPN2022
 
@@ -108,16 +113,20 @@ def evaluate(
 ):
     if not Path(path_save).exists():
         Path(path_save).mkdir(parents=True, exist_ok=False)
-    if sequential:
-        os.environ[Runner.FORCE_SEQUENTIAL] = "1"
-        nb_process = 1
+
+    os.environ[Runner.FORCE_SEQUENTIAL] = "1"
+    nb_process = 1
+
     if config.evaluation.compute_score:
         csv_path = Path(
             path_save, "l2rpn_2022_score_" + str(config.environment.difficulty) + ".csv"
         )
         if csv_path.exists():
             return pd.read_csv(csv_path)
-        score = ScoreL2RPN2022(env, nb_scenario=nb_episode, verbose=2)
+        print("Created Directory: " + str(csv_path))
+        score = ScoreL2RPN2022(
+            env, nb_scenario=nb_episode, verbose=2, nb_process_stats=nb_process
+        )
         agent_score = score.get(agent)
         agent_score_df = pd.DataFrame(agent_score).transpose()
         agent_score_df.columns = ["all_scores", "ts_survived", "total_ts"]
