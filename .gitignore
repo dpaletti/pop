@@ -11,7 +11,6 @@ README.rst
 .pydocstyle
 
 # Testing Directories
-run_files/
 profiling/
 test_data/
 tests/
