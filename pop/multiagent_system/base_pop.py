@@ -20,14 +20,18 @@ from pop.agents.loggable_module import LoggableModule
 from pop.agents.manager import Manager
 from pop.agents.ray_gcn_agent import RayGCNAgent
 from pop.agents.ray_shallow_gcn_agent import RayShallowGCNAgent
-from pop.community_detection.community_detector import (Community,
-                                                        CommunityDetector)
+from pop.community_detection.community_detector import Community, CommunityDetector
 from pop.configs.architecture import Architecture
 from pop.multiagent_system.action_detector import ActionDetector
 from pop.multiagent_system.fixed_set import FixedSet
 from pop.multiagent_system.space_factorization import (
-    EncodedAction, HashableAction, Substation, factor_action_space,
-    factor_observation, split_graph_into_communities)
+    EncodedAction,
+    HashableAction,
+    Substation,
+    factor_action_space,
+    factor_observation,
+    split_graph_into_communities,
+)
 from pop.networks.serializable_module import SerializableModule
 
 
@@ -337,10 +341,16 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
             # Stop the decay of the agent whose action has been selected
             # In case no-action is selected multiple agents may have their decay stopped
-            agents_stop_decay: Dict[Substation, bool] = {
-                sub_id: False if agent_action == self.chosen_action else True
-                for sub_id, agent_action in self.substation_to_encoded_action.items()
-            }
+            agents_stop_decay: Dict[Substation, bool] = (
+                {
+                    sub_id: False if agent_action == self.chosen_action else True
+                    for sub_id, agent_action in self.substation_to_encoded_action.items()
+                }
+                if self.architecture.pop.epsilon_beta_scheduling
+                else {
+                    sub_id: False for sub_id in self.substation_to_encoded_action.keys()
+                }
+            )
 
             # Query agents for action
             next_substation_to_local_actions: Dict[
@@ -359,10 +369,16 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
             # Stop the decay of the managers whose action has been selected
             # In case no-action is selected multiple agents may have their decay stopped
-            manager_stop_decay: Dict[Community, bool] = {
-                community: False if community == self.chosen_community else True
-                for community, _ in self.community_to_manager.items()
-            }
+            manager_stop_decay: Dict[Community, bool] = (
+                {
+                    community: False if community == self.chosen_community else True
+                    for community in self.community_to_manager.keys()
+                }
+                if self.architecture.pop.epsilon_beta_scheduling
+                else {
+                    community: False for community in self.community_to_manager.keys()
+                }
+            )
 
             # Children may add needed functionalities to the step function by extending extra_step
             self._extra_step(
@@ -610,7 +626,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
     @staticmethod
     def exponential_decay(initial_value: float, half_life: float, t: float):
-        return initial_value * 2 ** (-t / half_life)
+        return initial_value * 2 ** (-t / half_life) if half_life != 0 else 0
 
     def _initialize_new_manager(
         self, new_communities: List[Community]

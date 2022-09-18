@@ -3,15 +3,15 @@ import networkx as nx
 
 class ActionDetector:
     def __init__(self, n_actions: int, loop_length: int = 1):
-        if loop_length < 1:
+        self.loop_length: int = loop_length
+        if self.loop_length < 1:
             return
+
         self.action_graph_memory: nx.DiGraph = nx.DiGraph()
         self.action_graph_memory.add_nodes_from(list(range(n_actions)))
         self.action_graph_memory.add_node(-1)
 
         self.last_action: int = -1
-
-        self.loop_length: int = loop_length
 
     def is_repeated(self, action: int) -> bool:
         if self.loop_length < 1:

@@ -16,6 +16,23 @@
         "request": "launch",
         "name": "dpop_rte_curiosity"
     },
+
+        {
+        "type": "python",
+        "args": "--run-file ./run_files/dpop_simple.toml",
+        "cwd" : "${workspaceFolder}",
+        "target-module": "pop/main.py",
+        "request": "launch",
+        "name": "dpop_simple"
+    },
+        {
+        "type": "python",
+        "args": "--run-file ./run_files/dpop_rte_1e4_load.toml",
+        "cwd" : "${workspaceFolder}",
+        "target-module": "pop/main.py",
+        "request": "launch",
+        "name": "dpop_load"
+    },
         {
         "name": "Python: Attach",
         "type": "python",

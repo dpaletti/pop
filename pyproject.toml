@@ -25,6 +25,7 @@ numexpr = "^2.8.3"
 pylru = "^1.2.1"
 pandas = "1.0.3"
 networkx = "2.6.2"
+numpy = "1.19.5"
 
 [tool.poetry.dev-dependencies]
 

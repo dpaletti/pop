@@ -3,9 +3,9 @@ seed = 0
 device = "cpu"
 
 [model]
-name = "dpop_rte"
-architecture_path = "../architectures/dpop_small.toml"
-data_dir = "../test_data"
+name = "dpop_simple"
+architecture_path = "./architectures/dpop_simple.toml"
+data_dir = "./test_data"
 checkpoint_dir = "<<model_data_dir>>/pop_runs/checkpoint/<<model_name>>"
 
 [training]
