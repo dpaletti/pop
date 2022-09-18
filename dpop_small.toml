@@ -1,0 +1,85 @@
+[pop]
+node_features = 6
+edge_features = 14
+agent_neighbourhood_radius = 1
+decentralized = false
+epsilon_beta_scheduling = true
+enable_power_supply_modularity = true # rte community detection works only this way
+manager_history_size = 1e5
+manager_initialization_half_life = 26 # 2 * substations
+agent_type = "uniform"
+
+[agent]
+embedding = "egat_architecture_small"
+advantage_stream = "advantage_stream_small"
+value_stream = "value_stream_small"
+learning_rate = 1e-2
+learning_frequency = 4
+target_network_weight_replace_steps = 500
+gamma = 0.99
+huber_loss_delta = 1.0
+batch_size = 4
+
+
+[agent.exploration]
+method = "epsilon greedy"
+max_epsilon = 1.0
+min_epsilon = 0.01
+epsilon_decay = 200
+
+[agent.replay_memory]
+alpha = 0.5
+max_beta = 1.0
+min_beta = 0.0
+beta_decay = 200
+capacity = 1000
+
+[manager]
+embedding = "egat_architecture_very_small"
+advantage_stream = "advantage_stream_small"
+value_stream = "value_stream_small"
+learning_rate = 1e-2
+learning_frequency = 4
+target_network_weight_replace_steps = 500
+gamma = 0.99
+huber_loss_delta = 1.0
+batch_size = 4
+
+[manager.exploration]
+method = "epsilon greedy"
+max_epsilon = 1.0
+min_epsilon = 0.01
+epsilon_decay = 200
+
+[manager.replay_memory]
+alpha = 0.5
+max_beta = 1.0
+min_beta = 0.0
+beta_decay = 200
+capacity = 1000
+
+[head_manager]
+embedding = "gat_architecture_small"
+advantage_stream = "advantage_stream_small"
+value_stream = "value_stream_small"
+learning_rate = 1e-2
+learning_frequency = 4
+target_network_weight_replace_steps = 500
+gamma = 0.99
+huber_loss_delta = 1.0
+batch_size = 4
+
+[head_manager.exploration]
+method = "epsilon greedy"
+max_epsilon = 1.0
+min_epsilon = 0.01
+epsilon_decay = 200
+
+[head_manager.replay_memory]
+alpha = 0.5
+max_beta = 1.0
+min_beta = 0.0
+beta_decay = 200
+capacity = 1000
+
+

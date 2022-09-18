@@ -1,0 +1,5 @@
+frame = "inverse_action_stream_frame"
+
+[linear1]
+out_features = 64
+bias = true

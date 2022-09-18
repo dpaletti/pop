@@ -23,7 +23,7 @@ logging.getLogger("lightning").propagate = False
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-@ray.remote(num_cpus=2)
+@ray.remote(num_cpus=1)
 class Manager(BaseGCNAgent):
     def __init__(
         self,

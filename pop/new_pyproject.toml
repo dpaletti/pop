@@ -8,12 +8,13 @@ authors = ["dpaletti <danielepaletti98@gmail.com>"]
 python = ">=3.7, <3.10"
 Grid2Op = "^1.7.2"
 torch = "^1.11.0"
-prettytable = "^2.2.0"
+networkx = "2.4"
+prettytable = "^3.2.0"
 # DGL needs to be installed separately
 # dgl = {url = "https://data.dgl.ai/wheels/dgl-0.8.1-cp39-cp39-manylinux1_x86_64.whl", platform = "linux"}
 # dglgo = "^0.0.1"
 numba = "^0.55.1"
-scipy = "1.7.0"
+scipy = "^1.7.0"
 matplotlib = "^3.5.1"
 tensorboard = "^2.8.0"
 joblib = "^1.1.0"
@@ -23,8 +24,6 @@ dm-tree = "^0.1.7"
 pydantic = "^1.9.1"
 numexpr = "^2.8.3"
 pylru = "^1.2.1"
-pandas = "1.0.3"
-networkx = "2.6.2"
 
 [tool.poetry.dev-dependencies]
 
@@ -34,3 +33,4 @@ main = "pop.main:main"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+

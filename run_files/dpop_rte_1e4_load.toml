@@ -30,3 +30,4 @@ name = "rte_case14_realistic"
 difficulty = 0
 
 [environment.reward]
+Experimental = 1
