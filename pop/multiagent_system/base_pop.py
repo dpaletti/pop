@@ -145,7 +145,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         # Community Detector Initialization
         self.community_detector = CommunityDetector(
-            seed, architecture.pop.enable_power_supply_modularity
+            seed,
+            enable_power_supply_modularity=architecture.pop.enable_power_supply_modularity,
         )
         self.communities: Optional[List[Community]] = None
 
