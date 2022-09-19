@@ -36,6 +36,8 @@ logging.getLogger("lightning").propagate = False
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
+PER_PROCESS_GPU_MEMORY_FRACTION = 1e-4
+
 
 class NoActionRedispReward(RedispReward):
     def __init__(self, logger=None):
@@ -154,6 +156,7 @@ def fix_seed(env_train: BaseEnv, env_val: BaseEnv, seed: int = 0):
 def main(**kwargs):
 
     config = RunConfiguration(kwargs["run_file"])
+    th.cuda.memory.set_per_process_memory_fraction(PER_PROCESS_GPU_MEMORY_FRACTION)
 
     print(
         "Running with env: "

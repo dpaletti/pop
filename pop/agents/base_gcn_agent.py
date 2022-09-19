@@ -10,8 +10,7 @@ import psutil
 import torch as th
 import torch.nn as nn
 from agents.exploration.exploration_module import ExplorationModule
-from agents.exploration.exploration_module_factory import \
-    get_exploration_module
+from agents.exploration.exploration_module_factory import get_exploration_module
 from dgl import DGLHeteroGraph
 from grid2op.Observation import BaseObservation
 from torch import Tensor
@@ -74,8 +73,8 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
             value_stream_architecture=architecture.value_stream,
             name=name + "_dueling",
             log_dir=None,
-        )
-        self.target_network: DuelingNet = copy.deepcopy(self.q_network)
+        ).to(self.device)
+        self.target_network: DuelingNet = copy.deepcopy(self.q_network).to(self.device)
 
         # Logging
         self.train_steps: int = 0

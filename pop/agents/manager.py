@@ -17,13 +17,17 @@ import ray
 import logging
 import warnings
 
+from pop.main import PER_PROCESS_GPU_MEMORY_FRACTION
+
 logging.getLogger("lightning").addHandler(logging.NullHandler())
 logging.getLogger("lightning").propagate = False
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-@ray.remote(num_cpus=1, num_gpus=0 if not th.cuda.is_available() else 1)
+@ray.remote(
+    num_gpus=0 if not th.cuda.is_available() else PER_PROCESS_GPU_MEMORY_FRACTION,
+)
 class Manager(BaseGCNAgent):
     def __init__(
         self,
@@ -54,7 +58,7 @@ class Manager(BaseGCNAgent):
         return self.embedding_size
 
     def get_node_embeddings(self, transformed_observation: DGLHeteroGraph) -> Tensor:
-        return self.q_network.embedding(transformed_observation)
+        return self.q_network.embedding(transformed_observation.to(self.device))
 
     def _take_action(
         self, transformed_observation: DGLHeteroGraph, mask: List[int] = None

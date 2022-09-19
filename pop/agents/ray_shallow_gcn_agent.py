@@ -8,8 +8,10 @@ from ray import ObjectRef
 from pop.agents.base_gcn_agent import BaseGCNAgent
 from pop.configs.agent_architecture import AgentArchitecture
 
+from pop.main import PER_PROCESS_GPU_MEMORY_FRACTION
 
-@ray.remote
+
+@ray.remote(gpu=PER_PROCESS_GPU_MEMORY_FRACTION * 1e-2)
 class RayShallowGCNAgent(BaseGCNAgent):
     def __init__(
         self,

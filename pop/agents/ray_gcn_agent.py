@@ -13,13 +13,17 @@ from pop.networks.dueling_net import DuelingNet
 import logging
 import warnings
 
+from pop.main import PER_PROCESS_GPU_MEMORY_FRACTION
+
 logging.getLogger("lightning").addHandler(logging.NullHandler())
 logging.getLogger("lightning").propagate = False
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-@ray.remote(num_cpus=1, num_gpus=0 if not th.cuda.is_available() else 1)
+@ray.remote(
+    num_gpus=0 if not th.cuda.is_available() else PER_PROCESS_GPU_MEMORY_FRACTION,
+)
 class RayGCNAgent(BaseGCNAgent):
     def __init__(
         self,
