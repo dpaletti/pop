@@ -22,6 +22,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 
 @ray.remote(
+    num_cpus=0.5,
     num_gpus=0 if not th.cuda.is_available() else PER_PROCESS_GPU_MEMORY_FRACTION,
 )
 class RayGCNAgent(BaseGCNAgent):

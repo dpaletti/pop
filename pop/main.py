@@ -155,6 +155,7 @@ def fix_seed(env_train: BaseEnv, env_val: BaseEnv, seed: int = 0):
 def main(**kwargs):
 
     config = RunConfiguration(kwargs["run_file"])
+
     if th.cuda.is_available():
         th.cuda.memory.set_per_process_memory_fraction(PER_PROCESS_GPU_MEMORY_FRACTION)
 
