@@ -17,7 +17,7 @@ import ray
 import logging
 import warnings
 
-from pop.main import PER_PROCESS_GPU_MEMORY_FRACTION
+from pop.constants import PER_PROCESS_GPU_MEMORY_FRACTION
 
 logging.getLogger("lightning").addHandler(logging.NullHandler())
 logging.getLogger("lightning").propagate = False

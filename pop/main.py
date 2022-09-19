@@ -30,13 +30,12 @@ from grid2op.utils import ScoreL2RPN2022
 
 from pop.multiagent_system.base_pop import train
 from pop.multiagent_system.dpop import DPOP
+from pop.constants import PER_PROCESS_GPU_MEMORY_FRACTION
 
 logging.getLogger("lightning").addHandler(logging.NullHandler())
 logging.getLogger("lightning").propagate = False
 
 warnings.filterwarnings("ignore", category=UserWarning)
-
-PER_PROCESS_GPU_MEMORY_FRACTION = 1e-4
 
 
 class NoActionRedispReward(RedispReward):
@@ -156,7 +155,8 @@ def fix_seed(env_train: BaseEnv, env_val: BaseEnv, seed: int = 0):
 def main(**kwargs):
 
     config = RunConfiguration(kwargs["run_file"])
-    th.cuda.memory.set_per_process_memory_fraction(PER_PROCESS_GPU_MEMORY_FRACTION)
+    if th.cuda.is_available():
+        th.cuda.memory.set_per_process_memory_fraction(PER_PROCESS_GPU_MEMORY_FRACTION)
 
     print(
         "Running with env: "
