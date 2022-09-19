@@ -226,7 +226,12 @@ def main(**kwargs):
         print("Training " + str(config.model.name))
         # yappi.set_clock_type("cpu")
         # yappi.start(builtins=True)
-        train(env_train, iterations=config.training.steps, dpop=agent)
+        train(
+            env_train,
+            iterations=config.training.steps,
+            dpop=agent,
+            save_frequency=config.training.save_frequency,
+        )
         # stats = yappi.get_func_stats()
         # stats.save("yappi_out", type="callgrind")
     else:

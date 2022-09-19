@@ -51,6 +51,7 @@ class TrainingParameters:
     tensorboard_dir: str
     curriculum: bool
     reset_decay: bool
+    save_frequency: int
 
 
 @dataclass(frozen=True)

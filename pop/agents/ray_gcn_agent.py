@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 
 import ray
 from ray import ObjectRef
+import torch as th
 
 from pop.agents.base_gcn_agent import BaseGCNAgent
 from pop.configs.agent_architecture import AgentArchitecture
@@ -18,7 +19,7 @@ logging.getLogger("lightning").propagate = False
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-@ray.remote(num_cpus=1)
+@ray.remote(num_cpus=1, num_gpus=0 if not th.cuda.is_available() else 1)
 class RayGCNAgent(BaseGCNAgent):
     def __init__(
         self,

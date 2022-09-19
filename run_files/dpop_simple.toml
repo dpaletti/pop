@@ -14,6 +14,7 @@ train = true
 tensorboard_dir = "<<model_data_dir>>/pop_runs/tensorboard/<<model_name>>"
 curriculum = false
 reset_decay = true
+save_frequency = 3600
 
 
 [evaluation]
