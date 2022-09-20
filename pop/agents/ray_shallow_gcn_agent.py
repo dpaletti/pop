@@ -9,9 +9,13 @@ from pop.agents.base_gcn_agent import BaseGCNAgent
 from pop.configs.agent_architecture import AgentArchitecture
 
 from pop.constants import PER_PROCESS_GPU_MEMORY_FRACTION
+import torch as th
 
 
-@ray.remote(num_cpus=0.1, num_gpus=PER_PROCESS_GPU_MEMORY_FRACTION * 1e-2)
+@ray.remote(
+    num_cpus=0.1,
+    num_gpus=PER_PROCESS_GPU_MEMORY_FRACTION * 1e-2 if th.cuda.is_available() else 0,
+)
 class RayShallowGCNAgent(BaseGCNAgent):
     def __init__(
         self,
@@ -43,6 +47,9 @@ class RayShallowGCNAgent(BaseGCNAgent):
             "name": self.name,
             "device": self.device,
         }
+
+    def get_exploration_logs(self) -> Dict[str, Any]:
+        return {}
 
     def get_name(self) -> str:
         return self.name

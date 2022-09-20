@@ -35,6 +35,10 @@ class ExplorationModule(abc.ABC):
     def load_state(state: Dict[str, Any]):
         ...
 
+    @abc.abstractmethod
+    def get_state_to_log(self) -> Dict[str, Any]:
+        ...
+
     def apply_intrinsic_reward(
         self,
         step_function: Callable,

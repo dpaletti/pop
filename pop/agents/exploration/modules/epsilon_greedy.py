@@ -19,6 +19,7 @@ class EpsilonGreedy(ExplorationModule):
         self.exponential_half_life = int(self.exploration_parameters.epsilon_decay)
         self.decay_steps = 0
         self.number_of_actions = agent.actions
+        self.epsilon: float = 0
 
     def update(self, *args, **kwargs) -> None:
         self.decay_steps += 1
@@ -29,11 +30,12 @@ class EpsilonGreedy(ExplorationModule):
             action_list = list(range(self.number_of_actions))
             mask: Optional[List[int]] = kwargs.get("mask")
 
-            if np.random.rand() <= self._exponential_decay(
+            self.epsilon = self._exponential_decay(
                 self.max_epsilon,
                 self.min_epsilon,
                 self.exponential_half_life,
-            ):
+            )
+            if np.random.rand() <= self.epsilon:
                 return np.random.choice(
                     action_list,
                     p=[1 / len(mask) if action in mask else 0 for action in action_list]
@@ -52,3 +54,6 @@ class EpsilonGreedy(ExplorationModule):
 
     def load_state(self, state: Dict[str, Any]) -> None:
         self.decay_steps = state["decay_steps"]
+
+    def get_state_to_log(self) -> Dict[str, Any]:
+        return {"epsilon": self.epsilon}

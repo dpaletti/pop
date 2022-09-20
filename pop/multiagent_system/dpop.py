@@ -73,6 +73,13 @@ class DPOP(BasePOP):
                 )
             )
         )
+
+        self.log_exploration(
+            "head_manager",
+            ray.get(self.head_manager.get_exploration_logs.remote()),
+            self.train_steps,
+        )
+
         return chosen_node
 
     def _extra_step(

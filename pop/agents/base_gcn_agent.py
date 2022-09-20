@@ -101,6 +101,9 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
 
         self.exploration: ExplorationModule = get_exploration_module(self)
 
+    def get_exploration_logs(self) -> Dict[str, Any]:
+        return self.exploration.get_state_to_log()
+
     def get_name(self):
         return self.name
 

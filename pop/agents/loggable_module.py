@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple
 
 import networkx as nx
 from grid2op.Converter import IdToAct
@@ -7,7 +7,6 @@ from matplotlib import pyplot as plt
 from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
-from pop.community_detection.community_detector import Community
 from pop.multiagent_system.fixed_set import FixedSet
 
 
@@ -93,7 +92,7 @@ class LoggableModule:
                 "Agent Loss/Agent " + str(idx), loss, agent_learning_steps
             )
 
-    def log_communities(self, communities: List[Community], train_steps: int):
+    def log_communities(self, communities: List[FixedSet], train_steps: int):
         if not self.is_logging_active():
             return
         self.writer.add_text("Communities/POP", str(communities), train_steps)
@@ -139,8 +138,10 @@ class LoggableModule:
         best_action: int,
         best_action_str: str,
         head_manager_action: int,
-        manager_actions: Dict[FixedSet, Tuple[int, int]],
-        agent_actions: Dict[int, int],
+        manager_actions: Dict[FrozenSet, Tuple[Set, str]],
+        agent_actions: Dict[str, int],
+        manager_explorations: Dict[str, Dict[str, Any]],
+        agent_explorations: Dict[str, Dict[str, Any]],
         train_steps: int,
     ) -> None:
         if not self.is_logging_active():
@@ -162,6 +163,23 @@ class LoggableModule:
             agent_actions=agent_actions,
             train_steps=train_steps,
         )
+
+        self.log_multiple_explorations(manager_explorations, train_steps)
+        self.log_multiple_explorations(agent_explorations, train_steps)
+
+    def log_multiple_explorations(
+        self, exploration_states: Dict[str, Dict[str, Any]], train_steps: int
+    ):
+        for name, exploration_state in exploration_states.items():
+            self.log_exploration(name, exploration_state, train_steps)
+
+    def log_exploration(
+        self, name: str, exploration_state: Dict[str, Any], train_steps: int
+    ):
+        if not self.is_logging_active():
+            return
+        for section, value in exploration_state.items():
+            self.writer.add_scalar(section + "/" + name, value, train_steps)
 
     def _write_histogram_to_tensorboard(
         self, to_plot: list, tag: str, train_steps: int
@@ -186,12 +204,12 @@ class LoggableModule:
         )
 
     def log_managers_behaviour(
-        self, actions_communities: Dict[Set[int], Tuple[int, int]], train_steps: int
+        self, actions_communities: Dict[Set[int], Tuple[int, str]], train_steps: int
     ):
         community_manager_str = ""
-        for community, (action, manager_idx) in actions_communities.items():
+        for community, (action, manager_name) in actions_communities.items():
             self.writer.add_scalar(
-                "Manager Action/" + str(manager_idx),
+                "Manager Action/" + str(manager_name),
                 action,
                 train_steps,
             )
@@ -199,7 +217,7 @@ class LoggableModule:
                 "Community: "
                 + str(community)
                 + " is managed by "
-                + str(manager_idx)
+                + str(manager_name)
                 + "\n"
             )
         self.writer.add_text(

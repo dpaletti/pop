@@ -245,29 +245,64 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             filter(lambda community: self.chosen_node in community, self.communities)
         )
 
+        manager_names: List[str] = ray.get(
+            [
+                manager.get_name.remote()
+                for manager in list(self.community_to_manager.values())
+            ]
+        )
+        community_to_names: Dict[Community, str] = {
+            community: "_".join(manager_names[idx].split("_")[0:2])
+            for idx, community in enumerate(list(self.community_to_manager.keys()))
+        }
+
+        agent_names: List[str] = ray.get(
+            [
+                agent.get_name.remote()
+                for agent in list(self.substation_to_agent.values())
+            ]
+        )
+        substation_to_names: Dict[Substation, str] = {
+            substation: "_".join(agent_names[idx].split("_")[0:2])
+            for idx, substation in enumerate(list(self.substation_to_agent.keys()))
+        }
+
         # Log to Tensorboard
         self.log_system_behaviour(
             best_action=self.chosen_action,
             best_action_str=str(self.converter.all_actions[self.chosen_action]),
             head_manager_action=self.chosen_node,
             manager_actions={
-                community: (
-                    action,
-                    "_".join(
-                        ray.get(
-                            self.community_to_manager[community].get_name.remote()
-                        ).split("_")[0:2]
-                    ),
-                )
+                community: (action, community_to_names[community])
                 for community, action in self.community_to_substation.items()
             },
             agent_actions={
-                "_".join(
-                    ray.get(self.substation_to_agent[sub_id].get_name.remote()).split(
-                        "_"
-                    )[0:2]
-                ): action
+                substation_to_names[sub_id]: action
                 for sub_id, action in self.substation_to_local_action.items()
+            },
+            manager_explorations={
+                name: exploration_state
+                for name, exploration_state in zip(
+                    manager_names,
+                    ray.get(
+                        [
+                            manager.get_exploration_logs.remote()
+                            for manager in self.community_to_manager.values()
+                        ]
+                    ),
+                )
+            },
+            agent_explorations={
+                name: exploration_state
+                for name, exploration_state in zip(
+                    agent_names,
+                    ray.get(
+                        [
+                            agent.get_exploration_logs.remote()
+                            for agent in self.substation_to_agent.values()
+                        ]
+                    ),
+                )
             },
             train_steps=self.train_steps,
         )

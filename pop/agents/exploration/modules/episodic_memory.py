@@ -65,6 +65,8 @@ class EpisodicMemory(nn.Module, ExplorationModule):
         )
 
         self.last_predicted_action: Optional[th.Tensor] = None
+        self.episodic_reward: float = 0
+        self.explration_bonus: float = 0
 
     def update(self, action: int) -> None:
 
@@ -77,10 +79,10 @@ class EpisodicMemory(nn.Module, ExplorationModule):
         self.last_predicted_action, current_state_embedding = self.inverse_model(
             current_state, next_state
         )
-        episodic_reward = self._episodic_reward(current_state_embedding)
-        exploration_bonus = self._exploration_bonus(current_state)
-        return episodic_reward * th.clip(
-            th.Tensor(exploration_bonus), 1, self.exploration_bonus_limit
+        self.episodic_reward = self._episodic_reward(current_state_embedding)
+        self.exploration_bonus = self._exploration_bonus(current_state)
+        return self.episodic_reward * th.clip(
+            th.Tensor(self.exploration_bonus), 1, self.exploration_bonus_limit
         )
 
     def get_state(self) -> Dict[str, Any]:
@@ -108,6 +110,13 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             state["distiller_error_running_standard_deviation"]
         )
         self.last_predicted_action = state["last_predicted_action"]
+
+    def get_state_to_log(self) -> Dict[str, Any]:
+        return {
+            "episodic_reward": self.episodic_reward,
+            "exploration_bonus": self.exploration_bonus,
+            "inverse_action": self.last_predicted_action,
+        }
 
     def _episodic_reward(
         self, current_embedding: th.Tensor, denominator_constant: float = 1e-5
