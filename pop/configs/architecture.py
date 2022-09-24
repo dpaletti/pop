@@ -19,6 +19,7 @@ class POPArchitecture:
     manager_initialization_half_life: int
     agent_type: str
     disabled_action_loops_length: int
+    repeated_action_penalty: float
 
 
 @dataclass(frozen=True)

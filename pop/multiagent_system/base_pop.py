@@ -151,8 +151,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         self.communities: Optional[List[Community]] = None
 
         self.action_detector: ActionDetector = ActionDetector(
-            n_actions=len(self.converter.all_actions),
             loop_length=self.architecture.pop.disabled_action_loops_length,
+            penalty_value=self.architecture.pop.repeated_action_penalty,
+            repeatable_actions=[0],
         )
 
     @abstractmethod
@@ -353,7 +354,10 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             )
         else:
             # Log reward to tensorboard
+            repeated_action_penalty: float = self.action_detector.penalty()
+            reward += repeated_action_penalty
             self.log_reward(reward, self.train_steps)
+            self.log_penalty(repeated_action_penalty, self.train_steps)
             self.alive_steps += 1
             self.train_steps += 1
 
