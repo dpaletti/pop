@@ -355,9 +355,14 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         else:
             # Log reward to tensorboard
             repeated_action_penalty: float = self.action_detector.penalty()
-            reward += repeated_action_penalty
-            self.log_reward(reward, self.train_steps)
-            self.log_penalty(repeated_action_penalty, self.train_steps)
+            self.log_reward(reward, self.train_steps, name="Reward")
+            penalized_reward: float = reward + repeated_action_penalty
+            self.log_reward(penalized_reward, self.train_steps, name="Penalized Reward")
+            self.log_reward(
+                repeated_action_penalty,
+                self.train_steps,
+                name="Repeated Action Penalty",
+            )
             self.alive_steps += 1
             self.train_steps += 1
 
@@ -425,7 +430,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 next_sub_graphs=next_sub_graphs,
                 next_graph=next_graph,
                 next_substation_to_encoded_action=next_substation_to_encoded_action,
-                reward=reward,
+                reward=penalized_reward,
                 action=self.chosen_node,
                 done=done,
                 next_communities=next_communities,

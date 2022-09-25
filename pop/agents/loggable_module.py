@@ -235,9 +235,9 @@ class LoggableModule:
         for idx, action in agent_actions.items():
             self.writer.add_scalar("Agent Action/" + str(idx), action, train_steps)
 
-    def log_reward(self, reward: float, train_steps: int):
+    def log_reward(self, reward: float, train_steps: int, name: str):
         if self.is_logging_active():
-            self.writer.add_scalar("POP/Reward", reward, train_steps)
+            self.writer.add_scalar("POP/" + name, reward, train_steps)
 
     def log_penalty(self, penalty: float, train_steps: int):
         if self.is_logging_active():
