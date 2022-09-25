@@ -252,8 +252,11 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 for manager in list(self.community_to_manager.values())
             ]
         )
+        manager_names: List[str] = [
+            "_".join(name.split("_")[0:2]) for name in manager_names
+        ]
         community_to_names: Dict[Community, str] = {
-            community: "_".join(manager_names[idx].split("_")[0:2])
+            community: manager_names[idx]
             for idx, community in enumerate(list(self.community_to_manager.keys()))
         }
 
@@ -263,8 +266,12 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 for agent in list(self.substation_to_agent.values())
             ]
         )
+
+        agent_names: List[str] = [
+            "_".join(name.split("_")[0:2]) for name in agent_names
+        ]
         substation_to_names: Dict[Substation, str] = {
-            substation: "_".join(agent_names[idx].split("_")[0:2])
+            substation: agent_names[idx]
             for idx, substation in enumerate(list(self.substation_to_agent.keys()))
         }
 
