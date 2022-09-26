@@ -275,6 +275,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             for idx, substation in enumerate(list(self.substation_to_agent.keys()))
         }
 
+        if self.action_detector.is_repeated(self.chosen_action):
+            self.chosen_action = 0
+
         # Log to Tensorboard
         self.log_system_behaviour(
             best_action=self.chosen_action,
@@ -315,8 +318,6 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             train_steps=self.train_steps,
         )
 
-        if self.action_detector.is_repeated(self.chosen_action):
-            self.chosen_action = 0
         return self.chosen_action
 
     def convert_obs(
