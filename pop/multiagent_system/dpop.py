@@ -159,9 +159,9 @@ class DPOP(BasePOP):
             device=checkpoint["device"],
         )
         dpop.pre_initialized = True
-        dpop.alive_steps = checkpoint["alive_steps"]
-        dpop.episodes = checkpoint["episodes"]
-        dpop.train_steps = checkpoint["train_steps"]
+        dpop.alive_steps = checkpoint["alive_steps"] if training else 0
+        dpop.episodes = checkpoint["episodes"] if training else 0
+        dpop.train_steps = checkpoint["train_steps"] if training else 0
         dpop.edge_features = checkpoint["edge_features"]
         dpop.node_features = checkpoint["node_features"]
         dpop.manager_initialization_threshold = checkpoint[

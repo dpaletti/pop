@@ -318,6 +318,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             train_steps=self.train_steps,
         )
 
+        if not self.training:
+            self.train_steps += 1
+
         return self.chosen_action
 
     def convert_obs(

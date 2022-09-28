@@ -207,9 +207,7 @@ def main(**kwargs):
         agent = DPOP.load(
             log_file=config.loading.load_dir,
             env=env_train if config.training.train else env_val,
-            tensorboard_dir=config.training.tensorboard_dir
-            if config.training.train
-            else None,
+            tensorboard_dir=config.training.tensorboard_dir,
             checkpoint_dir=config.model.checkpoint_dir,
             name=config.model.name,
             training=config.training.train,
