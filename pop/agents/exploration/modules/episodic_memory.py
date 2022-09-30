@@ -89,6 +89,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
                 current_state_embedding,
             ) = self.inverse_model(current_state, next_state)
         except Exception as e:
+            self.last_predicted_action_values = None
             print(
                 "Could not compute inverse model due to: "
                 + str(e)
