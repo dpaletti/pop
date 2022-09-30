@@ -50,6 +50,7 @@ class RandomNetworkDistiller(nn.Module):
         return self.last_loss
 
     def learn(self):
-        self.distiller_optimizer.zero_grad()
-        self.last_loss.backward()
-        self.distiller_optimizer.step()
+        if self.last_loss is not None:
+            self.distiller_optimizer.zero_grad()
+            self.last_loss.backward()
+            self.distiller_optimizer.step()

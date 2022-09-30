@@ -73,8 +73,20 @@ class EpisodicMemory(nn.Module, ExplorationModule):
         self.random_network_distiller.learn()
         self.inverse_model.learn(action, self.last_predicted_action_values)
 
-    def compute_intrinsic_reward(self, current_state, next_state, action, done):
-        if done:
+    def compute_intrinsic_reward(
+        self,
+        current_state: dgl.DGLHeteroGraph,
+        next_state: dgl.DGLHeteroGraph,
+        action: int,
+        done: bool,
+    ):
+        if (
+            done
+            or not dict(current_state.ndata)
+            or not dict(current_state.edata)
+            or not dict(next_state.ndata)
+            or not dict(next_state.edata)
+        ):
             return 0
         self.last_predicted_action_values, current_state_embedding = self.inverse_model(
             current_state, next_state
