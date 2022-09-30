@@ -70,8 +70,8 @@ class EpisodicMemory(nn.Module, ExplorationModule):
 
     def update(self, action: int) -> None:
 
-        self.random_network_distiller.learn()
         if self.last_predicted_action_values is not None:
+            self.random_network_distiller.learn()
             self.inverse_model.learn(action, self.last_predicted_action_values)
 
     def compute_intrinsic_reward(
