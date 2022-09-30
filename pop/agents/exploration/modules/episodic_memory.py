@@ -35,7 +35,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
         )
         node_features = agent.node_features
         edge_features = agent.edge_features
-        name = agent.name + "_episodic_memory"
+        self.name = agent.name + "_episodic_memory"
 
         self.memory = deque(maxlen=self.exploration_parameters.size)
         self.neighbors = self.exploration_parameters.neighbors
@@ -48,7 +48,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             edge_features=edge_features,
             actions=agent.actions,
             architecture=self.exploration_parameters.inverse_model,
-            name=name + "_inverse_model",
+            name=self.name + "_inverse_model",
             log_dir=None,
         )
         self.k_squared_distance_running_mean = self.RunningMean()
@@ -57,7 +57,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             node_features=node_features,
             edge_features=edge_features,
             architecture=self.exploration_parameters.random_network_distiller,
-            name=name + "_distiller",
+            name=self.name + "_distiller",
         )
         self.distiller_error_running_mean = self.RunningMean()
         self.distiller_error_running_standard_deviation = (
@@ -71,7 +71,8 @@ class EpisodicMemory(nn.Module, ExplorationModule):
     def update(self, action: int) -> None:
 
         self.random_network_distiller.learn()
-        self.inverse_model.learn(action, self.last_predicted_action_values)
+        if self.last_predicted_action_values is not None:
+            self.inverse_model.learn(action, self.last_predicted_action_values)
 
     def compute_intrinsic_reward(
         self,
@@ -80,13 +81,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
         action: int,
         done: bool,
     ):
-        if (
-            done
-            or not dict(current_state.ndata)
-            or not dict(current_state.edata)
-            or not dict(next_state.ndata)
-            or not dict(next_state.edata)
-        ):
+        if done:
             return 0
         self.last_predicted_action_values, current_state_embedding = self.inverse_model(
             current_state, next_state
