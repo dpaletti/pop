@@ -93,7 +93,9 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             "random_network_distiller": self.random_network_distiller.state_dict(),
             "distiller_error_running_mean": self.distiller_error_running_mean.get_state(),
             "distiller_error_running_standard_deviation": self.distiller_error_running_standard_deviation.get_state(),
-            "last_predicted_action": self.last_predicted_action,
+            "last_predicted_action": self.last_predicted_action
+            if not self.last_predicted_action is None
+            else -1,
         }
 
     def load_state(self, state: Dict[str, Any]) -> None:
