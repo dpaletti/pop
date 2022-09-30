@@ -83,9 +83,20 @@ class EpisodicMemory(nn.Module, ExplorationModule):
     ):
         if done:
             return 0
-        self.last_predicted_action_values, current_state_embedding = self.inverse_model(
-            current_state, next_state
-        )
+        try:
+            (
+                self.last_predicted_action_values,
+                current_state_embedding,
+            ) = self.inverse_model(current_state, next_state)
+        except Exception as e:
+            print(
+                "Could not compute inverse model due to: "
+                + str(e)
+                + " returning 0 at "
+                + self.name
+            )
+            return 0
+
         self.episodic_reward = self._episodic_reward(current_state_embedding)
         self.exploration_bonus = self._exploration_bonus(current_state)
         return self.episodic_reward * th.clip(
