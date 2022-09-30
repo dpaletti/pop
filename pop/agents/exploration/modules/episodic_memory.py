@@ -64,19 +64,19 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             self.RunningStandardDeviation()
         )
 
-        self.last_predicted_action: Optional[th.Tensor] = None
+        self.last_predicted_action_values: Optional[th.Tensor] = None
         self.episodic_reward: float = 0
         self.exploration_bonus: float = 0
 
     def update(self, action: int) -> None:
 
         self.random_network_distiller.learn()
-        self.inverse_model.learn(action, self.last_predicted_action)
+        self.inverse_model.learn(action, self.last_predicted_action_values)
 
     def compute_intrinsic_reward(self, current_state, next_state, action, done):
         if done:
             return 0
-        self.last_predicted_action, current_state_embedding = self.inverse_model(
+        self.last_predicted_action_values, current_state_embedding = self.inverse_model(
             current_state, next_state
         )
         self.episodic_reward = self._episodic_reward(current_state_embedding)
@@ -93,9 +93,9 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             "random_network_distiller": self.random_network_distiller.state_dict(),
             "distiller_error_running_mean": self.distiller_error_running_mean.get_state(),
             "distiller_error_running_standard_deviation": self.distiller_error_running_standard_deviation.get_state(),
-            "last_predicted_action": self.last_predicted_action
-            if not self.last_predicted_action is None
-            else -1,
+            # "last_predicted_action": self.last_predicted_action
+            # if not self.last_predicted_action is None
+            # else -1,
         }
 
     def load_state(self, state: Dict[str, Any]) -> None:
@@ -111,13 +111,15 @@ class EpisodicMemory(nn.Module, ExplorationModule):
         self.distiller_error_running_standard_deviation.load_state(
             state["distiller_error_running_standard_deviation"]
         )
-        self.last_predicted_action = state["last_predicted_action"]
+        # self.last_predicted_action = state["last_predicted_action"]
 
     def get_state_to_log(self) -> Dict[str, Any]:
         return {
             "episodic_reward": self.episodic_reward,
             "exploration_bonus": self.exploration_bonus,
-            "inverse_action": self.last_predicted_action,
+            # "inverse_action": self.last_predicted_action
+            # if self.last_predicted_action is not None
+            # else -1,
         }
 
     def _episodic_reward(

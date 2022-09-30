@@ -12,6 +12,7 @@ checkpoint_dir = "<<model_data_dir>>/pop_runs/checkpoint/<<model_name>>"
 steps = 10
 train = true
 tensorboard_dir = "<<model_data_dir>>/pop_runs/tensorboard/<<model_name>>"
+save_frequency=3600
 curriculum = false
 reset_decay = true
 

@@ -9,6 +9,7 @@ manager_history_size = 1e5
 manager_initialization_half_life = 26 # 2 * substations
 agent_type = "uniform"
 disabled_action_loops_length = 1
+repeated_action_penalty = 0
 
 [agent]
 embedding = "egat_architecture_small"
