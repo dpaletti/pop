@@ -66,7 +66,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
 
         self.last_predicted_action: Optional[th.Tensor] = None
         self.episodic_reward: float = 0
-        self.explration_bonus: float = 0
+        self.exploration_bonus: float = 0
 
     def update(self, action: int) -> None:
 
@@ -142,7 +142,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
         # Episodic Reward
         return 1 / np.sqrt(np.sum(neighbor_distances) + denominator_constant)
 
-    def _exploration_bonus(self, current_state: dgl.DGLHeteroGraph):
+    def _exploration_bonus(self, current_state: dgl.DGLHeteroGraph) -> float:
         distiller_error: th.Tensor = self.random_network_distiller(current_state)
         self.distiller_error_running_mean.update(float(distiller_error.data))
         self.distiller_error_running_standard_deviation.update(
