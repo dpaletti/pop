@@ -20,6 +20,7 @@ class POPArchitecture:
     agent_type: str
     disabled_action_loops_length: int
     repeated_action_penalty: float
+    selective_learning: bool
 
 
 @dataclass(frozen=True)

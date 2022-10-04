@@ -395,11 +395,17 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 radius=self.architecture.pop.agent_neighbourhood_radius,
             )
 
+            selected_substations: List[Substation] = [
+                sub
+                for sub, agent_action in self.substation_to_encoded_action.items()
+                if agent_action == self.chosen_action
+            ]
+
             # Stop the decay of the agent whose action has been selected
             # In case no-action is selected multiple agents may have their decay stopped
             agents_stop_decay: Dict[Substation, bool] = (
                 {
-                    sub_id: False if agent_action == self.chosen_action else True
+                    sub_id: False if sub_id in selected_substations else True
                     for sub_id, agent_action in self.substation_to_encoded_action.items()
                 }
                 if self.architecture.pop.epsilon_beta_scheduling
@@ -456,6 +462,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 done=done,
                 stop_decay=manager_stop_decay,
                 next_community_to_manager=next_community_to_manager,
+                chosen_communities=[self.chosen_community]
+                if self.architecture.pop.selective_learning
+                else self.communities,
             )
 
             self._step_agents(
@@ -465,6 +474,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 next_factored_observation=next_factored_observation,
                 done=done,
                 stop_decay=agents_stop_decay,
+                selected_substations=selected_substations
+                if self.architecture.pop.selective_learning
+                else list(self.substation_to_local_action.keys()),
             )
 
     def get_state(self: "BasePOP") -> Dict[str, Any]:
@@ -816,6 +828,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         done: bool,
         stop_decay: Dict[Community, bool],
         next_community_to_manager: Dict[Community, Manager],
+        chosen_communities: List[Community],
     ) -> None:
 
         # Build a mapping between each manager and the communities she handles
@@ -869,6 +882,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                                     old_community
                                 ].num_edges()
                                 > 0
+                                and old_community in chosen_communities
                             ]
                             for manager, (
                                 old_manager_communities,
@@ -919,21 +933,28 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         next_factored_observation: Dict[Substation, dgl.DGLHeteroGraph],
         done: bool,
         stop_decay: Dict[Substation, bool],
+        selected_substations: List[Substation],
     ) -> None:
         # List of promises to get with ray.get
         step_promises = []
 
         # Substations present in next_factored_observation
         substations = []
+
+        subs_to_agent_to_step = {
+            sub: agent
+            for sub, agent in self.substation_to_agent.items()
+            if sub in selected_substations
+        }
         for sub_id, observation in factored_observation.items():
             next_observation: Optional[
                 dgl.DGLHeteroGraph
             ] = next_factored_observation.get(sub_id)
-            if next_observation is not None:
+            if next_observation is not None and sub_id in subs_to_agent_to_step.keys():
 
                 # Build step promise with the previous and next observation
                 step_promises.append(
-                    self.substation_to_agent[sub_id].step.remote(
+                    subs_to_agent_to_step[sub_id].step.remote(
                         observation=observation,
                         action=actions[sub_id],
                         reward=reward,
@@ -943,20 +964,12 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                     )
                 )
                 substations.append(sub_id)
-            else:
-                print(
-                    "("
-                    + str(self.train_steps)
-                    + ") Substation '"
-                    + str(sub_id)
-                    + "' not present in current next_state, related agent is not stepping..."
-                )
 
         # Step the agents
         losses, rewards = zip(*ray.get(step_promises))
         names = ray.get(
             [
-                self.substation_to_agent[substation].get_name.remote()
+                subs_to_agent_to_step[substation].get_name.remote()
                 for substation in substations
             ]
         )
