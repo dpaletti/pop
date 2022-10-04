@@ -836,7 +836,12 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         manager_to_community_transformation: Dict[
             Manager, Tuple[List[Community], List[Community]]
         ] = {manager: ([], []) for manager in self.managers_history.keys()}
-        for community, manager in self.community_to_manager.items():
+        chosen_communities_to_manager = {
+            community: manager
+            for community, manager in self.community_to_manager.items()
+            if community in chosen_communities
+        }
+        for community, manager in chosen_communities_to_manager.items():
             manager_to_community_transformation[manager][0].append(community)
 
         for new_community, manager in next_community_to_manager.items():
@@ -882,7 +887,6 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                                     old_community
                                 ].num_edges()
                                 > 0
-                                and old_community in chosen_communities
                             ]
                             for manager, (
                                 old_manager_communities,
@@ -913,8 +917,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         )
         names = ray.get(
             [
-                self.community_to_manager[community].get_name.remote()
-                for community in self.communities
+                chosen_communities_to_manager[community].get_name.remote()
+                for community in chosen_communities
             ]
         )
 
