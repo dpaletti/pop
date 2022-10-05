@@ -847,6 +847,10 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         for new_community, manager in next_community_to_manager.items():
             manager_to_community_transformation[manager][1].append(new_community)
 
+        if not manager_to_community_transformation:
+            print("No manager is stepping")
+            return
+
         # Step the managers
         # For each community before applying the action
         # Find the most similar community among the ones managed after applying the action
