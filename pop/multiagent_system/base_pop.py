@@ -847,78 +847,81 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         for new_community, manager in next_community_to_manager.items():
             manager_to_community_transformation[manager][1].append(new_community)
 
-        if not manager_to_community_transformation:
-            print("No manager is stepping")
-            return
-
         # Step the managers
         # For each community before applying the action
         # Find the most similar community among the ones managed after applying the action
-        losses, rewards = zip(
-            *ray.get(
-                list(
-                    itertools.chain(
-                        *[
-                            [
-                                manager.step.remote(
-                                    observation=community_to_sub_graphs_dict[
+        try:
+            losses, rewards = zip(
+                *ray.get(
+                    list(
+                        itertools.chain(
+                            *[
+                                [
+                                    manager.step.remote(
+                                        observation=community_to_sub_graphs_dict[
+                                            old_community
+                                        ],
+                                        action=actions[old_community],
+                                        reward=reward,
+                                        next_observation=next_community_to_sub_graphs_dict[
+                                            new_manager_communities[
+                                                np.argmax(
+                                                    [
+                                                        self._jaccard_distance(
+                                                            old_community,
+                                                            new_community,
+                                                        )
+                                                        for new_community in new_manager_communities
+                                                        if next_community_to_sub_graphs_dict[
+                                                            new_community
+                                                        ].num_edges()
+                                                        > 0
+                                                    ]
+                                                )
+                                            ]
+                                        ],
+                                        done=done,
+                                        stop_decay=stop_decay[old_community],
+                                    )
+                                    for old_community in old_manager_communities
+                                    if community_to_sub_graphs_dict[
                                         old_community
-                                    ],
-                                    action=actions[old_community],
-                                    reward=reward,
-                                    next_observation=next_community_to_sub_graphs_dict[
-                                        new_manager_communities[
-                                            np.argmax(
-                                                [
-                                                    self._jaccard_distance(
-                                                        old_community,
-                                                        new_community,
-                                                    )
-                                                    for new_community in new_manager_communities
-                                                    if next_community_to_sub_graphs_dict[
-                                                        new_community
-                                                    ].num_edges()
-                                                    > 0
-                                                ]
-                                            )
-                                        ]
-                                    ],
-                                    done=done,
-                                    stop_decay=stop_decay[old_community],
-                                )
-                                for old_community in old_manager_communities
-                                if community_to_sub_graphs_dict[
-                                    old_community
-                                ].num_edges()
-                                > 0
-                            ]
-                            for manager, (
-                                old_manager_communities,
-                                new_manager_communities,
-                            ) in manager_to_community_transformation.items()
-                            if list(
-                                filter(
-                                    lambda x: community_to_sub_graphs_dict[
-                                        x
                                     ].num_edges()
-                                    > 0,
+                                    > 0
+                                ]
+                                for manager, (
                                     old_manager_communities,
-                                )
-                            )
-                            and list(
-                                filter(
-                                    lambda x: next_community_to_sub_graphs_dict[
-                                        x
-                                    ].num_edges()
-                                    > 0,
                                     new_manager_communities,
+                                ) in manager_to_community_transformation.items()
+                                if list(
+                                    filter(
+                                        lambda x: community_to_sub_graphs_dict[
+                                            x
+                                        ].num_edges()
+                                        > 0,
+                                        old_manager_communities,
+                                    )
                                 )
-                            )
-                        ]
+                                and list(
+                                    filter(
+                                        lambda x: next_community_to_sub_graphs_dict[
+                                            x
+                                        ].num_edges()
+                                        > 0,
+                                        new_manager_communities,
+                                    )
+                                )
+                            ]
+                        )
                     )
                 )
             )
-        )
+        except ValueError as e:
+            print(
+                "Manager stepping raised ValueError, usually not a problem, not stepping any manager ..."
+            )
+            return
+
         names = ray.get(
             [
                 chosen_communities_to_manager[community].get_name.remote()
