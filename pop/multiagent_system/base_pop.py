@@ -241,9 +241,18 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         # The head manager chooses the best action from every community given the summarized graph
         self.chosen_node = self.get_action(self.summarized_graph)
-        self.chosen_action = graph.nodes[self.chosen_node]["action"]
-        self.chosen_community = next(
-            filter(lambda community: self.chosen_node in community, self.communities)
+        chosen_node_features = self.summarized_graph.ndata[
+            "embedding_community_action"
+        ][self.chosen_node]
+        self.chosen_action = int(chosen_node_features[-1].item())
+        self.chosen_community = frozenset(
+            [
+                idx
+                for idx, one_hot in enumerate(
+                    chosen_node_features[-(1 + self.env.n_sub) : -1].tolist()
+                )
+                if one_hot == 1
+            ]
         )
 
         manager_names: List[str] = ray.get(
@@ -1056,7 +1065,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 summarized_graph = nx.contracted_nodes(
                     summarized_graph, community_list[0], node
                 )
-            summarized_graph.nodes[community_list[0]]["embedding_action"] = th.cat(
+            summarized_graph.nodes[community_list[0]][
+                "embedding_community_action"
+            ] = th.cat(
                 (
                     summarized_graph.nodes[community_list[0]]["embedding"],
                     th.tensor(
@@ -1069,13 +1080,13 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 ),
                 dim=-1,
             )
-
+        summarized_graph
         # The summarized graph is returned in DGL format
         # Each supernode has the action chosen by its community manager
         # And the contracted embedding
         return dgl.from_networkx(
             summarized_graph.to_directed(),
-            node_attrs=["embedding_action"],
+            node_attrs=["embedding_community_action"],
             device=self.device,
         )
 
