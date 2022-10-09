@@ -1,6 +1,6 @@
 import importlib
 
-from agents.exploration.exploration_module import ExplorationModule
+from pop.agents.exploration.exploration_module import ExplorationModule
 
 
 def get_exploration_module(agent) -> ExplorationModule:

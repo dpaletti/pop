@@ -9,8 +9,8 @@ import networkx as nx
 import psutil
 import torch as th
 import torch.nn as nn
-from agents.exploration.exploration_module import ExplorationModule
-from agents.exploration.exploration_module_factory import get_exploration_module
+from pop.agents.exploration.exploration_module import ExplorationModule
+from pop.agents.exploration.exploration_module_factory import get_exploration_module
 from dgl import DGLHeteroGraph
 from grid2op.Observation import BaseObservation
 from torch import Tensor

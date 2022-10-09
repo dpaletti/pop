@@ -34,6 +34,8 @@ from pop.multiagent_system.space_factorization import (
 )
 from pop.networks.serializable_module import SerializableModule
 
+from pop.multiagent_system.reward_distributor import Incentivizer
+
 
 class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
     def __init__(
@@ -155,6 +157,18 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             penalty_value=self.architecture.pop.repeated_action_penalty,
             repeatable_actions=[0],
         )
+
+        if self.architecture.pop.incentives:
+            self.agent_incentives: Incentivizer = Incentivizer(
+                {
+                    substation: len(action_converter.all_actions)
+                    for substation, action_converter in self.substation_to_action_converter.items()
+                },
+                **self.architecture.pop.incentives
+            )
+            self.manager_incentives: Incentivizer = Incentivizer(
+                {}, **self.architecture.pop.incentives
+            )
 
     @abstractmethod
     def get_action(self, observation: dgl.DGLHeteroGraph) -> int:
@@ -372,6 +386,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             self.old_graph = (
                 None  # this resets the incremental community detection algorithm
             )
+            if self.architecture.pop.incentives:
+                self.agent_incentives.reset()
+                self.manager_incentives.reset()
         else:
             # Log reward to tensorboard
             repeated_action_penalty: float = self.action_detector.penalty()
@@ -451,6 +468,16 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 }
             )
 
+            current_agent_incentives: Optional[Dict[Substation, float]] = None
+            current_manager_incentives: Optional[Dict[Manager, float]] = None
+            if self.architecture.pop.incentives:
+                current_agent_incentives = self.agent_incentives.incentives(
+                    selected_substations
+                )
+                current_manager_incentives = self.manager_incentives.incentives(
+                    [self.community_to_manager[self.chosen_community]]
+                )
+
             # Children may add needed functionalities to the step function by extending extra_step
             self._extra_step(
                 next_sub_graphs=next_sub_graphs,
@@ -474,6 +501,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 chosen_communities=[self.chosen_community]
                 if self.architecture.pop.selective_learning
                 else self.communities,
+                incentives=current_manager_incentives,
             )
 
             self._step_agents(
@@ -486,6 +514,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 selected_substations=selected_substations
                 if self.architecture.pop.selective_learning
                 else list(self.substation_to_local_action.keys()),
+                incentives=current_agent_incentives,
             )
 
     def get_state(self: "BasePOP") -> Dict[str, Any]:
@@ -732,6 +761,12 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 for idx in range(len(new_communities))
             ]
 
+            if self.architecture.pop.incentives:
+                # TODO: find a way to model manager importance, for now they are all the same
+                # TODO: care that manager importance may change with time due to dynamic community structure
+                for manager in managers:
+                    self.manager_incentives.add_agent(manager, 1)
+
             self.managers_history = {
                 manager: FixedSet(int(self.architecture.pop.manager_history_size))
                 for manager in managers
@@ -774,6 +809,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 self.managers_history[manager] = FixedSet(
                     int(self.architecture.pop.manager_history_size)
                 )
+                if self.architecture.pop.incentives:
+                    # TODO: find a way to model manager importance, for now they are all the same
+                    self.manager_incentives.add_agent(manager, 1)
                 return {most_distant_community: manager}
             else:
                 return {}
@@ -838,6 +876,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         stop_decay: Dict[Community, bool],
         next_community_to_manager: Dict[Community, Manager],
         chosen_communities: List[Community],
+        incentives: Optional[Dict[Manager, float]] = None,
     ) -> None:
 
         # Build a mapping between each manager and the communities she handles
@@ -871,7 +910,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                                             old_community
                                         ],
                                         action=actions[old_community],
-                                        reward=reward,
+                                        reward=reward + incentives[manager]
+                                        if incentives is not None
+                                        else reward,
                                         next_observation=next_community_to_sub_graphs_dict[
                                             new_manager_communities[
                                                 np.argmax(
@@ -943,6 +984,12 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             implicit_rewards=[full_reward - reward for full_reward in rewards],
             names=names,
             train_steps=self.train_steps,
+            incentives=[
+                incentives[chosen_communities_to_manager[community]]
+                for community in chosen_communities
+            ]
+            if incentives is not None
+            else None,
         )
 
     def _step_agents(
@@ -954,6 +1001,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         done: bool,
         stop_decay: Dict[Substation, bool],
         selected_substations: List[Substation],
+        incentives: Optional[Dict[Substation, float]] = None,
     ) -> None:
         # List of promises to get with ray.get
         step_promises = []
@@ -977,7 +1025,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                     subs_to_agent_to_step[sub_id].step.remote(
                         observation=observation,
                         action=actions[sub_id],
-                        reward=reward,
+                        reward=reward + incentives[sub_id]
+                        if incentives is not None
+                        else reward,
                         next_observation=next_factored_observation[sub_id],
                         done=done,
                         stop_decay=stop_decay[sub_id],
@@ -998,6 +1048,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             implicit_rewards=[full_reward - reward for full_reward in rewards],
             names=names,
             train_steps=self.train_steps,
+            incentives=[incentives[substation] for substation in substations]
+            if incentives is not None
+            else None,
         )
 
     def _lookup_local_action(self, action: BaseAction):

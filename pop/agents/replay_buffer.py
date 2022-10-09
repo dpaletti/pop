@@ -2,10 +2,10 @@ from collections import namedtuple
 from dataclasses import asdict
 
 import numpy as np
-from typing import Tuple, List, Any, Optional
+from typing import Dict, Tuple, List, Any
 import pandas as pd
 
-from configs.agent_architecture import ReplayMemoryParameters
+from pop.configs.agent_architecture import ReplayMemoryParameters
 
 Transition = namedtuple(
     "Transition", ("observation", "action", "next_observation", "reward", "done")

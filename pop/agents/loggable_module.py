@@ -35,6 +35,7 @@ class LoggableModule:
         implicit_rewards: List[float],
         names: List[str],
         train_steps: int,
+        incentives: Optional[List[float]] = None,
     ):
         # Log losses to tensorboard
         self.log_simple_scalar(
@@ -58,6 +59,15 @@ class LoggableModule:
             train_steps,
             "Implicit Reward",
         )
+        if incentives:
+            self.log_simple_scalar(
+                {
+                    "_".join(agent_name.split("_")[0:2]): implicit_reward
+                    for agent_name, implicit_reward in zip(names, implicit_rewards)
+                },
+                train_steps,
+                "Incentives",
+            )
 
     def log_action_space_size(self, agent_converters: Dict[int, IdToAct]) -> None:
         if not self.is_logging_active():
