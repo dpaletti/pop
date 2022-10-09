@@ -474,9 +474,16 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 current_agent_incentives = self.agent_incentives.incentives(
                     selected_substations
                 )
-                current_manager_incentives = self.manager_incentives.incentives(
-                    [self.community_to_manager[self.chosen_community]]
-                )
+                try:
+                    current_manager_incentives = self.manager_incentives.incentives(
+                        [self.community_to_manager[self.chosen_community]]
+                    )
+                except KeyError:
+                    print(
+                        "Could not find manager of "
+                        + str(self.chosen_community)
+                        + ", skipping incentives"
+                    )
 
             # Children may add needed functionalities to the step function by extending extra_step
             self._extra_step(
