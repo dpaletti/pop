@@ -78,12 +78,22 @@ class ReplayMemory(object):
             np.sum(priorities**self.alpha) + epsilon
         )
 
-        indices = np.random.choice(
-            np.arange(priorities.size),
-            size=batch_size,
-            replace=True,
-            p=sampling_probabilities,
-        )
+        try:
+            indices = np.random.choice(
+                np.arange(priorities.size),
+                size=batch_size,
+                replace=True,
+                p=sampling_probabilities,
+            )
+        except ValueError:
+            print(
+                "Found NaN in sampling probabilities, applying uniform sampling at this step"
+            )
+            indices = np.random.choice(
+                np.arange(priorities.size),
+                size=batch_size,
+                replace=True,
+            )
         transitions = self.memory["transition"][indices]
         weights = (self.buffer_length * sampling_probabilities[indices]) ** -self.beta
         normalized_weights = weights / weights.max()
