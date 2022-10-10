@@ -188,8 +188,10 @@ class DPOP(BasePOP):
             )
         }
         # TODO: managers here are treated as equal, they may be not
-        for manager in dpop.managers_history.keys():
-            dpop.manager_incentives.add_agent(manager, 1)
+
+        if dpop.architecture.pop.incentives:
+            for manager in dpop.managers_history.keys():
+                dpop.manager_incentives.add_agent(manager, 1)
         print("Loading Head Manager")
         dpop.head_manager = Manager.load(
             checkpoint=checkpoint["head_manager_state"],
