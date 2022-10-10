@@ -70,12 +70,12 @@ class ReplayMemory(object):
         )
 
     def sample(
-        self, batch_size: int
+        self, batch_size: int, epsilon: float = 1e-4
     ) -> Tuple[List[int], List[Transition], List[float]]:
 
         priorities = self.memory[: self.buffer_length]["priority"]
-        sampling_probabilities = priorities**self.alpha / np.sum(
-            priorities**self.alpha
+        sampling_probabilities = priorities**self.alpha / (
+            np.sum(priorities**self.alpha) + epsilon
         )
 
         indices = np.random.choice(
