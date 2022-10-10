@@ -26,6 +26,7 @@ class ReplayMemory(object):
         self.min_beta: float = architecture.min_beta
         self.half_life: float = architecture.beta_decay
         self.beta: float = self.max_beta
+        self.apply_uniform: bool = False
 
     def push(
         self,
@@ -78,22 +79,31 @@ class ReplayMemory(object):
             np.sum(priorities**self.alpha) + epsilon
         )
 
-        try:
+        if not self.apply_uniform:
+            try:
+                indices = np.random.choice(
+                    np.arange(priorities.size),
+                    size=batch_size,
+                    replace=True,
+                    p=sampling_probabilities,
+                )
+            except ValueError:
+                print(
+                    "Found NaN in sampling probabilities, applying uniform sampling from now on"
+                )
+                self.apply_uniform = True
+                indices = np.random.choice(
+                    np.arange(priorities.size),
+                    size=batch_size,
+                    replace=True,
+                )
+        else:
             indices = np.random.choice(
                 np.arange(priorities.size),
                 size=batch_size,
                 replace=True,
-                p=sampling_probabilities,
             )
-        except ValueError:
-            print(
-                "Found NaN in sampling probabilities, applying uniform sampling at this step"
-            )
-            indices = np.random.choice(
-                np.arange(priorities.size),
-                size=batch_size,
-                replace=True,
-            )
+
         transitions = self.memory["transition"][indices]
         weights = (self.buffer_length * sampling_probabilities[indices]) ** -self.beta
         normalized_weights = weights / weights.max()
