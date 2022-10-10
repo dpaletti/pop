@@ -15,6 +15,8 @@ from pop.configs.architecture import Architecture
 from pop.multiagent_system.base_pop import BasePOP
 from pop.multiagent_system.space_factorization import EncodedAction, Substation
 
+from pop.multiagent_system.dictatorship_penalizer import DictatorshipPenalizer
+
 
 class DPOP(BasePOP):
     def __init__(
@@ -64,6 +66,11 @@ class DPOP(BasePOP):
             training=self.training,
             device=str(self.device),
         )
+        if self.architecture.pop.dictatorship_penalty:
+            self.dictatorship_penalty = DictatorshipPenalizer(
+                {choice: 1 for choice in range(self.env.n_sub)},
+                **self.architecture.pop.dictatorship_penalty
+            )
 
     def get_action(self, graph: dgl.DGLHeteroGraph) -> int:
         chosen_node: int = int(
@@ -94,6 +101,10 @@ class DPOP(BasePOP):
         next_community_to_manager: Dict[Community, Manager],
     ):
         try:
+            penalty = 0
+            if self.architecture.pop.dictatorship_penalty:
+                penalty = self.dictatorship_penalty.penalty(action)
+
             next_community_to_substation: Dict[
                 Community, Substation
             ] = self._get_manager_actions(
@@ -116,7 +127,7 @@ class DPOP(BasePOP):
                 self.head_manager.step.remote(
                     observation=self.summarized_graph,
                     action=action,
-                    reward=reward,
+                    reward=reward + penalty,
                     next_observation=next_summarized_graph,
                     done=done,
                     stop_decay=False,
@@ -128,6 +139,7 @@ class DPOP(BasePOP):
                 implicit_rewards=[full_reward - reward],
                 names=[self.name],
                 train_steps=self.train_steps,
+                dictatorship_penalties=[penalty],
             )
 
         except KeyError as e:

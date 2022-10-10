@@ -36,6 +36,7 @@ class LoggableModule:
         names: List[str],
         train_steps: int,
         incentives: Optional[List[float]] = None,
+        dictatorship_penalties: Optional[List[float]] = None,
     ):
         # Log losses to tensorboard
         self.log_simple_scalar(
@@ -67,6 +68,17 @@ class LoggableModule:
                 },
                 train_steps,
                 "Incentives",
+            )
+        if dictatorship_penalties:
+            self.log_simple_scalar(
+                {
+                    "_".join(agent_name.split("_")[0:2]): dictatorship_penalty
+                    for agent_name, dictatorship_penalty in zip(
+                        names, dictatorship_penalties
+                    )
+                },
+                train_steps,
+                "Dictatorship Penalties",
             )
 
     def log_action_space_size(self, agent_converters: Dict[int, IdToAct]) -> None:

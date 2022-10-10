@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, Hashable, List
+from typing import Dict, Hashable, List, Optional, Tuple
 
 from math import exp, log10
 
@@ -61,7 +61,7 @@ class Incentivizer:
 
         self._agents: List[Hashable] = list(agent_actions.keys())
         self.agent_actions = agent_actions
-        self._agent_ranking: Dict[int, List[Hashable]] = self._rank_agents(
+        self._rank_to_agents: Dict[int, List[Hashable]] = self._rank_agents(
             self.agent_actions
         )
         self._elections: Dict[Hashable, Incentivizer.ElectionHistory] = {
@@ -84,19 +84,24 @@ class Incentivizer:
         self._agents_incentives: Dict[
             Hashable, "Incentivizer.Incentive"
         ] = self._compute_base_incentives(
-            agent_ranking=self._agent_ranking,
+            agent_ranking=self._rank_to_agents,
             smallest_penalty=self._smallest_penalty,
             largest_prize=self._largest_prize,
             prize_exponential_decay_factor=base_prize_exponential_decay_half_life,
             penalty_exponential_growth_factor=base_penalty_exponential_growth_factor,
         )
 
-    def incentives(self, elected_agents: List[Hashable]) -> Dict[Hashable, float]:
+    def incentives(
+        self,
+        elected_agents: List[Hashable],
+    ) -> Dict[Hashable, float]:
+
         for agent in self._agents:
             if agent in elected_agents:
                 self._elections[agent].elect()
             else:
                 self._elections[agent].reject()
+
         return {
             agent: self._agents_incentives[agent].incentive(self._elections[agent])
             for agent in self._agents
@@ -105,14 +110,14 @@ class Incentivizer:
     def add_agent(self, agent_to_add: Hashable, actions: int):
         self._agents.append(agent_to_add)
         self.agent_actions[agent_to_add] = actions
-        self._agent_ranking = self._rank_agents(self.agent_actions)
+        self._rank_to_agents = self._rank_agents(self.agent_actions)
         self._elections = {
             agent: Incentivizer.ElectionHistory() for agent in self._agents
         }
         self._agents_incentives: Dict[
             Hashable, "Incentivizer.Incentive"
         ] = self._compute_base_incentives(
-            agent_ranking=self._agent_ranking,
+            agent_ranking=self._rank_to_agents,
             smallest_penalty=self._smallest_penalty,
             largest_prize=self._largest_prize,
             prize_exponential_decay_factor=self._base_prize_exponential_decay_factor,
@@ -122,6 +127,13 @@ class Incentivizer:
     def reset(self):
         for election_history in self._elections.values():
             election_history.reset()
+
+    def _invert_ranking(
+        self, ranking: Dict[int, List[Hashable]]
+    ) -> Dict[Hashable, List[int]]:
+        return {
+            agent: rank for rank, agents in ranking.items() for agent in agents
+        }  # type: ignore
 
     def _compute_base_incentives(
         self,

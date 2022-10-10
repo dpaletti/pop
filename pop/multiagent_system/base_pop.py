@@ -33,6 +33,7 @@ from pop.multiagent_system.space_factorization import (
     split_graph_into_communities,
 )
 from pop.networks.serializable_module import SerializableModule
+from pop.multiagent_system.dictatorship_penalizer import DictatorshipPenalizer
 
 from pop.multiagent_system.reward_distributor import Incentivizer
 
@@ -169,6 +170,11 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             self.manager_incentives: Incentivizer = Incentivizer(
                 {}, **self.architecture.pop.incentives
             )
+
+        if self.architecture.pop.dictatorship_penalty:
+            self.manager_dictatorship_penalties: Dict[
+                Manager, DictatorshipPenalizer
+            ] = {}
 
     @abstractmethod
     def get_action(self, observation: dgl.DGLHeteroGraph) -> int:
@@ -472,17 +478,33 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             current_manager_incentives: Optional[Dict[Manager, float]] = None
             if self.architecture.pop.incentives:
                 current_agent_incentives = self.agent_incentives.incentives(
-                    selected_substations
+                    selected_substations  # type: ignore
                 )
                 try:
                     current_manager_incentives = self.manager_incentives.incentives(
-                        [self.community_to_manager[self.chosen_community]]
-                    )
+                        [self.community_to_manager[self.chosen_community]]  # type: ignore
+                    )  # type: ignore
                 except KeyError:
                     print(
                         "Could not find manager of "
                         + str(self.chosen_community)
                         + ", skipping incentives"
+                    )
+
+            current_manager_dictatorship_penalty: Optional[Dict[Manager, float]] = None
+            if self.architecture.pop.dictatorship_penalty:
+                current_manager_dictatorship_penalty = {
+                    manager: 0 for manager in self.manager_dictatorship_penalties
+                }
+                for (
+                    community,
+                    chosen_substation,
+                ) in self.community_to_substation.items():
+                    manager = self.community_to_manager[community]
+                    current_manager_dictatorship_penalty[
+                        manager
+                    ] += self.manager_dictatorship_penalties[manager].penalty(
+                        chosen_substation
                     )
 
             # Children may add needed functionalities to the step function by extending extra_step
@@ -509,6 +531,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 if self.architecture.pop.selective_learning
                 else self.communities,
                 incentives=current_manager_incentives,
+                dictatorship_penalties=current_manager_dictatorship_penalty,
             )
 
             self._step_agents(
@@ -774,6 +797,18 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 for manager in managers:
                     self.manager_incentives.add_agent(manager, 1)
 
+            if self.architecture.pop.dictatorship_penalty:
+                for manager in managers:
+                    self.manager_dictatorship_penalties[
+                        manager
+                    ] = DictatorshipPenalizer(
+                        choice_to_ranking={
+                            substation: len(action_converter.all_actions)
+                            for substation, action_converter in self.substation_to_action_converter.items()
+                        },
+                        **self.architecture.pop.dictatorship_penalty
+                    )
+
             self.managers_history = {
                 manager: FixedSet(int(self.architecture.pop.manager_history_size))
                 for manager in managers
@@ -819,6 +854,18 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 if self.architecture.pop.incentives:
                     # TODO: find a way to model manager importance, for now they are all the same
                     self.manager_incentives.add_agent(manager, 1)
+
+                if self.architecture.pop.dictatorship_penalty:
+                    self.manager_dictatorship_penalties[
+                        manager
+                    ] = DictatorshipPenalizer(
+                        choice_to_ranking={
+                            substation: len(action_converter.all_actions)
+                            for substation, action_converter in self.substation_to_action_converter.items()
+                        },
+                        **self.architecture.pop.dictatorship_penalties
+                    )
+
                 return {most_distant_community: manager}
             else:
                 return {}
@@ -884,6 +931,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         next_community_to_manager: Dict[Community, Manager],
         chosen_communities: List[Community],
         incentives: Optional[Dict[Manager, float]] = None,
+        dictatorship_penalties: Optional[Dict[Manager, float]] = None,
     ) -> None:
 
         # Build a mapping between each manager and the communities she handles
@@ -917,9 +965,16 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                                             old_community
                                         ],
                                         action=actions[old_community],
-                                        reward=reward + incentives[manager]
-                                        if incentives is not None
-                                        else reward,
+                                        reward=(
+                                            reward + incentives[manager]
+                                            if incentives is not None
+                                            else reward
+                                        )
+                                        + (
+                                            0
+                                            if not dictatorship_penalties
+                                            else dictatorship_penalties[manager]
+                                        ),
                                         next_observation=next_community_to_sub_graphs_dict[
                                             new_manager_communities[
                                                 np.argmax(
@@ -996,6 +1051,12 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 for community in chosen_communities
             ]
             if incentives is not None
+            else None,
+            dictatorship_penalties=[
+                dictatorship_penalties[chosen_communities_to_manager[community]]
+                for community in chosen_communities
+            ]
+            if dictatorship_penalties is not None
             else None,
         )
 

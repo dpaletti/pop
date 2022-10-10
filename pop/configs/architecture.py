@@ -1,11 +1,10 @@
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 import toml
 
 from pop.configs.agent_architecture import AgentArchitecture
 from pop.configs.type_aliases import ParsedTOMLDict
-from torch.types import Number
 
 
 @dataclass(frozen=True)
@@ -22,7 +21,8 @@ class POPArchitecture:
     disabled_action_loops_length: int
     repeated_action_penalty: float
     selective_learning: bool
-    incentives: Optional[Dict[str, Number]] = None
+    incentives: Optional[Dict[str, Any]] = None
+    dictatorship_penalty: Optional[Dict[str, Any]] = None
 
 
 @dataclass(frozen=True)
