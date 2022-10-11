@@ -397,7 +397,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 self.manager_incentives.reset()
 
             if self.architecture.pop.dictatorship_penalty:
-                for manager, penalty in self.manager_dictatorship_penalties.reset():
+                for manager, penalty in self.manager_dictatorship_penalties.items():
                     penalty.reset()
                 try:
                     # in case of DPOP
