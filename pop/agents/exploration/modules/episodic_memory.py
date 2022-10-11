@@ -144,26 +144,30 @@ class EpisodicMemory(nn.Module, ExplorationModule):
     def _episodic_reward(
         self, current_embedding: th.Tensor, denominator_constant: float = 1e-5
     ):
-        current_embedding_detached = current_embedding.detach().numpy()
+        try:
+            current_embedding_detached = current_embedding.detach().numpy()
 
-        if len(self.memory) <= self.neighbors:
-            neighbor_distances = [0]
-        else:
-            # Compute K nearest neighbors wrt inverse kernel from memory
-            neighbors_model = NearestNeighbors(
-                n_neighbors=self.neighbors, metric=self._inverse_kernel
-            )
-            memory_array = np.array(self.memory)
-            neighbors_model.fit(memory_array)
-            neighbor_distances, _ = neighbors_model.kneighbors(
-                np.array(current_embedding_detached).reshape(1, -1),
-            )
+            if len(self.memory) <= self.neighbors:
+                neighbor_distances = [0]
+            else:
+                # Compute K nearest neighbors wrt inverse kernel from memory
+                neighbors_model = NearestNeighbors(
+                    n_neighbors=self.neighbors, metric=self._inverse_kernel
+                )
+                memory_array = np.array(self.memory)
+                neighbors_model.fit(memory_array)
+                neighbor_distances, _ = neighbors_model.kneighbors(
+                    np.array(current_embedding_detached).reshape(1, -1),
+                )
 
-        # Update Memory
-        self.memory.append(current_embedding_detached)
+            # Update Memory
+            self.memory.append(current_embedding_detached)
 
-        # Episodic Reward
-        return 1 / np.sqrt(np.sum(neighbor_distances) + denominator_constant)
+            # Episodic Reward
+            return 1 / np.sqrt(np.sum(neighbor_distances) + denominator_constant)
+        except ValueError:
+            print("ValueError in episodic reward, returning 0 for this step")
+            return 0
 
     def _exploration_bonus(self, current_state: dgl.DGLHeteroGraph) -> float:
         distiller_error: th.Tensor = self.random_network_distiller(current_state)
