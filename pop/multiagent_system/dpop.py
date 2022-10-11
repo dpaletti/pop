@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional
 
 import dgl
 import networkx as nx
+from pop.configs import architecture
 import psutil
 from grid2op.Environment import BaseEnv
 from ray.util.client import ray
@@ -204,6 +205,17 @@ class DPOP(BasePOP):
         if dpop.architecture.pop.incentives:
             for manager in dpop.managers_history.keys():
                 dpop.manager_incentives.add_agent(manager, 1)
+
+        if dpop.architecture.pop.dictatorship_penalty:
+            for manager in dpop.managers_history.keys():
+                dpop.manager_dictatorship_penalties[manager] = DictatorshipPenalizer(
+                    choice_to_ranking={
+                        substation: len(action_converter.all_actions)
+                        for substation, action_converter in dpop.substation_to_action_converter.items()
+                    },
+                    **dpop.architecture.pop.dictatorship_penalty
+                )
+
         print("Loading Head Manager")
         dpop.head_manager = Manager.load(
             checkpoint=checkpoint["head_manager_state"],

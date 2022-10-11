@@ -69,3 +69,6 @@ class DictatorshipPenalizer:
 
     def add_choice(self, choice: int, ranking: int):
         self._choice_to_ranking[choice] = ranking
+
+    def reset(self):
+        self._dictatorship_tracker.reset()

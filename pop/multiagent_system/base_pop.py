@@ -395,6 +395,10 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             if self.architecture.pop.incentives:
                 self.agent_incentives.reset()
                 self.manager_incentives.reset()
+
+            if self.architecture.pop.dictatorship_penalty:
+                for manager, penalty in self.manager_dictatorship_penalties.reset():
+                    penalty.reset()
         else:
             # Log reward to tensorboard
             repeated_action_penalty: float = self.action_detector.penalty()
