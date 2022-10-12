@@ -21,6 +21,7 @@ class POPArchitecture:
     disabled_action_loops_length: int
     repeated_action_penalty: float
     selective_learning: bool
+    composite_actions: bool
     incentives: Optional[Dict[str, Any]] = None
     dictatorship_penalty: Optional[Dict[str, Any]] = None
 
