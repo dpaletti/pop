@@ -115,7 +115,10 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         # Agents Initialization
         substation_to_action_space, self.action_lookup_table = factor_action_space(
-            env.observation_space, self.converter, self.env.n_sub
+            env.observation_space,
+            self.converter,
+            self.env.n_sub,
+            composite_actions=self.architecture.pop.composite_actions,
         )
 
         self.substation_to_action_converter = self._get_substation_to_agent_mapping(

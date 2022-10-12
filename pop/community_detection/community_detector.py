@@ -243,6 +243,13 @@ class CommunityDetector:
         for two_vertices_community in merged_to_vertices_communities:
             comm_t1.append(set(two_vertices_community))
 
+        missing_nodes = set(graph_t1.nodes).difference(
+            {node for community in comm_t1 for node in community}
+        )
+        if missing_nodes:
+            for missing_node in missing_nodes:
+                comm_t1.append({missing_node})
+
         return [
             frozenset(community)
             for community in louvain_communities(

@@ -65,6 +65,7 @@ def _assign_action(
     line_origin_to_node: np.array,
     line_extremity_to_node: np.array,
     encoded_action: int,
+    composite_actions: bool = False,
 ) -> Optional[Tuple[int, BaseAction, int]]:
     (
         _,
@@ -77,16 +78,15 @@ def _assign_action(
     ) = action.get_types()
     action_impact = action.impact_on_objects()
 
-    if [topology, line, redispatching, curtailment].count(True) > 1:
-        # Composite actions are ignored
-        return
+    if not composite_actions:
+        if [topology, line, redispatching, curtailment].count(True) > 1:
+            return
 
     if topology:
         action_impact_on_topology = action_impact["topology"]
         if (
-            len(action_impact_on_topology) == 1
-            and not action_impact_on_topology["assigned_bus"]
-        ):
+            len(action_impact_on_topology) == 1 or composite_actions
+        ) and not action_impact_on_topology["assigned_bus"]:
             # Topological switches which include only 1 action
             return (
                 _get_topological_action_owner(
@@ -101,7 +101,7 @@ def _assign_action(
             )
     if line:
         if (
-            action_impact["switch_line"]["count"] == 1
+            (action_impact["switch_line"]["count"] == 1 or composite_actions)
             and not list(action_impact["force_line"]["reconnections"]["powerlines"])
             and not list(action_impact["force_line"]["disconnections"]["powerlines"])
         ):
@@ -122,6 +122,7 @@ def factor_action_space(
     observation_space: ObservationSpace,
     full_converter: IdToAct,
     n_substations: int,
+    composite_actions: bool = False,
 ) -> Tuple[Dict[int, List[int]], Dict[HashableAction, int]]:
     # TODO: take storage into account, take observation_space.storage_to_subid
 
@@ -148,6 +149,7 @@ def factor_action_space(
                     line_origin_to_node,
                     line_extremity_to_node,
                     encoded_action,
+                    composite_actions=composite_actions,
                 )
                 for encoded_action, action in enumerate(
                     tqdm(full_converter.all_actions[1:])
