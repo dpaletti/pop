@@ -3,6 +3,7 @@ from typing import List, Set, Tuple, Optional, FrozenSet
 
 import networkx as nx
 import networkx.linalg as nx_linalg
+from networkx.algorithms.community.quality import NotAPartition
 import numpy as np
 from pop.community_detection.louvain import louvain_communities
 from pop.community_detection.power_supply_modularity import belong_to_same_community
@@ -243,26 +244,34 @@ class CommunityDetector:
         for two_vertices_community in merged_to_vertices_communities:
             comm_t1.append(set(two_vertices_community))
 
-        # TODO: remove this and check correctness of community stuff
-        # One solution would be keeping this and removing overlapping communities when they are added
-        missing_nodes = set(graph_t1.nodes).difference(
-            {node for community in comm_t1 for node in community}
-        )
-        if missing_nodes:
-            for missing_node in missing_nodes:
-                comm_t1.append({missing_node})
+        try:
+            return [
+                frozenset(community)
+                for community in louvain_communities(
+                    graph_t1,
+                    comm_t1,
+                    weight=None,
+                    resolution=self.resolution,
+                    threshold=self.threshold,
+                    seed=Random(self.seed),
+                    enable_power_supply_modularity=self.enable_power_supply_modularity,
+                    alpha=alpha,
+                    beta=beta,
+                )
+            ]
+        except NotAPartition:
+            print("Could not build a valid partition, skipping community update")
+            comm_t_nodes = {node for community in comm_t for node in community}
+            missing_nodes = set(graph_t1.nodes).difference(comm_t_nodes)
+            if missing_nodes:
+                for missing_node in missing_nodes:
+                    comm_t.append({missing_node})
 
-        return [
-            frozenset(community)
-            for community in louvain_communities(
-                graph_t1,
-                comm_t1,
-                weight=None,
-                resolution=self.resolution,
-                threshold=self.threshold,
-                seed=Random(self.seed),
-                enable_power_supply_modularity=self.enable_power_supply_modularity,
-                alpha=alpha,
-                beta=beta,
-            )
-        ]
+            exceeding_nodes = set(comm_t_nodes).difference(set(graph_t1.nodes))
+            if exceeding_nodes:
+                for exceeding_node in exceeding_nodes:
+                    for comm in comm_t:
+                        if exceeding_node in comm:
+                            comm.remove(exceeding_node)
+                            break
+            return [frozenset(community) for community in comm_t if community]
