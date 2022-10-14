@@ -540,7 +540,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 stop_decay=manager_stop_decay,
                 next_community_to_manager=next_community_to_manager,
                 chosen_communities=[self.chosen_community]
-                if self.architecture.pop.selective_learning
+                if self.architecture.pop.manager_selective_learning
                 else self.communities,
                 incentives=current_manager_incentives,
                 dictatorship_penalties=current_manager_dictatorship_penalty,
@@ -548,13 +548,20 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
             self._step_agents(
                 factored_observation=self.factored_observation,
-                actions=self.substation_to_local_action,
+                actions=self.substation_to_local_action
+                if not self.architecture.pop.no_action_reward
+                else {
+                    substation: local_action
+                    if substation in selected_substations
+                    else 0
+                    for substation, local_action in self.substation_to_local_action.items()
+                },
                 reward=reward,
                 next_factored_observation=next_factored_observation,
                 done=done,
                 stop_decay=agents_stop_decay,
                 selected_substations=selected_substations
-                if self.architecture.pop.selective_learning
+                if self.architecture.pop.agent_selective_learning
                 else list(self.substation_to_local_action.keys()),
                 incentives=current_agent_incentives,
             )

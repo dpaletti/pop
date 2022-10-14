@@ -11,17 +11,19 @@ from pop.configs.type_aliases import ParsedTOMLDict
 class POPArchitecture:
     node_features: int
     edge_features: int
-    agent_neighbourhood_radius: int
-    decentralized: bool
-    epsilon_beta_scheduling: bool
-    enable_power_supply_modularity: bool
-    manager_history_size: int
-    manager_initialization_half_life: int
+    agent_neighbourhood_radius: int = 1
+    decentralized: bool = False
+    epsilon_beta_scheduling: bool = False
+    enable_power_supply_modularity: bool = False
+    manager_history_size: int = int(1e5)
+    manager_initialization_half_life: int = 0
     agent_type: str = "uniform"
     disabled_action_loops_length: int = 0
     repeated_action_penalty: float = 0
-    selective_learning: bool = False
+    manager_selective_learning: bool = False
+    agent_selective_learning: bool = False
     composite_actions: bool = False
+    no_action_reward: bool = False
     incentives: Optional[Dict[str, Any]] = None
     dictatorship_penalty: Optional[Dict[str, Any]] = None
 

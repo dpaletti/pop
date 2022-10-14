@@ -243,6 +243,8 @@ class CommunityDetector:
         for two_vertices_community in merged_to_vertices_communities:
             comm_t1.append(set(two_vertices_community))
 
+        # TODO: remove this and check correctness of community stuff
+        # One solution would be keeping this and removing overlapping communities when they are added
         missing_nodes = set(graph_t1.nodes).difference(
             {node for community in comm_t1 for node in community}
         )
