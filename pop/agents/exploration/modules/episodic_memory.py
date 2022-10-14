@@ -190,9 +190,17 @@ class EpisodicMemory(nn.Module, ExplorationModule):
         # y <- K nearest neighbors to x in M (all Ks, then the outputs of the kernels are summed)
         squared_euclidean_distance = float(norm(x - y) ** 2)
         self.k_squared_distance_running_mean.update(squared_euclidean_distance)
-        return epsilon / (
-            squared_euclidean_distance / self.k_squared_distance_running_mean.value
-            + epsilon
+        return (
+            epsilon
+            / (
+                (
+                    squared_euclidean_distance
+                    / self.k_squared_distance_running_mean.value
+                )
+                + epsilon
+            )
+            if self.k_squared_distance_running_mean.value != 0
+            else 0
         )
 
     class InverseNetwork(nn.Module):
