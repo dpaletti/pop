@@ -17,11 +17,11 @@ class POPArchitecture:
     enable_power_supply_modularity: bool
     manager_history_size: int
     manager_initialization_half_life: int
-    agent_type: str
-    disabled_action_loops_length: int
-    repeated_action_penalty: float
-    selective_learning: bool
-    composite_actions: bool
+    agent_type: str = "uniform"
+    disabled_action_loops_length: int = 0
+    repeated_action_penalty: float = 0
+    selective_learning: bool = False
+    composite_actions: bool = False
     incentives: Optional[Dict[str, Any]] = None
     dictatorship_penalty: Optional[Dict[str, Any]] = None
 
