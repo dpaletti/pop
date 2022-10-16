@@ -181,7 +181,7 @@ def factor_action_space(
 
 def factor_observation(
     obs_graph: nx.Graph, device: str, radius: int = 1
-) -> Dict[Substation, Optional[dgl.DGLHeteroGraph]]:
+) -> Dict[Substation, dgl.DGLHeteroGraph]:
     if radius < 1:
         dgl_graph = BaseGCNAgent.from_networkx_to_dgl(obs_graph, device)
         return {
@@ -206,8 +206,6 @@ def factor_observation(
 
     return {
         sub_id: BaseGCNAgent.from_networkx_to_dgl(ego_graph, device)
-        if ego_graph.number_of_edges() > 0
-        else None
         for sub_id, ego_graph in ego_graphs_dict.items()
     }
 

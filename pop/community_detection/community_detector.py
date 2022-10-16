@@ -244,34 +244,42 @@ class CommunityDetector:
         for two_vertices_community in merged_to_vertices_communities:
             comm_t1.append(set(two_vertices_community))
 
-        try:
-            return [
-                frozenset(community)
-                for community in louvain_communities(
-                    graph_t1,
-                    comm_t1,
-                    weight=None,
-                    resolution=self.resolution,
-                    threshold=self.threshold,
-                    seed=Random(self.seed),
-                    enable_power_supply_modularity=self.enable_power_supply_modularity,
-                    alpha=alpha,
-                    beta=beta,
-                )
+        # Isolated nodes must be manually added
+        # Once added they are carried through so we must avoid re-
+        for isolated_node in nx.isolates(graph_t1):
+            node_community = [
+                community for community in comm_t1 if isolated_node in community
             ]
-        except NotAPartition:
-            print("Could not build a valid partition, skipping community update")
-            comm_t_nodes = {node for community in comm_t for node in community}
-            missing_nodes = set(graph_t1.nodes).difference(comm_t_nodes)
-            if missing_nodes:
-                for missing_node in missing_nodes:
-                    comm_t.append({missing_node})
+            if not node_community:
+                comm_t1.append({isolated_node})
+            if len(node_community) > 1:
+                largest_community = node_community[
+                    np.argmax([len(community) for community in node_community])
+                ]
+                node_community.remove(largest_community)
+                comm_t1 = [
+                    community
+                    for community in comm_t1
+                    if community not in node_community
+                ]
 
-            exceeding_nodes = set(comm_t_nodes).difference(set(graph_t1.nodes))
-            if exceeding_nodes:
-                for exceeding_node in exceeding_nodes:
-                    for comm in comm_t:
-                        if exceeding_node in comm:
-                            comm.remove(exceeding_node)
-                            break
-            return [frozenset(community) for community in comm_t if community]
+        # Isolated nodes must be manually removed too
+        for isolated_node in filter(
+            lambda node: node not in graph_t1.nodes, nx.isolates(graph_t)
+        ):
+            comm_t1.remove({isolated_node})
+
+        return [
+            frozenset(community)
+            for community in louvain_communities(
+                graph_t1,
+                comm_t1,
+                weight=None,
+                resolution=self.resolution,
+                threshold=self.threshold,
+                seed=Random(self.seed),
+                enable_power_supply_modularity=self.enable_power_supply_modularity,
+                alpha=alpha,
+                beta=beta,
+            )
+        ]

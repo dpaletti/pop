@@ -60,7 +60,7 @@ class DPOP(BasePOP):
         self.head_manager: Optional[Manager] = Manager.remote(
             agent_actions=self.env.n_sub * 2,
             node_features=int(node_features)
-            + self.env.n_sub
+            + self.env.n_sub * 2
             + 1,  # Manager Node Embedding + Manager Community (1 hot encoded) + selected action
             architecture=self.architecture.head_manager,
             name="head_manager_" + self.name,
@@ -101,11 +101,22 @@ class DPOP(BasePOP):
         next_communities: List[Community],
         next_community_to_manager: Dict[Community, Manager],
     ):
-        try:
-            penalty = 0
-            if self.architecture.pop.dictatorship_penalty:
-                penalty = self.dictatorship_penalty.penalty(action)
+        penalty = 0
+        if self.architecture.pop.dictatorship_penalty:
+            penalty = self.dictatorship_penalty.penalty(action)
 
+        if done:
+            loss, full_reward = ray.get(
+                self.head_manager.step.remote(
+                    observation=self.summarized_graph,
+                    action=action,
+                    reward=reward + penalty,
+                    next_observation=dgl.DGLGraph(),
+                    done=done,
+                    stop_decay=False,
+                )
+            )
+        else:
             next_community_to_substation: Dict[
                 Community, Substation
             ] = self._get_manager_actions(
@@ -135,17 +146,13 @@ class DPOP(BasePOP):
                 )
             )
 
-            self.log_step(
-                losses=[loss],
-                implicit_rewards=[full_reward - reward],
-                names=[self.name],
-                train_steps=self.train_steps,
-                dictatorship_penalties=[penalty],
-            )
-
-        except KeyError as e:
-            print("...")
-            raise e
+        self.log_step(
+            losses=[loss],
+            implicit_rewards=[full_reward - reward],
+            names=[self.name],
+            train_steps=self.train_steps,
+            dictatorship_penalties=[penalty],
+        )
 
     def get_state(self: "DPOP") -> Dict[str, Any]:
         state: Dict[str, Any] = super().get_state()

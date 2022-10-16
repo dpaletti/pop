@@ -230,6 +230,10 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         )
         return loss.item()
 
+    def _add_fake_edge_features(self, graph: dgl.DGLGraph):
+        for edge_feature_number in range(self.edge_features):
+            graph.edata["feature_" + str(edge_feature_number)] = th.zeros((1, 1))
+
     def _step(
         self,
         observation: DGLHeteroGraph,
@@ -246,19 +250,38 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
             self.episodes += 1
             self.alive_steps = 0
 
+            next_observation.add_nodes(1)
+            next_observation.add_edges([0], [0])
+
+            for node_feature_number in range(self.node_features):
+                next_observation.ndata[
+                    "feature_" + str(node_feature_number)
+                ] = th.zeros((1, 1))
+            if self.edge_features is not None:
+                self._add_fake_edge_features(next_observation)
+
         else:
-            self.memory.push(observation, action, next_observation, reward, done)
             self.alive_steps += 1
 
-            if not stop_decay and self.training:
-                self.exploration.update(action)
-                self.memory.update()
+        if self.edge_features is not None:
+            if observation.num_edges() == 0:
+                observation.add_edges([0], [0])
+                self._add_fake_edge_features(observation)
+            if next_observation.num_edges() == 0:
+                next_observation.add_edges([0], [0])
+                self._add_fake_edge_features(next_observation)
 
-            # every so often the agents should learn from experiences
-            if self.train_steps % self.architecture.learning_frequency == 0:
-                loss: Optional[float] = self.learn()
-                self.learning_steps += 1
-                return loss, reward
+        self.memory.push(observation, action, next_observation, reward, done)
+
+        if not stop_decay and self.training:
+            self.exploration.update(action)
+            self.memory.update()
+
+        # every so often the agents should learn from experiences
+        if self.train_steps % self.architecture.learning_frequency == 0:
+            loss: Optional[float] = self.learn()
+            self.learning_steps += 1
+            return loss, reward
         return None, reward
 
     def step(

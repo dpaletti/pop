@@ -272,7 +272,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             [
                 idx
                 for idx, one_hot in enumerate(
-                    chosen_node_features[-(1 + self.env.n_sub) : -1].tolist()
+                    chosen_node_features[-(1 + self.env.n_sub * 2) : -1].tolist()
                 )
                 if one_hot == 1
             ]
@@ -357,7 +357,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
     def convert_obs(
         self, observation: BaseObservation
-    ) -> Tuple[Dict[Substation, Optional[dgl.DGLHeteroGraph]], nx.Graph]:
+    ) -> Tuple[Dict[Substation, dgl.DGLHeteroGraph], nx.Graph]:
         """
         Upon calling act(observation)
         The agent calls my_act(convert_obs(observation))
@@ -369,9 +369,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         observation_graph: nx.Graph = observation.as_networkx()
 
         # Observation is factored for each agent by taking the ego_graph of each substation
-        factored_observation: Dict[
-            Substation, Optional[dgl.DGLHeteroGraph]
-        ] = factor_observation(
+        factored_observation: Dict[Substation, dgl.DGLHeteroGraph] = factor_observation(
             observation_graph,
             str(self.device),
             self.architecture.pop.agent_neighbourhood_radius,
@@ -387,6 +385,81 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         next_observation: BaseObservation,
         done: bool,
     ):
+        # Log reward to tensorboard
+        repeated_action_penalty: float = self.action_detector.penalty()
+        self.log_reward(reward, self.train_steps, name="Reward")
+        penalized_reward: float = reward + repeated_action_penalty
+        self.log_reward(penalized_reward, self.train_steps, name="Penalized Reward")
+        self.log_reward(
+            repeated_action_penalty,
+            self.train_steps,
+            name="Repeated Action Penalty",
+        )
+        self.alive_steps += 1
+        self.train_steps += 1
+
+        selected_substations: List[Substation] = [
+            sub
+            for sub, agent_action in self.substation_to_encoded_action.items()
+            if agent_action == self.chosen_action
+        ]
+
+        # Stop the decay of the agent whose action has been selected
+        # In case no-action is selected multiple agents may have their decay stopped
+        agents_stop_decay: Dict[Substation, bool] = (
+            {
+                sub_id: False if sub_id in selected_substations else True
+                for sub_id, agent_action in self.substation_to_encoded_action.items()
+            }
+            if self.architecture.pop.epsilon_beta_scheduling
+            else {sub_id: False for sub_id in self.substation_to_encoded_action.keys()}
+        )
+
+        # Stop the decay of the managers whose action has been selected
+        # In case no-action is selected multiple agents may have their decay stopped
+        manager_stop_decay: Dict[Community, bool] = (
+            {
+                community: False if community == self.chosen_community else True
+                for community in self.community_to_manager.keys()
+            }
+            if self.architecture.pop.epsilon_beta_scheduling
+            else {community: False for community in self.community_to_manager.keys()}
+        )
+
+        current_agent_incentives: Optional[Dict[Substation, float]] = None
+        current_manager_incentives: Optional[Dict[Manager, float]] = None
+        if self.architecture.pop.incentives:
+            current_agent_incentives = self.agent_incentives.incentives(
+                selected_substations  # type: ignore
+            )
+            try:
+                current_manager_incentives = self.manager_incentives.incentives(
+                    [self.community_to_manager[self.chosen_community]]  # type: ignore
+                )  # type: ignore
+            except KeyError:
+                print(
+                    "Could not find manager of "
+                    + str(self.chosen_community)
+                    + ", skipping incentives"
+                )
+
+        current_manager_dictatorship_penalty: Optional[Dict[Manager, float]] = None
+
+        if self.architecture.pop.dictatorship_penalty:
+            current_manager_dictatorship_penalty = {
+                manager: 0 for manager in self.manager_dictatorship_penalties
+            }
+            for (
+                community,
+                chosen_substation,
+            ) in self.community_to_substation.items():
+                manager = self.community_to_manager[community]
+                current_manager_dictatorship_penalty[
+                    manager
+                ] += self.manager_dictatorship_penalties[manager].penalty(
+                    chosen_substation
+                )
+
         if done:
             self.log_alive_steps(self.alive_steps, self.episodes)
             self.train_steps += 1
@@ -407,19 +480,54 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                     self.dictatorship_penalty.reset()
                 except:
                     pass
-        else:
-            # Log reward to tensorboard
-            repeated_action_penalty: float = self.action_detector.penalty()
-            self.log_reward(reward, self.train_steps, name="Reward")
-            penalized_reward: float = reward + repeated_action_penalty
-            self.log_reward(penalized_reward, self.train_steps, name="Penalized Reward")
-            self.log_reward(
-                repeated_action_penalty,
-                self.train_steps,
-                name="Repeated Action Penalty",
+
+            self._extra_step(
+                next_sub_graphs=None,
+                next_graph=None,
+                next_substation_to_encoded_action=None,
+                reward=penalized_reward,
+                action=self.chosen_node,
+                done=done,
+                next_communities=None,
+                next_community_to_manager=None,
             )
-            self.alive_steps += 1
-            self.train_steps += 1
+
+            self._step_managers(
+                community_to_sub_graphs_dict=self.sub_graphs,
+                actions=self.community_to_substation,
+                reward=reward,
+                next_community_to_sub_graphs_dict=None,
+                done=done,
+                stop_decay=manager_stop_decay,
+                next_community_to_manager=None,
+                chosen_communities=[self.chosen_community]
+                if self.architecture.pop.manager_selective_learning
+                else self.communities,
+                incentives=current_manager_incentives,
+                dictatorship_penalties=current_manager_dictatorship_penalty,
+            )
+
+            self._step_agents(
+                factored_observation=self.factored_observation,
+                actions=self.substation_to_local_action
+                if not self.architecture.pop.no_action_reward
+                else {
+                    substation: local_action
+                    if substation in selected_substations
+                    else 0
+                    for substation, local_action in self.substation_to_local_action.items()
+                },
+                reward=reward,
+                next_factored_observation=None,
+                done=done,
+                stop_decay=agents_stop_decay,
+                selected_substations=selected_substations
+                if self.architecture.pop.agent_selective_learning
+                else list(self.substation_to_local_action.keys()),
+                incentives=current_agent_incentives,
+            )
+
+        else:
 
             # Normal graph of the next_observation
             next_graph: nx.Graph = next_observation.as_networkx()
@@ -439,25 +547,6 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 radius=self.architecture.pop.agent_neighbourhood_radius,
             )
 
-            selected_substations: List[Substation] = [
-                sub
-                for sub, agent_action in self.substation_to_encoded_action.items()
-                if agent_action == self.chosen_action
-            ]
-
-            # Stop the decay of the agent whose action has been selected
-            # In case no-action is selected multiple agents may have their decay stopped
-            agents_stop_decay: Dict[Substation, bool] = (
-                {
-                    sub_id: False if sub_id in selected_substations else True
-                    for sub_id, agent_action in self.substation_to_encoded_action.items()
-                }
-                if self.architecture.pop.epsilon_beta_scheduling
-                else {
-                    sub_id: False for sub_id in self.substation_to_encoded_action.keys()
-                }
-            )
-
             # Query agents for action
             next_substation_to_local_actions: Dict[
                 Substation, int
@@ -472,52 +561,6 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 substation_to_local_action=next_substation_to_local_actions,
                 new_communities=next_communities,
             )
-
-            # Stop the decay of the managers whose action has been selected
-            # In case no-action is selected multiple agents may have their decay stopped
-            manager_stop_decay: Dict[Community, bool] = (
-                {
-                    community: False if community == self.chosen_community else True
-                    for community in self.community_to_manager.keys()
-                }
-                if self.architecture.pop.epsilon_beta_scheduling
-                else {
-                    community: False for community in self.community_to_manager.keys()
-                }
-            )
-
-            current_agent_incentives: Optional[Dict[Substation, float]] = None
-            current_manager_incentives: Optional[Dict[Manager, float]] = None
-            if self.architecture.pop.incentives:
-                current_agent_incentives = self.agent_incentives.incentives(
-                    selected_substations  # type: ignore
-                )
-                try:
-                    current_manager_incentives = self.manager_incentives.incentives(
-                        [self.community_to_manager[self.chosen_community]]  # type: ignore
-                    )  # type: ignore
-                except KeyError:
-                    print(
-                        "Could not find manager of "
-                        + str(self.chosen_community)
-                        + ", skipping incentives"
-                    )
-
-            current_manager_dictatorship_penalty: Optional[Dict[Manager, float]] = None
-            if self.architecture.pop.dictatorship_penalty:
-                current_manager_dictatorship_penalty = {
-                    manager: 0 for manager in self.manager_dictatorship_penalties
-                }
-                for (
-                    community,
-                    chosen_substation,
-                ) in self.community_to_substation.items():
-                    manager = self.community_to_manager[community]
-                    current_manager_dictatorship_penalty[
-                        manager
-                    ] += self.manager_dictatorship_penalties[manager].penalty(
-                        chosen_substation
-                    )
 
             # Children may add needed functionalities to the step function by extending extra_step
             self._extra_step(
@@ -952,27 +995,46 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         incentives: Optional[Dict[Manager, float]] = None,
         dictatorship_penalties: Optional[Dict[Manager, float]] = None,
     ) -> None:
-
-        # Build a mapping between each manager and the communities she handles
-        # The mapping represents communities before and after applying the chosen action
-        manager_to_community_transformation: Dict[
-            Manager, Tuple[List[Community], List[Community]]
-        ] = {manager: ([], []) for manager in self.managers_history.keys()}
         chosen_communities_to_manager = {
             community: manager
             for community, manager in self.community_to_manager.items()
             if community in chosen_communities
         }
-        for community, manager in chosen_communities_to_manager.items():
-            manager_to_community_transformation[manager][0].append(community)
+        if done:
+            losses, rewards = zip(
+                *ray.get(
+                    [
+                        manager.step.remote(
+                            observation=community_to_sub_graphs_dict[old_community],
+                            action=actions[old_community],
+                            reward=(
+                                reward + incentives[manager]
+                                if incentives is not None
+                                else reward
+                            ),
+                            next_observation=dgl.DGLGraph(),
+                            done=done,
+                            stop_decay=stop_decay[old_community],
+                        )
+                        for old_community, manager in chosen_communities_to_manager.items()
+                    ]
+                )
+            )
+        else:
+            # Build a mapping between each manager and the communities she handles
+            # The mapping represents communities before and after applying the chosen action
+            manager_to_community_transformation: Dict[
+                Manager, Tuple[List[Community], List[Community]]
+            ] = {manager: ([], []) for manager in self.managers_history.keys()}
+            for community, manager in chosen_communities_to_manager.items():
+                manager_to_community_transformation[manager][0].append(community)
 
-        for new_community, manager in next_community_to_manager.items():
-            manager_to_community_transformation[manager][1].append(new_community)
+            for new_community, manager in next_community_to_manager.items():
+                manager_to_community_transformation[manager][1].append(new_community)
 
-        # Step the managers
-        # For each community before applying the action
-        # Find the most similar community among the ones managed after applying the action
-        try:
+            # Step the managers
+            # For each community before applying the action
+            # Find the most similar community among the ones managed after applying the action
             losses, rewards = zip(
                 *ray.get(
                     list(
@@ -1003,10 +1065,6 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                                                             new_community,
                                                         )
                                                         for new_community in new_manager_communities
-                                                        if next_community_to_sub_graphs_dict[
-                                                            new_community
-                                                        ].num_edges()
-                                                        > 0
                                                     ]
                                                 )
                                             ]
@@ -1015,43 +1073,17 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                                         stop_decay=stop_decay[old_community],
                                     )
                                     for old_community in old_manager_communities
-                                    if community_to_sub_graphs_dict[
-                                        old_community
-                                    ].num_edges()
-                                    > 0
                                 ]
                                 for manager, (
                                     old_manager_communities,
                                     new_manager_communities,
                                 ) in manager_to_community_transformation.items()
-                                if list(
-                                    filter(
-                                        lambda x: community_to_sub_graphs_dict[
-                                            x
-                                        ].num_edges()
-                                        > 0,
-                                        old_manager_communities,
-                                    )
-                                )
-                                and list(
-                                    filter(
-                                        lambda x: next_community_to_sub_graphs_dict[
-                                            x
-                                        ].num_edges()
-                                        > 0,
-                                        new_manager_communities,
-                                    )
-                                )
+                                if new_manager_communities and old_manager_communities
                             ]
                         )
                     )
                 )
             )
-        except ValueError as e:
-            print(
-                "Manager stepping raised ValueError, usually not a problem, not stepping any manager ..."
-            )
-            return
 
         names = ray.get(
             [
@@ -1101,26 +1133,46 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             for sub, agent in self.substation_to_agent.items()
             if sub in selected_substations
         }
-        for sub_id, observation in factored_observation.items():
-            next_observation: Optional[
-                dgl.DGLHeteroGraph
-            ] = next_factored_observation.get(sub_id)
-            if next_observation is not None and sub_id in subs_to_agent_to_step.keys():
 
-                # Build step promise with the previous and next observation
-                step_promises.append(
-                    subs_to_agent_to_step[sub_id].step.remote(
-                        observation=observation,
-                        action=actions[sub_id],
-                        reward=reward + incentives[sub_id]
-                        if incentives is not None
-                        else reward,
-                        next_observation=next_factored_observation[sub_id],
-                        done=done,
-                        stop_decay=stop_decay[sub_id],
+        if done:
+            for sub_id, observation in factored_observation.items():
+                if sub_id in subs_to_agent_to_step.keys():
+                    step_promises.append(
+                        subs_to_agent_to_step[sub_id].step.remote(
+                            observation=observation,
+                            action=actions[sub_id],
+                            reward=reward + incentives[sub_id]
+                            if incentives is not None
+                            else reward,
+                            next_observation=dgl.DGLGraph(),
+                            done=done,
+                            stop_decay=stop_decay[sub_id],
+                        )
                     )
-                )
-                substations.append(sub_id)
+        else:
+            for sub_id, observation in factored_observation.items():
+                next_observation: Optional[
+                    dgl.DGLHeteroGraph
+                ] = next_factored_observation.get(sub_id)
+                if (
+                    next_observation is not None
+                    and sub_id in subs_to_agent_to_step.keys()
+                ):
+
+                    # Build step promise with the previous and next observation
+                    step_promises.append(
+                        subs_to_agent_to_step[sub_id].step.remote(
+                            observation=observation,
+                            action=actions[sub_id],
+                            reward=reward + incentives[sub_id]
+                            if incentives is not None
+                            else reward,
+                            next_observation=next_factored_observation[sub_id],
+                            done=done,
+                            stop_decay=stop_decay[sub_id],
+                        )
+                    )
+                    substations.append(sub_id)
 
         # Step the agents
         losses, rewards = zip(*ray.get(step_promises))
@@ -1213,7 +1265,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                     th.tensor(
                         [
                             1 if substation in community else 0
-                            for substation in range(self.env.n_sub)
+                            for substation in range(self.env.n_sub * 2)
                         ]
                     ),
                     th.tensor([manager_actions[community]]),
