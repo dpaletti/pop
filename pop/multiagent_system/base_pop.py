@@ -248,6 +248,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         # Managers chooses the best substation for each community they handle
         self.community_to_substation = self._get_manager_actions(
+            graph,
             self.sub_graphs,
             self.substation_to_encoded_action,
             self.communities,
@@ -432,16 +433,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             current_agent_incentives = self.agent_incentives.incentives(
                 selected_substations  # type: ignore
             )
-            try:
-                current_manager_incentives = self.manager_incentives.incentives(
-                    [self.community_to_manager[self.chosen_community]]  # type: ignore
-                )  # type: ignore
-            except KeyError:
-                print(
-                    "Could not find manager of "
-                    + str(self.chosen_community)
-                    + ", skipping incentives"
-                )
+            current_manager_incentives = self.manager_incentives.incentives(
+                [self.community_to_manager[self.chosen_community]]  # type: ignore
+            )  # type: ignore
 
         current_manager_dictatorship_penalty: Optional[Dict[Manager, float]] = None
 
@@ -675,7 +669,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         return answers
 
     def _get_agent_actions(
-        self, factored_observation: Dict[Substation, Optional[dgl.DGLHeteroGraph]]
+        self, factored_observation: Dict[Substation, dgl.DGLHeteroGraph]
     ) -> Dict[Substation, int]:
         """
         Query each agent for 1 action
@@ -694,8 +688,6 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                         self.substation_to_agent[sub_id].take_action.remote(
                             observation,
                         )
-                        if observation is not None
-                        else no_action_positions_to_add.append(idx)
                         for idx, (sub_id, observation) in enumerate(
                             factored_observation.items()
                         )
@@ -715,6 +707,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
     def _get_manager_actions(
         self,
+        graph: nx.Graph,
         community_to_sub_graphs_dict: Dict[Community, dgl.DGLHeteroGraph],
         substation_to_encoded_action: Dict[Substation, EncodedAction],
         communities: List[Community],
@@ -724,12 +717,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         Query one action per community
         """
 
-        no_action_positions_to_add: List[int] = []
-
         # Managers are queried for an action
         # Each manager chooses one action for each community she handles
-        # In case of single node communities managers choose no action
-        actions: List[Substation] = ray.get(
+        actions: List[int] = ray.get(
             list(
                 filter(
                     lambda x: x is not None,
@@ -738,27 +728,18 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                             transformed_observation=community_to_sub_graphs_dict[
                                 community
                             ],
-                            mask=frozenset(
-                                [
-                                    sub
-                                    for sub in community
-                                    if sub in list(substation_to_encoded_action.keys())
-                                ]
-                            ),
+                            mask=frozenset([node for node in community]),
                         )
-                        if community_to_sub_graphs_dict[community].num_edges() > 0
-                        else no_action_positions_to_add.append(idx)
-                        for idx, community in enumerate(communities)
+                        for community in communities
                     ],
                 )
             )
         )
 
-        # no_action is added for each single node community
-        for no_action_position in no_action_positions_to_add:
-            actions.insert(no_action_position, 0)
-
-        return {community: action for community, action in zip(communities, actions)}
+        return {
+            community: graph.nodes.data()[action]["sub_id"]
+            for community, action in zip(communities, actions)
+        }
 
     def _compute_managers_sub_graphs(
         self,
@@ -805,16 +786,20 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         # The graph is summarized by contracting every community in 1 supernode
         # And storing the embedding of each manager in each supernode as node feature
         # Together with the action chosen by the manager
-        return self._summarize_graph(
-            graph,
-            {
-                community: substation_to_encoded_action[substation]
-                for community, substation in community_to_substation.items()
-            },
-            sub_graphs,
-            new_communities=new_communities,
-            new_community_to_manager_dict=new_community_to_manager_dict,
-        ).to(self.device)
+        try:
+            return self._summarize_graph(
+                graph,
+                {
+                    community: substation_to_encoded_action[substation]
+                    for community, substation in community_to_substation.items()
+                },
+                sub_graphs,
+                new_communities=new_communities,
+                new_community_to_manager_dict=new_community_to_manager_dict,
+            ).to(self.device)
+        except Exception as e:
+            print("...")
+            raise e
 
     @staticmethod
     def _jaccard_distance(s1: frozenset, s2: frozenset) -> float:
@@ -1212,22 +1197,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         node_attribute_dict = {}
         for community, sub_graph in sub_graphs.items():
-            node_embeddings = (
-                ray.get(
-                    current_community_to_manager_dict[
-                        community
-                    ].get_node_embeddings.remote(sub_graph)
-                )
-                if sub_graph.num_nodes() > 1
-                else th.zeros(
-                    (
-                        1,
-                        ray.get(
-                            current_community_to_manager_dict[
-                                community
-                            ].get_embedding_size.remote()
-                        ),
-                    )
+            node_embeddings = ray.get(
+                current_community_to_manager_dict[community].get_node_embeddings.remote(
+                    sub_graph
                 )
             )
             sub_graphs[community].ndata["node_embeddings"] = node_embeddings

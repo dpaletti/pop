@@ -232,7 +232,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
 
     def _add_fake_edge_features(self, graph: dgl.DGLGraph):
         for edge_feature_number in range(self.edge_features):
-            graph.edata["feature_" + str(edge_feature_number)] = th.zeros((1, 1))
+            graph.edata["feature_" + str(edge_feature_number)] = th.zeros((1,))
 
     def _step(
         self,
@@ -245,6 +245,8 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
     ) -> Tuple[Optional[float], float]:
         # This method is redefined by ExplorationModule.apply_intrinsic_reward() at runtime if training=True
 
+        # TODO: don't add fake edge move this logic to the GCN itself
+        # TODO: so that a fake tensor can be easily generated
         self.train_steps += 1
         if done:
             self.episodes += 1
@@ -256,7 +258,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
             for node_feature_number in range(self.node_features):
                 next_observation.ndata[
                     "feature_" + str(node_feature_number)
-                ] = th.zeros((1, 1))
+                ] = th.zeros((1,))
             if self.edge_features is not None:
                 self._add_fake_edge_features(next_observation)
 

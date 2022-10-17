@@ -58,6 +58,13 @@ class Manager(BaseGCNAgent):
         return self.embedding_size
 
     def get_node_embeddings(self, transformed_observation: DGLHeteroGraph) -> Tensor:
+        if self.edge_features is not None:
+            if transformed_observation.num_edges() == 0:
+                transformed_observation.add_edge([0], [0])
+                for edge_feature_number in range(self.edge_features):
+                    transformed_observation.edata[
+                        "feature_" + str(edge_feature_number)
+                    ] = th.zeros((1,))
         return self.q_network.embedding(transformed_observation.to(self.device))
 
     def _take_action(
