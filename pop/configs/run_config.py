@@ -52,6 +52,7 @@ class TrainingParameters:
     curriculum: bool
     reset_decay: bool
     save_frequency: int
+    skip: int = 1
 
 
 @dataclass(frozen=True)

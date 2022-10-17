@@ -245,7 +245,7 @@ class CommunityDetector:
             comm_t1.append(set(two_vertices_community))
 
         # Isolated nodes must be manually added
-        # Once added they are carried through so we must avoid re-
+        # Once added they are carried through so we must avoid re-adding
         for isolated_node in nx.isolates(graph_t1):
             node_community = [
                 community for community in comm_t1 if isolated_node in community

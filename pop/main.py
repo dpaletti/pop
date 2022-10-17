@@ -240,6 +240,7 @@ def main(**kwargs):
             iterations=config.training.steps,
             dpop=agent,
             save_frequency=config.training.save_frequency,
+            skip=config.training.skip,
         )
         # stats = yappi.get_func_stats()
         # stats.save("yappi_out", type="callgrind")

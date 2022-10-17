@@ -36,6 +36,7 @@ from pop.networks.serializable_module import SerializableModule
 from pop.multiagent_system.dictatorship_penalizer import DictatorshipPenalizer
 
 from pop.multiagent_system.reward_distributor import Incentivizer
+import random
 
 
 class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
@@ -786,20 +787,16 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         # The graph is summarized by contracting every community in 1 supernode
         # And storing the embedding of each manager in each supernode as node feature
         # Together with the action chosen by the manager
-        try:
-            return self._summarize_graph(
-                graph,
-                {
-                    community: substation_to_encoded_action[substation]
-                    for community, substation in community_to_substation.items()
-                },
-                sub_graphs,
-                new_communities=new_communities,
-                new_community_to_manager_dict=new_community_to_manager_dict,
-            ).to(self.device)
-        except Exception as e:
-            print("...")
-            raise e
+        return self._summarize_graph(
+            graph,
+            {
+                community: substation_to_encoded_action[substation]
+                for community, substation in community_to_substation.items()
+            },
+            sub_graphs,
+            new_communities=new_communities,
+            new_community_to_manager_dict=new_community_to_manager_dict,
+        ).to(self.device)
 
     @staticmethod
     def _jaccard_distance(s1: frozenset, s2: frozenset) -> float:
@@ -1255,7 +1252,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         )
 
 
-def train(env: BaseEnv, iterations: int, dpop, save_frequency: int = 3600):
+def train(
+    env: BaseEnv, iterations: int, dpop, save_frequency: int = 3600, skip: int = 1
+):
 
     training_step: int = 0
     obs: BaseObservation = env.reset()
@@ -1270,7 +1269,10 @@ def train(env: BaseEnv, iterations: int, dpop, save_frequency: int = 3600):
             if dpop.episodes % total_episodes == 0:
                 env.chronics_handler.shuffle()
             if done:
-                obs = env.reset()
+                sampled_skip = random.sample(range(0, skip), 1)[0]
+                env.reset()
+                env.fast_forward_chronics(sampled_skip)
+                obs = env.get_obs()
             encoded_action = dpop.my_act(dpop.convert_obs(obs), reward, done)
             action = dpop.convert_act(encoded_action)
             next_obs, reward, done, _ = env.step(action)
