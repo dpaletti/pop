@@ -279,24 +279,6 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
     ) -> Tuple[Optional[float], float]:
         # This method is redefined by ExplorationModule.apply_intrinsic_reward() at runtime if training=True
 
-        self._cast_features_to_float32(observation)
-        self._cast_features_to_float32(next_observation)
-
-        self.train_steps += 1
-
-        if observation.num_nodes() == 0:
-            self._add_fake_node(observation)
-
-        if next_observation.num_nodes() == 0:
-            self._add_fake_node(next_observation)
-
-        if self.edge_features is not None:
-            if observation.num_edges() == 0:
-                observation.add_edges([0], [0])
-                self._add_fake_edge_features(observation)
-            if next_observation.num_edges() == 0:
-                next_observation.add_edges([0], [0])
-                self._add_fake_edge_features(next_observation)
         if done:
             self.episodes += 1
             self.alive_steps = 0
@@ -326,6 +308,26 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         done: bool,
         stop_decay: bool = False,
     ) -> Tuple[Optional[float], float]:
+
+        self._cast_features_to_float32(observation)
+        self._cast_features_to_float32(next_observation)
+
+        self.train_steps += 1
+
+        if observation.num_nodes() == 0:
+            self._add_fake_node(observation)
+
+        if next_observation.num_nodes() == 0:
+            self._add_fake_node(next_observation)
+
+        if self.edge_features is not None:
+            if observation.num_edges() == 0:
+                observation.add_edges([0], [0])
+                self._add_fake_edge_features(observation)
+            if next_observation.num_edges() == 0:
+                next_observation.add_edges([0], [0])
+                self._add_fake_edge_features(next_observation)
+
         if self.training:
             return self.exploration.apply_intrinsic_reward(self._step)(
                 self,
@@ -336,6 +338,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
                 done,
                 stop_decay=stop_decay,
             )
+
         else:
             return self._step(
                 observation,
