@@ -66,6 +66,7 @@ class DPOP(BasePOP):
             name="head_manager_" + self.name,
             training=self.training,
             device=str(self.device),
+            single_node_features=self.architecture.pop.head_manager_embedding_name,
         )
         if self.architecture.pop.dictatorship_penalty:
             self.dictatorship_penalty = DictatorshipPenalizer(

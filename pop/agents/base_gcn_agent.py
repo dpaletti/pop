@@ -33,14 +33,15 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
     def __init__(
         self,
         agent_actions: Optional[int],
-        node_features: Optional[int],
+        node_features: Optional[List[str]],
         architecture: Optional[AgentArchitecture],
         training: bool,
         name: str,
         device: str,
         log_dir: Optional[str],
         tensorboard_dir: Optional[str],
-        edge_features: Optional[int] = None,
+        edge_features: Optional[List[str]] = None,
+        single_node_features: Optional[str] = None,
     ):
         SerializableModule.__init__(self, name=name, log_dir=log_dir)
         LoggableModule.__init__(self, tensorboard_dir=tensorboard_dir)
@@ -48,9 +49,14 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         # Agent Architecture
         self.architecture = architecture
         self.actions = agent_actions
-        self.node_features = node_features
-        self.edge_features = edge_features
+        self.node_features_schema: Optional[List[str]] = node_features
+        self.edge_features_schema: Optional[List[str]] = edge_features
+        self.node_features: int = len(node_features)
+        self.edge_features: Optional[int] = (
+            len(edge_features) if edge_features is not None else None
+        )
         self.name = name
+        self.single_node_features = single_node_features
 
         # Initialize Torch device
         if device is None:
@@ -66,8 +72,8 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         # Initialize deep networks
         self.q_network: DuelingNet = DuelingNet(
             action_space_size=agent_actions,
-            node_features=node_features,
-            edge_features=edge_features,
+            node_features=self.node_features,
+            edge_features=self.edge_features,
             embedding_architecture=architecture.embedding,
             advantage_stream_architecture=architecture.advantage_stream,
             value_stream_architecture=architecture.value_stream,
@@ -235,8 +241,20 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         return loss.item()
 
     def _add_fake_edge_features(self, graph: dgl.DGLGraph):
-        for edge_feature_number in range(self.edge_features):
-            graph.edata["feature_" + str(edge_feature_number)] = th.zeros((1,))
+        if self.edge_features_schema is not None:
+            for edge_feature in self.edge_features_schema:
+                graph.edata[edge_feature] = th.zeros((1,))
+        else:
+            raise Exception("Called add_fake_edge_features without features")
+
+    def _add_fake_node(self, graph: dgl.DGLGraph):
+
+        graph.add_nodes(1)
+        if not self.single_node_features:
+            for node_feature in self.node_features_schema:
+                graph.ndata[node_feature] = th.zeros((1,))
+        else:
+            graph.ndata[self.single_node_features] = th.zeros((self.node_features,))
 
     def _step(
         self,
@@ -254,18 +272,10 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         self.train_steps += 1
 
         if observation.num_nodes() == 0:
-            observation.add_nodes(1)
-            for node_feature_number in range(self.node_features):
-                observation.ndata["feature_" + str(node_feature_number)] = th.zeros(
-                    (1,)
-                )
+            self._add_fake_node(observation)
 
         if next_observation.num_nodes() == 0:
-            next_observation.add_nodes(1)
-            for node_feature_number in range(self.node_features):
-                next_observation.ndata[
-                    "feature_" + str(node_feature_number)
-                ] = th.zeros((1,))
+            self._add_fake_node(next_observation)
 
         if self.edge_features is not None:
             if observation.num_edges() == 0:

@@ -58,8 +58,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         self.name = name
         self.seed: int = seed
         self.env = env
-        self.node_features: int = architecture.pop.node_features
-        self.edge_features: int = architecture.pop.edge_features
+        self.node_features: List[str] = architecture.pop.node_features
+        self.edge_features: List[str] = architecture.pop.edge_features
 
         # Converter
         self.converter = IdToAct(env.action_space)
@@ -266,9 +266,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         # The head manager chooses the best action from every community given the summarized graph
         self.chosen_node = self.get_action(self.summarized_graph)
-        chosen_node_features = self.summarized_graph.ndata[
-            "embedding_community_action"
-        ][self.chosen_node]
+        chosen_node_features = self.summarized_graph.ndata[head_manager_embedding_name][
+            self.chosen_node
+        ]
         self.chosen_action = int(chosen_node_features[-1].item())
         self.chosen_community = frozenset(
             [
@@ -1232,7 +1232,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                     summarized_graph, community_list[0], node
                 )
             summarized_graph.nodes[community_list[0]][
-                "embedding_community_action"
+                self.architecture.pop.head_manager_embedding_name
             ] = th.cat(
                 (
                     summarized_graph.nodes[community_list[0]]["embedding"],
@@ -1246,13 +1246,13 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 ),
                 dim=-1,
             )
-        summarized_graph
+
         # The summarized graph is returned in DGL format
         # Each supernode has the action chosen by its community manager
         # And the contracted embedding
         return dgl.from_networkx(
             summarized_graph.to_directed(),
-            node_attrs=["embedding_community_action"],
+            node_attrs=[self.architecture.pop.head_manager_embedding_name],
             device=self.device,
         )
 

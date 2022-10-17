@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, Optional, Any
+from typing import Dict, List, Optional, Any
 
 import toml
 
@@ -9,9 +9,10 @@ from pop.configs.type_aliases import ParsedTOMLDict
 
 @dataclass(frozen=True)
 class POPArchitecture:
-    node_features: int
-    edge_features: int
+    node_features: List[str]
+    edge_features: List[str]
     agent_neighbourhood_radius: int = 1
+    head_manager_embedding_name: str = "embedding_community_action"
     decentralized: bool = False
     epsilon_beta_scheduling: bool = False
     enable_power_supply_modularity: bool = False
