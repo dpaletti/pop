@@ -183,6 +183,10 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
     def take_action(
         self, transformed_observation: DGLHeteroGraph, mask: Optional[List[int]] = None
     ) -> int:
+        if self.edge_features is not None and transformed_observation.num_edges() == 0:
+            transformed_observation.add_edges([0], [0])
+            self._add_fake_edge_features(transformed_observation)
+
         if self.training:
             return self.exploration.action_exploration(self._take_action)(
                 self, transformed_observation, mask=mask
@@ -248,22 +252,20 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         # TODO: don't add fake edge move this logic to the GCN itself
         # TODO: so that a fake tensor can be easily generated
         self.train_steps += 1
-        if done:
-            self.episodes += 1
-            self.alive_steps = 0
 
+        if observation.num_nodes() == 0:
+            observation.add_nodes(1)
+            for node_feature_number in range(self.node_features):
+                observation.ndata["feature_" + str(node_feature_number)] = th.zeros(
+                    (1,)
+                )
+
+        if next_observation.num_nodes() == 0:
             next_observation.add_nodes(1)
-            next_observation.add_edges([0], [0])
-
             for node_feature_number in range(self.node_features):
                 next_observation.ndata[
                     "feature_" + str(node_feature_number)
                 ] = th.zeros((1,))
-            if self.edge_features is not None:
-                self._add_fake_edge_features(next_observation)
-
-        else:
-            self.alive_steps += 1
 
         if self.edge_features is not None:
             if observation.num_edges() == 0:
@@ -272,6 +274,12 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
             if next_observation.num_edges() == 0:
                 next_observation.add_edges([0], [0])
                 self._add_fake_edge_features(next_observation)
+        if done:
+            self.episodes += 1
+            self.alive_steps = 0
+
+        else:
+            self.alive_steps += 1
 
         self.memory.push(observation, action, next_observation, reward, done)
 

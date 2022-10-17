@@ -1017,55 +1017,60 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             # Step the managers
             # For each community before applying the action
             # Find the most similar community among the ones managed after applying the action
-            losses, rewards = zip(
-                *ray.get(
-                    list(
-                        itertools.chain(
-                            *[
-                                [
-                                    manager.step.remote(
-                                        observation=community_to_sub_graphs_dict[
-                                            old_community
-                                        ],
-                                        action=actions[old_community],
-                                        reward=(
-                                            reward + incentives[manager]
-                                            if incentives is not None
-                                            else reward
-                                        )
-                                        + (
-                                            0
-                                            if not dictatorship_penalties
-                                            else dictatorship_penalties[manager]
-                                        ),
-                                        next_observation=next_community_to_sub_graphs_dict[
-                                            new_manager_communities[
-                                                np.argmax(
-                                                    [
-                                                        self._jaccard_distance(
-                                                            old_community,
-                                                            new_community,
-                                                        )
-                                                        for new_community in new_manager_communities
-                                                    ]
-                                                )
+            try:
+                losses, rewards = zip(
+                    *ray.get(
+                        list(
+                            itertools.chain(
+                                *[
+                                    [
+                                        manager.step.remote(
+                                            observation=community_to_sub_graphs_dict[
+                                                old_community
+                                            ],
+                                            action=actions[old_community],
+                                            reward=(
+                                                reward + incentives[manager]
+                                                if incentives is not None
+                                                else reward
+                                            )
+                                            + (
+                                                0
+                                                if not dictatorship_penalties
+                                                else dictatorship_penalties[manager]
+                                            ),
+                                            next_observation=next_community_to_sub_graphs_dict[
+                                                new_manager_communities[
+                                                    np.argmax(
+                                                        [
+                                                            self._jaccard_distance(
+                                                                old_community,
+                                                                new_community,
+                                                            )
+                                                            for new_community in new_manager_communities
+                                                        ]
+                                                    )
+                                                ]
                                             ]
-                                        ],
-                                        done=done,
-                                        stop_decay=stop_decay[old_community],
-                                    )
-                                    for old_community in old_manager_communities
+                                            if new_manager_communities
+                                            else dgl.DGLGraph(),
+                                            done=done,
+                                            stop_decay=stop_decay[old_community],
+                                        )
+                                        for old_community in old_manager_communities
+                                    ]
+                                    for manager, (
+                                        old_manager_communities,
+                                        new_manager_communities,
+                                    ) in manager_to_community_transformation.items()
                                 ]
-                                for manager, (
-                                    old_manager_communities,
-                                    new_manager_communities,
-                                ) in manager_to_community_transformation.items()
-                                if new_manager_communities and old_manager_communities
-                            ]
+                            )
                         )
                     )
                 )
-            )
+            except ValueError as e:
+                print("....")
+                raise e
 
         names = ray.get(
             [

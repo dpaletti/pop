@@ -245,13 +245,23 @@ class CommunityDetector:
             comm_t1.append(set(two_vertices_community))
 
         # Isolated nodes must be manually added
-        # Once added they are carried through so we must avoid re-adding
+        # Once added they are carried through so we must avoid re-
         for isolated_node in nx.isolates(graph_t1):
             node_community = [
                 community for community in comm_t1 if isolated_node in community
             ]
             if not node_community:
                 comm_t1.append({isolated_node})
+            if len(node_community) > 1:
+                largest_community = node_community[
+                    np.argmax([len(community) for community in node_community])
+                ]
+                node_community.remove(largest_community)
+                comm_t1 = [
+                    community
+                    for community in comm_t1
+                    if community not in node_community
+                ]
 
         # Isolated nodes must be manually removed too
         for isolated_node in filter(
@@ -259,17 +269,21 @@ class CommunityDetector:
         ):
             comm_t1.remove({isolated_node})
 
-        return [
-            frozenset(community)
-            for community in louvain_communities(
-                graph_t1,
-                comm_t1,
-                weight=None,
-                resolution=self.resolution,
-                threshold=self.threshold,
-                seed=Random(self.seed),
-                enable_power_supply_modularity=self.enable_power_supply_modularity,
-                alpha=alpha,
-                beta=beta,
-            )
-        ]
+        try:
+            return [
+                frozenset(community)
+                for community in louvain_communities(
+                    graph_t1,
+                    comm_t1,
+                    weight=None,
+                    resolution=self.resolution,
+                    threshold=self.threshold,
+                    seed=Random(self.seed),
+                    enable_power_supply_modularity=self.enable_power_supply_modularity,
+                    alpha=alpha,
+                    beta=beta,
+                )
+            ]
+        except NotAPartition as e:
+            print("...")
+            raise e
