@@ -4,6 +4,7 @@ from dataclasses import asdict
 import numpy as np
 from typing import Dict, Tuple, List, Any
 import pandas as pd
+import torch as th
 
 from pop.configs.agent_architecture import ReplayMemoryParameters
 

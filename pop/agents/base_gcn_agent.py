@@ -210,6 +210,8 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         next_observation: DGLHeteroGraph,
         done: bool,
     ) -> None:
+        self._cast_features_to_float32(observation)
+        self._cast_features_to_float32(next_observation)
 
         self.memory.push(observation, action, next_observation, reward, done)
 
@@ -260,6 +262,12 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
                 1, self.single_node_features
             )
 
+    def _cast_features_to_float32(self, graph: DGLHeteroGraph):
+        for feature in graph.node_attr_schemes().keys():
+            graph.ndata[feature] = graph.ndata[feature].type(th.float32)
+        for feature in graph.edge_attr_schemes().keys():
+            graph.edata[feature] = graph.edata[feature].type(th.float32)
+
     def _step(
         self,
         observation: DGLHeteroGraph,
@@ -271,8 +279,9 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
     ) -> Tuple[Optional[float], float]:
         # This method is redefined by ExplorationModule.apply_intrinsic_reward() at runtime if training=True
 
-        # TODO: don't add fake edge move this logic to the GCN itself
-        # TODO: so that a fake tensor can be easily generated
+        self._cast_features_to_float32(observation)
+        self._cast_features_to_float32(next_observation)
+
         self.train_steps += 1
 
         if observation.num_nodes() == 0:

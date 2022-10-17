@@ -34,7 +34,7 @@ class DPOP(BasePOP):
         process = psutil.Process()
         process.cpu_affinity(list(range(0, 14)))
         print("Running on cores: " + str(process.cpu_affinity()))
-        ray.init(local_mode=False, num_cpus=len(process.cpu_affinity()) * 2)
+        ray.init(local_mode=True, num_cpus=len(process.cpu_affinity()) * 2)
         super(DPOP, self).__init__(
             env=env,
             name=name,
