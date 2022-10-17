@@ -54,3 +54,4 @@ class RandomNetworkDistiller(nn.Module):
             self.distiller_optimizer.zero_grad()
             self.last_loss.backward()
             self.distiller_optimizer.step()
+            self.last_loss = None
