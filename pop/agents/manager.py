@@ -32,12 +32,13 @@ class Manager(BaseGCNAgent):
     def __init__(
         self,
         agent_actions: int,
-        node_features: int,
+        node_features: List[str],
         architecture: AgentArchitecture,
         name: str,
         training: bool,
         device: str,
-        edge_features: Optional[int] = None,
+        edge_features: Optional[List[str]] = None,
+        single_node_features: Optional[int] = None,
     ):
         BaseGCNAgent.__init__(
             self,
@@ -50,6 +51,7 @@ class Manager(BaseGCNAgent):
             device=device,
             tensorboard_dir=None,
             log_dir=None,
+            single_node_features=single_node_features,
         )
 
         self.embedding_size = self.q_network.get_embedding_size()
@@ -61,10 +63,7 @@ class Manager(BaseGCNAgent):
         if self.edge_features is not None:
             if transformed_observation.num_edges() == 0:
                 transformed_observation.add_edge([0], [0])
-                for edge_feature_number in range(self.edge_features):
-                    transformed_observation.edata[
-                        "feature_" + str(edge_feature_number)
-                    ] = th.zeros((1,))
+                self._add_fake_edge_features(transformed_observation)
         return self.q_network.embedding(transformed_observation.to(self.device))
 
     def _take_action(

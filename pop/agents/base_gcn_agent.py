@@ -41,7 +41,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         log_dir: Optional[str],
         tensorboard_dir: Optional[str],
         edge_features: Optional[List[str]] = None,
-        single_node_features: Optional[str] = None,
+        single_node_features: Optional[int] = None,
     ):
         SerializableModule.__init__(self, name=name, log_dir=log_dir)
         LoggableModule.__init__(self, tensorboard_dir=tensorboard_dir)
@@ -51,7 +51,9 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         self.actions = agent_actions
         self.node_features_schema: Optional[List[str]] = node_features
         self.edge_features_schema: Optional[List[str]] = edge_features
-        self.node_features: int = len(node_features)
+        self.node_features: int = (
+            len(node_features) if single_node_features is None else single_node_features
+        )
         self.edge_features: Optional[int] = (
             len(edge_features) if edge_features is not None else None
         )
@@ -254,7 +256,9 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
             for node_feature in self.node_features_schema:
                 graph.ndata[node_feature] = th.zeros((1,))
         else:
-            graph.ndata[self.single_node_features] = th.zeros((self.node_features,))
+            graph.ndata[self.node_features_schema[0]] = th.zeros(
+                1, self.single_node_features
+            )
 
     def _step(
         self,

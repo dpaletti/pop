@@ -34,7 +34,7 @@ class DPOP(BasePOP):
         process = psutil.Process()
         process.cpu_affinity(list(range(0, 14)))
         print("Running on cores: " + str(process.cpu_affinity()))
-        ray.init(local_mode=False, num_cpus=len(process.cpu_affinity()) * 2)
+        ray.init(local_mode=True, num_cpus=len(process.cpu_affinity()) * 2)
         super(DPOP, self).__init__(
             env=env,
             name=name,
@@ -59,14 +59,14 @@ class DPOP(BasePOP):
         # Head Manager Initialization
         self.head_manager: Optional[Manager] = Manager.remote(
             agent_actions=self.env.n_sub * 2,
-            node_features=int(node_features)
-            + self.env.n_sub * 2
-            + 1,  # Manager Node Embedding + Manager Community (1 hot encoded) + selected action
+            node_features=[self.architecture.pop.head_manager_embedding_name],
             architecture=self.architecture.head_manager,
             name="head_manager_" + self.name,
             training=self.training,
             device=str(self.device),
-            single_node_features=self.architecture.pop.head_manager_embedding_name,
+            single_node_features=int(node_features)
+            + self.env.n_sub * 2
+            + 1,  # Manager Node Embedding + Manager Community (1 hot encoded) + selected action
         )
         if self.architecture.pop.dictatorship_penalty:
             self.dictatorship_penalty = DictatorshipPenalizer(

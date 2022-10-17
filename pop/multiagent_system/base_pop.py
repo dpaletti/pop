@@ -266,9 +266,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         # The head manager chooses the best action from every community given the summarized graph
         self.chosen_node = self.get_action(self.summarized_graph)
-        chosen_node_features = self.summarized_graph.ndata[head_manager_embedding_name][
-            self.chosen_node
-        ]
+        chosen_node_features = self.summarized_graph.ndata[
+            self.architecture.pop.head_manager_embedding_name
+        ][self.chosen_node]
         self.chosen_action = int(chosen_node_features[-1].item())
         self.chosen_community = frozenset(
             [
@@ -825,7 +825,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             managers = [
                 Manager.remote(
                     agent_actions=self.env.n_sub * 2,
-                    node_features=self.node_features + 1,  # Node Features + Action
+                    node_features=self.node_features + ["action"],
                     edge_features=self.edge_features,
                     architecture=self.architecture.manager,
                     name="manager_" + str(idx) + "_" + self.name,
@@ -885,7 +885,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             if min_max_jaccard < self.manager_initialization_threshold:
                 manager = Manager.remote(
                     agent_actions=self.env.n_sub * 2,
-                    node_features=self.node_features + 1,  # Node Features + Action
+                    node_features=self.node_features + ["action"],
                     edge_features=self.edge_features,
                     architecture=self.architecture.manager,
                     name="manager_" + str(len(self.managers_history)) + "_" + self.name,

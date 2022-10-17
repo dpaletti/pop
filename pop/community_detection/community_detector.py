@@ -253,6 +253,11 @@ class CommunityDetector:
             if not node_community:
                 comm_t1.append({isolated_node})
             if len(node_community) > 1:
+                print(
+                    "Found more than one community with "
+                    + str(isolated_node)
+                    + " (isolated node) inside. Keeping the largest."
+                )
                 largest_community = node_community[
                     np.argmax([len(community) for community in node_community])
                 ]
@@ -269,21 +274,17 @@ class CommunityDetector:
         ):
             comm_t1.remove({isolated_node})
 
-        try:
-            return [
-                frozenset(community)
-                for community in louvain_communities(
-                    graph_t1,
-                    comm_t1,
-                    weight=None,
-                    resolution=self.resolution,
-                    threshold=self.threshold,
-                    seed=Random(self.seed),
-                    enable_power_supply_modularity=self.enable_power_supply_modularity,
-                    alpha=alpha,
-                    beta=beta,
-                )
-            ]
-        except NotAPartition as e:
-            print("...")
-            raise e
+        return [
+            frozenset(community)
+            for community in louvain_communities(
+                graph_t1,
+                comm_t1,
+                weight=None,
+                resolution=self.resolution,
+                threshold=self.threshold,
+                seed=Random(self.seed),
+                enable_power_supply_modularity=self.enable_power_supply_modularity,
+                alpha=alpha,
+                beta=beta,
+            )
+        ]
