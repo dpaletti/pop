@@ -252,16 +252,6 @@ class CommunityDetector:
             ]
             if not node_community:
                 comm_t1.append({isolated_node})
-            if len(node_community) > 1:
-                largest_community = node_community[
-                    np.argmax([len(community) for community in node_community])
-                ]
-                node_community.remove(largest_community)
-                comm_t1 = [
-                    community
-                    for community in comm_t1
-                    if community not in node_community
-                ]
 
         # Isolated nodes must be manually removed too
         for isolated_node in filter(
