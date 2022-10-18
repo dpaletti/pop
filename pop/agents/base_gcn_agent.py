@@ -349,6 +349,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
                 stop_decay=stop_decay,
             )
 
+    # TODO: fix state
     def get_state(
         self,
     ) -> Dict[str, Any]:
@@ -362,8 +363,9 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
             "train_steps": self.train_steps,
             "learning_steps": self.learning_steps,
             "agent_actions": self.actions,
-            "node_features": self.node_features,
-            "edge_features": self.edge_features,
+            "node_features": self.node_features_schema,
+            "edge_features": self.edge_features_schema,
+            "single_node_features": self.single_node_features,
             "architecture": asdict(self.architecture),
             "name": self.name,
             "training": self.training,

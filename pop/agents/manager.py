@@ -93,6 +93,7 @@ class Manager(BaseGCNAgent):
             training=checkpoint["training"],
             device=checkpoint["device"],
             edge_features=checkpoint["edge_features"],
+            single_node_features=checkpoint["single_node_features"],
         )
         manager.load_state.remote(
             optimizer_state=checkpoint["optimizer_state"],
