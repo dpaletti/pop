@@ -154,7 +154,7 @@ def fix_seed(env_train: BaseEnv, env_val: BaseEnv, seed: int = 0):
     th.manual_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
-    th.use_deterministic_algorithms(True)
+    # th.use_deterministic_algorithms(True)
     th.cuda.manual_seed_all(seed)
     dgl.seed(seed)
 
