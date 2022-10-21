@@ -1241,8 +1241,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                             1 if substation in community else 0
                             for substation in range(self.env.n_sub * 2)
                         ]
-                    ),
-                    th.tensor([manager_actions[community]]),
+                    ).to(self.device),
+                    th.tensor([manager_actions[community]]).to(self.device),
                 ),
                 dim=-1,
             )
