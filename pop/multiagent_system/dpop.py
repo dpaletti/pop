@@ -30,11 +30,12 @@ class DPOP(BasePOP):
         checkpoint_dir: Optional[str] = None,
         tensorboard_dir: Optional[str] = None,
         device: Optional[str] = None,
+        local: bool = False,
     ):
         process = psutil.Process()
         process.cpu_affinity(list(range(0, 14)))
         print("Running on cores: " + str(process.cpu_affinity()))
-        ray.init(local_mode=False, num_cpus=len(process.cpu_affinity()) * 2)
+        ray.init(local_mode=local, num_cpus=len(process.cpu_affinity()) * 2)
         super(DPOP, self).__init__(
             env=env,
             name=name,
@@ -169,6 +170,7 @@ class DPOP(BasePOP):
         checkpoint_dir: Optional[str] = None,
         name: Optional[str] = None,
         training: Optional[bool] = None,
+        local: bool = False,
     ) -> "DPOP":
         dpop: "DPOP" = DPOP(
             env=env,
@@ -179,6 +181,7 @@ class DPOP(BasePOP):
             checkpoint_dir=checkpoint_dir,
             seed=checkpoint["seed"],
             device=checkpoint["device"],
+            local=local,
         )
         dpop.pre_initialized = True
         dpop.alive_steps = checkpoint["alive_steps"] if training else 0

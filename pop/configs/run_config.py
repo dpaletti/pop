@@ -53,6 +53,7 @@ class TrainingParameters:
     reset_decay: bool
     save_frequency: int
     skip: int = 1
+    local: bool = False
 
 
 @dataclass(frozen=True)

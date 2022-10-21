@@ -218,6 +218,7 @@ def main(**kwargs):
             checkpoint_dir=config.model.checkpoint_dir,
             name=config.model.name,
             training=config.training.train,
+            local=config.training.local,
         )
     else:
         agent = DPOP(
@@ -229,6 +230,7 @@ def main(**kwargs):
             checkpoint_dir=config.model.checkpoint_dir,
             tensorboard_dir=config.training.tensorboard_dir,
             device=config.reproducibility.device,
+            local=config.training.local,
         )
 
     if config.training.train:
