@@ -252,11 +252,22 @@ class CommunityDetector:
             ]
             if not node_community:
                 comm_t1.append({isolated_node})
+
+        # Isolated nodes must be manually removed too
+        for isolated_node in filter(
+            lambda node: node not in graph_t1.nodes, nx.isolates(graph_t)
+        ):
+            comm_t1.remove({isolated_node})
+
+        for node in graph_t1.nodes:
+            node_community = [community for community in comm_t1 if node in community]
             if len(node_community) > 1:
                 print(
                     "Found more than one community with "
-                    + str(isolated_node)
-                    + " (isolated node) inside. Keeping the largest."
+                    + str(node)
+                    + " inside "
+                    + str(node_community)
+                    + ". Keeping the largest."
                 )
                 largest_community = node_community[
                     np.argmax([len(community) for community in node_community])
@@ -267,12 +278,6 @@ class CommunityDetector:
                     for community in comm_t1
                     if community not in node_community
                 ]
-
-        # Isolated nodes must be manually removed too
-        for isolated_node in filter(
-            lambda node: node not in graph_t1.nodes, nx.isolates(graph_t)
-        ):
-            comm_t1.remove({isolated_node})
 
         return [
             frozenset(community)

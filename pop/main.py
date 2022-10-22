@@ -194,13 +194,6 @@ def main(**kwargs):
     else:
         set_experimental_reward(env_train)
 
-    env_train.chronics_handler.set_filter(
-        lambda path: re.match(".*[0-9][0-9][0-9].*", path) is not None
-    )
-    print("Loading chronics...")
-    env_train.chronics_handler.real_data.reset()
-    print("Chronics loaded")
-
     # Validation Environment
     # WARNING: chronics_class bugs the runner, don't set it in env_val
     env_val = grid2op.make(
@@ -245,7 +238,15 @@ def main(**kwargs):
         )
 
     if config.training.train:
-        print("Training " + str(config.model.name))
+        print("Loading chronics up to 1000...")
+
+        env_train.chronics_handler.set_filter(
+            lambda path: re.match(".*[0-9][0-9][0-9].*", path) is not None
+        )
+        kept = env_train.chronics_handler.real_data.reset()
+        print(
+            "Loaded " + str(len(kept)) + " chronics. Training" + str(config.model.name)
+        )
         # yappi.set_clock_type("cpu")
         # yappi.start(builtins=True)
         train(
