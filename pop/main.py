@@ -32,6 +32,7 @@ from grid2op.utils import ScoreL2RPN2022
 from pop.multiagent_system.base_pop import train
 from pop.multiagent_system.dpop import DPOP
 from pop.constants import PER_PROCESS_GPU_MEMORY_FRACTION
+import re
 
 logging.getLogger("lightning").addHandler(logging.NullHandler())
 logging.getLogger("lightning").propagate = False
@@ -187,10 +188,18 @@ def main(**kwargs):
         chronics_class=MultifolderWithCache,
         difficulty=config.environment.difficulty,
     )
+
     if reward_class == CombinedScaledReward:
         set_reward(env_train, config)
     else:
         set_experimental_reward(env_train)
+
+    env_train.chronics_handler.set_filter(
+        lambda path: re.match(".*[0-9][0-9][0-9].*", path) is not None
+    )
+    print("Loading chronics...")
+    env_train.chronics_handler.real_data.reset()
+    print("Chronics loaded")
 
     # Validation Environment
     # WARNING: chronics_class bugs the runner, don't set it in env_val
