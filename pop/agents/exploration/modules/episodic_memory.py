@@ -91,12 +91,6 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             ) = self.inverse_model(current_state, next_state)
         except Exception as e:
             self.last_predicted_action_values = None
-            print(
-                "Could not compute inverse model due to: "
-                + str(e)
-                + " returning 0 at "
-                + self.name
-            )
             return 0
 
         self.episodic_reward = self._episodic_reward(current_state_embedding)
@@ -167,7 +161,6 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             # Episodic Reward
             return 1 / np.sqrt(np.sum(neighbor_distances) + denominator_constant)
         except ValueError:
-            print("ValueError in episodic reward, returning 0 for this step")
             return 0
 
     def _exploration_bonus(self, current_state: dgl.DGLHeteroGraph) -> float:
