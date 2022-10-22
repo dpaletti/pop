@@ -37,6 +37,7 @@ class LoggableModule:
         train_steps: int,
         incentives: Optional[List[float]] = None,
         dictatorship_penalties: Optional[List[float]] = None,
+        q_values: Optional[List[float]] = None,
     ):
         # Log losses to tensorboard
         self.log_simple_scalar(
@@ -79,6 +80,15 @@ class LoggableModule:
                 },
                 train_steps,
                 "Dictatorship Penalties",
+            )
+        if q_values:
+            self.log_simple_scalar(
+                {
+                    "_".join(agent_name.split("_")[0:2]): dictatorship_penalty
+                    for agent_name, dictatorship_penalty in zip(names, q_values)
+                },
+                train_steps,
+                "Q Values",
             )
 
     def log_action_space_size(self, agent_converters: Dict[int, IdToAct]) -> None:
@@ -164,6 +174,9 @@ class LoggableModule:
         agent_actions: Dict[str, int],
         manager_explorations: Dict[str, Dict[str, Any]],
         agent_explorations: Dict[str, Dict[str, Any]],
+        agent_q_values: Optional[Dict[str, float]],
+        manager_q_values: Optional[Dict[str, Dict[str, Any]]],
+        head_manager_q_value: Optional[float],
         train_steps: int,
     ) -> None:
         if not self.is_logging_active():
@@ -174,15 +187,19 @@ class LoggableModule:
         self.log_head_manager_behaviour(
             best_action=head_manager_action,
             best_action_str=best_action_str,
+            head_manager_q_value=head_manager_q_value,
             train_steps=train_steps,
         )
 
         self.log_managers_behaviour(
-            actions_communities=manager_actions, train_steps=train_steps
+            actions_communities=manager_actions,
+            train_steps=train_steps,
+            manager_q_values=manager_q_values,
         )
 
         self.log_agents_behaviour(
             agent_actions=agent_actions,
+            agent_q_values=agent_q_values,
             train_steps=train_steps,
         )
 
@@ -215,6 +232,7 @@ class LoggableModule:
     def log_head_manager_behaviour(
         self,
         best_action: int,
+        head_manager_q_value: Optional[float],
         best_action_str: str,
         train_steps: int,
     ) -> None:
@@ -225,13 +243,21 @@ class LoggableModule:
             "Manager Action/Head Manager", best_action_str, train_steps
         )
 
+        if head_manager_q_value is not None:
+            self.writer.add_scalar(
+                "Manager Q Value/head_manager", head_manager_q_value, train_steps
+            )
+
     def log_managers_behaviour(
-        self, actions_communities: Dict[Set[int], Tuple[int, str]], train_steps: int
+        self,
+        actions_communities: Dict[Set[int], Tuple[int, str]],
+        manager_q_values: Optional[Dict[Set[int], Tuple[int, str]]],
+        train_steps: int,
     ):
         community_manager_str = ""
         for community, (action, manager_name) in actions_communities.items():
             self.writer.add_scalar(
-                "Manager Action/" + str(manager_name),
+                "Manager Action/" + str(manager_name) + "->" + str(community),
                 action,
                 train_steps,
             )
@@ -242,20 +268,36 @@ class LoggableModule:
                 + str(manager_name)
                 + "\n"
             )
+
         self.writer.add_text(
             "POP/Manager-Community",
             self._format_to_md(community_manager_str),
             train_steps,
         )
 
+        if manager_q_values:
+            for community, (q_value, manager_name) in manager_q_values.items():
+                self.writer.add_scalar(
+                    "Manager Q Value/" + str(manager_name) + "->" + str(community),
+                    q_value,
+                    train_steps,
+                )
+
     def log_agents_behaviour(
         self,
         agent_actions: Dict[int, int],
+        agent_q_values: Optional[Dict[int, float]],
         train_steps: int,
     ):
 
         for idx, action in agent_actions.items():
             self.writer.add_scalar("Agent Action/" + str(idx), action, train_steps)
+
+        if agent_q_values:
+            for idx, q_value in agent_q_values.items():
+                self.writer.add_scalar(
+                    "Agent Q Value/" + str(idx), q_value, train_steps
+                )
 
     def log_reward(self, reward: float, train_steps: int, name: str):
         if self.is_logging_active():

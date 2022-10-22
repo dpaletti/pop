@@ -177,7 +177,9 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         return self.memory
 
     def _take_action(
-        self, transformed_observation: DGLHeteroGraph, mask: Optional[List[int]] = None
+        self,
+        transformed_observation: DGLHeteroGraph,
+        mask: Optional[List[int]] = None,
     ) -> int:
 
         # -> (actions)
@@ -188,19 +190,24 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
 
         return action
 
+    def q_value(self, transformed_observation: DGLHeteroGraph, action: int):
+        return self.q_network(transformed_observation).squeeze()[action].item()
+
     def take_action(
         self, transformed_observation: DGLHeteroGraph, mask: Optional[List[int]] = None
-    ) -> int:
+    ) -> Tuple[int, float]:
         if self.edge_features is not None and transformed_observation.num_edges() == 0:
             transformed_observation.add_edges([0], [0])
             self._add_fake_edge_features(transformed_observation)
 
         if self.training:
-            return self.exploration.action_exploration(self._take_action)(
+            action = self.exploration.action_exploration(self._take_action)(
                 self, transformed_observation, mask=mask
             )
         else:
-            return self._take_action(transformed_observation, mask=mask)
+            action = self._take_action(transformed_observation, mask=mask)
+
+        return action, self.q_value(transformed_observation, action)
 
     def update_mem(
         self,
@@ -231,7 +238,9 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         )
         transitions = Transition(*zip(*transitions))
 
-        loss, td_error = self.compute_loss(transitions, th.Tensor(sampling_weights))
+        loss, td_error = self.compute_loss(
+            transitions, th.Tensor(sampling_weights).to(self.device)
+        )
 
         # Backward propagation
         self.optimizer.zero_grad()
@@ -247,7 +256,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
     def _add_fake_edge_features(self, graph: dgl.DGLGraph):
         if self.edge_features_schema is not None:
             for edge_feature in self.edge_features_schema:
-                graph.edata[edge_feature] = th.zeros((1,))
+                graph.edata[edge_feature] = th.zeros((1,)).to(self.device)
         else:
             raise Exception("Called add_fake_edge_features without features")
 
@@ -256,11 +265,11 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         graph.add_nodes(1)
         if not self.single_node_features:
             for node_feature in self.node_features_schema:
-                graph.ndata[node_feature] = th.zeros((1,))
+                graph.ndata[node_feature] = th.zeros((1,)).to(self.device)
         else:
             graph.ndata[self.node_features_schema[0]] = th.zeros(
                 1, self.single_node_features
-            )
+            ).to(self.device)
 
     def _cast_features_to_float32(self, graph: DGLHeteroGraph):
         for feature in graph.node_attr_schemes().keys():
@@ -294,9 +303,10 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
 
         # every so often the agents should learn from experiences
         if self.train_steps % self.architecture.learning_frequency == 0:
-            loss: Optional[float] = self.learn()
-            self.learning_steps += 1
-            return loss, reward
+            loss = self.learn()
+            if loss is not None:
+                self.learning_steps += 1
+                return loss, reward
         return None, reward
 
     def step(

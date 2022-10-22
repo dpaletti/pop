@@ -63,8 +63,8 @@ class RayShallowGCNAgent(BaseGCNAgent):
 
     def take_action(
         self, transformed_observation: DGLHeteroGraph, mask: List[int] = None
-    ) -> int:
-        return 0  # Always no-action
+    ) -> Tuple[int, float]:
+        return 0, 0  # Always no-action with 0 q-value
 
     def step(
         self,

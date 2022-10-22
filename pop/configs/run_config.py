@@ -54,6 +54,7 @@ class TrainingParameters:
     save_frequency: int
     skip: int = 1
     local: bool = False
+    pre_train: bool = False
 
 
 @dataclass(frozen=True)

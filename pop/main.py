@@ -76,7 +76,7 @@ class NoActionRedispReward(RedispReward):
 
 def set_experimental_reward(env):
     combined_reward: CombinedReward = env.get_reward_instance()
-    combined_reward.addReward("flat", FlatReward(per_timestep=1))
+    combined_reward.addReward("flat", FlatReward(per_timestep=5))
     combined_reward.initialize(env)
 
 
@@ -219,6 +219,7 @@ def main(**kwargs):
             name=config.model.name,
             training=config.training.train,
             local=config.training.local,
+            pre_train=config.training.pre_train,
         )
     else:
         agent = DPOP(
@@ -231,6 +232,7 @@ def main(**kwargs):
             tensorboard_dir=config.training.tensorboard_dir,
             device=config.reproducibility.device,
             local=config.training.local,
+            pre_train=config.training.pre_train,
         )
 
     if config.training.train:

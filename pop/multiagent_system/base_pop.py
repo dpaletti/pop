@@ -50,6 +50,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         checkpoint_dir: Optional[str] = None,
         tensorboard_dir: Optional[str] = None,
         device: Optional[str] = None,
+        pre_train: bool = False,
     ):
         AgentWithConverter.__init__(self, env.action_space, IdToAct)
         SerializableModule.__init__(self, checkpoint_dir, name)
@@ -60,6 +61,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         self.env = env
         self.node_features: List[str] = architecture.pop.node_features
         self.edge_features: List[str] = architecture.pop.edge_features
+        self.pre_train = pre_train
 
         # Converter
         self.converter = IdToAct(env.action_space)
@@ -181,7 +183,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             ] = {}
 
     @abstractmethod
-    def get_action(self, observation: dgl.DGLHeteroGraph) -> int:
+    def get_action(
+        self, observation: dgl.DGLHeteroGraph
+    ) -> Tuple[int, Optional[float]]:
         """
         Method to get System action given manager's action encoded in the observation
         """
@@ -235,9 +239,10 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         # Actions retrieved are encoded with local agent converters
         # need to be remapped to the global converter
-        self.substation_to_local_action = self._get_agent_actions(
-            self.factored_observation
-        )
+        (
+            self.substation_to_local_action,
+            substation_to_q_values,
+        ) = self._get_agent_actions(self.factored_observation)
 
         # Split graph into communities
         (
@@ -248,7 +253,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         )
 
         # Managers chooses the best substation for each community they handle
-        self.community_to_substation = self._get_manager_actions(
+        self.community_to_substation, community_to_q_values = self._get_manager_actions(
             graph,
             self.sub_graphs,
             self.substation_to_encoded_action,
@@ -265,7 +270,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         )
 
         # The head manager chooses the best action from every community given the summarized graph
-        self.chosen_node = self.get_action(self.summarized_graph)
+        self.chosen_node, chosen_node_q_value = self.get_action(self.summarized_graph)
         chosen_node_features = self.summarized_graph.ndata[
             self.architecture.pop.head_manager_embedding_name
         ][self.chosen_node]
@@ -317,14 +322,27 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             best_action=self.chosen_action,
             best_action_str=str(self.converter.all_actions[self.chosen_action]),
             head_manager_action=self.chosen_node,
+            head_manager_q_value=chosen_node_q_value,
             manager_actions={
                 community: (action, community_to_names[community])
                 for community, action in self.community_to_substation.items()
             },
+            manager_q_values={
+                community: (action, community_to_names[community])
+                for community, action in community_to_q_values.items()
+            }
+            if community_to_q_values
+            else None,
             agent_actions={
                 substation_to_names[sub_id]: action
                 for sub_id, action in self.substation_to_local_action.items()
             },
+            agent_q_values={
+                substation_to_names[sub_id]: action
+                for sub_id, action in substation_to_q_values.items()
+            }
+            if substation_to_q_values
+            else None,
             manager_explorations={
                 name: exploration_state
                 for name, exploration_state in zip(
@@ -543,9 +561,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             )
 
             # Query agents for action
-            next_substation_to_local_actions: Dict[
-                Substation, int
-            ] = self._get_agent_actions(next_factored_observation)
+            next_substation_to_local_actions, _ = self._get_agent_actions(
+                next_factored_observation
+            )
 
             # Factor next_observation given the new community structure
             (
@@ -671,39 +689,34 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
     def _get_agent_actions(
         self, factored_observation: Dict[Substation, dgl.DGLHeteroGraph]
-    ) -> Dict[Substation, int]:
+    ) -> Tuple[Dict[Substation, int], Optional[Dict[Substation, float]]]:
         """
         Query each agent for 1 action
         """
-        no_action_positions_to_add: List[int] = []
-
         # Observations are None in case the neighbourhood is empty (e.g. isolated nodes)
         # In such case no_action (id = 0) is selected
         # Each agent returns an action for its associated Substation
 
-        actions = ray.get(
-            list(
-                filter(
-                    lambda x: x is not None,
-                    [
-                        self.substation_to_agent[sub_id].take_action.remote(
-                            observation,
-                        )
-                        for idx, (sub_id, observation) in enumerate(
-                            factored_observation.items()
-                        )
-                    ],
+        if self.pre_train:
+            return {substation: 0 for substation in factored_observation.keys()}, None
+
+        actions_taken = ray.get(
+            [
+                self.substation_to_agent[sub_id].take_action.remote(observation)
+                for idx, (sub_id, observation) in enumerate(
+                    factored_observation.items()
                 )
-            )
+            ],
         )
 
-        # no_action is added for each None neighbourhood
-        for no_action_position in no_action_positions_to_add:
-            actions.insert(no_action_position, 0)
+        actions, q_values = zip(*actions_taken)
 
         return {
             sub_id: action
             for sub_id, action in zip(factored_observation.keys(), actions)
+        }, {
+            sub_id: q_value
+            for sub_id, q_value in zip(factored_observation.keys(), q_values)
         }
 
     def _get_manager_actions(
@@ -713,26 +726,33 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         substation_to_encoded_action: Dict[Substation, EncodedAction],
         communities: List[Community],
         community_to_manager: Dict[Community, Manager],
-    ) -> Dict[Community, Substation]:
+    ) -> Tuple[Dict[Community, Substation], Optional[Dict[Community, float]]]:
         """
         Query one action per community
         """
+        if self.pre_train:
+            return {
+                community: random.sample(community, 1)[0]
+                for community in community_to_sub_graphs_dict.keys()
+            }, None
 
         # Managers are queried for an action
         # Each manager chooses one action for each community she handles
-        actions: List[int] = ray.get(
-            list(
-                filter(
-                    lambda x: x is not None,
-                    [
-                        community_to_manager[community].take_action.remote(
-                            transformed_observation=community_to_sub_graphs_dict[
-                                community
-                            ],
-                            mask=frozenset([node for node in community]),
-                        )
-                        for community in communities
-                    ],
+        actions, q_values = zip(
+            *ray.get(
+                list(
+                    filter(
+                        lambda x: x is not None,
+                        [
+                            community_to_manager[community].take_action.remote(
+                                transformed_observation=community_to_sub_graphs_dict[
+                                    community
+                                ],
+                                mask=frozenset([node for node in community]),
+                            )
+                            for community in communities
+                        ],
+                    )
                 )
             )
         )
@@ -740,7 +760,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         return {
             community: graph.nodes.data()[action]["sub_id"]
             for community, action in zip(communities, actions)
-        }
+        }, {community: q_value for community, q_value in zip(communities, q_values)}
 
     def _compute_managers_sub_graphs(
         self,

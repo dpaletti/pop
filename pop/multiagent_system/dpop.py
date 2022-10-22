@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import dgl
 import networkx as nx
@@ -15,6 +15,7 @@ from pop.community_detection.community_detector import Community
 from pop.configs.architecture import Architecture
 from pop.multiagent_system.base_pop import BasePOP
 from pop.multiagent_system.space_factorization import EncodedAction, Substation
+import random
 
 from pop.multiagent_system.dictatorship_penalizer import DictatorshipPenalizer
 
@@ -31,6 +32,7 @@ class DPOP(BasePOP):
         tensorboard_dir: Optional[str] = None,
         device: Optional[str] = None,
         local: bool = False,
+        pre_train: bool = False,
     ):
         process = psutil.Process()
         process.cpu_affinity(list(range(0, 14)))
@@ -45,6 +47,7 @@ class DPOP(BasePOP):
             checkpoint_dir=checkpoint_dir,
             seed=seed,
             device=device,
+            pre_train=pre_train,
         )
         try:
             node_features = self.architecture.manager.embedding.layers[-1].kwargs[
@@ -75,14 +78,15 @@ class DPOP(BasePOP):
                 **self.architecture.pop.dictatorship_penalty
             )
 
-    def get_action(self, graph: dgl.DGLHeteroGraph) -> int:
-        chosen_node: int = int(
-            ray.get(
+    def get_action(self, graph: dgl.DGLHeteroGraph) -> Tuple[int, Optional[float]]:
+        if self.pre_train:
+            return random.sample(list(range(graph.num_nodes())), 1)[0], None
+        else:
+            chosen_node, q_value = ray.get(
                 self.head_manager.take_action.remote(
                     graph, mask=list(range(graph.num_nodes()))
                 )
             )
-        )
 
         self.log_exploration(
             "head_manager",
@@ -90,7 +94,7 @@ class DPOP(BasePOP):
             self.train_steps,
         )
 
-        return chosen_node
+        return int(chosen_node), q_value
 
     def _extra_step(
         self,
@@ -119,9 +123,7 @@ class DPOP(BasePOP):
                 )
             )
         else:
-            next_community_to_substation: Dict[
-                Community, Substation
-            ] = self._get_manager_actions(
+            next_community_to_substation, _ = self._get_manager_actions(
                 next_graph,
                 next_sub_graphs,
                 next_substation_to_encoded_action,
@@ -152,7 +154,7 @@ class DPOP(BasePOP):
         self.log_step(
             losses=[loss],
             implicit_rewards=[full_reward - reward],
-            names=[self.name],
+            names=["Head Manager"],
             train_steps=self.train_steps,
             dictatorship_penalties=[penalty],
         )
@@ -171,6 +173,7 @@ class DPOP(BasePOP):
         name: Optional[str] = None,
         training: Optional[bool] = None,
         local: bool = False,
+        pre_train: bool = False,
     ) -> "DPOP":
         dpop: "DPOP" = DPOP(
             env=env,
@@ -182,6 +185,7 @@ class DPOP(BasePOP):
             seed=checkpoint["seed"],
             device=checkpoint["device"],
             local=local,
+            pre_train=pre_train,
         )
         dpop.pre_initialized = True
         dpop.alive_steps = checkpoint["alive_steps"] if training else 0
