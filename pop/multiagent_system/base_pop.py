@@ -1291,13 +1291,6 @@ def train(
     print("Model will be checkpointed every " + str(save_frequency) + " seconds")
     with tqdm(total=iterations - training_step) as pbar:
         while training_step < iterations:
-            if dpop.episodes % total_episodes == 0:
-                env.chronics_handler.shuffle()
-            if done:
-                sampled_skip = random.sample(range(0, skip), 1)[0]
-                env.reset()
-                env.fast_forward_chronics(sampled_skip)
-                obs = env.get_obs()
             encoded_action = dpop.my_act(dpop.convert_obs(obs), reward, done)
             action = dpop.convert_act(encoded_action)
             next_obs, reward, done, _ = env.step(action)
@@ -1317,6 +1310,14 @@ def train(
                 print("Saving Checkpoint")
                 dpop.save()
                 last_save_time = time.time()
+
+            if dpop.episodes % total_episodes == 0:
+                env.chronics_handler.shuffle()
+            if done:
+                sampled_skip = random.sample(range(0, skip), 1)[0]
+                env.reset()
+                env.fast_forward_chronics(sampled_skip)
+                obs = env.get_obs()
 
             pbar.update(1)
 

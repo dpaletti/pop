@@ -9,6 +9,7 @@ from typing import Optional, Union
 
 import dgl
 import grid2op.Environment
+from grid2op.Reward.BaseReward import BaseReward
 from grid2op.Reward.FlatReward import FlatReward
 import numpy as np
 import pandas as pd
@@ -40,10 +41,12 @@ logging.getLogger("lightning").propagate = False
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-class NoActionRedispReward(RedispReward):
-    def __init__(self, logger=None):
-        super(NoActionRedispReward, self).__init__(logger=logger)
-        self.previous_action: Optional[BaseAction] = None
+class MyFlatReward(BaseReward):
+    def __init__(self, per_step: int = 1):
+        super(BaseReward, self).__init__()
+        self._per_step = per_step
+        self.reward_min = 0
+        self.reward_max = self._per_step
 
     def __call__(
         self,
@@ -54,7 +57,7 @@ class NoActionRedispReward(RedispReward):
         is_illegal: bool,
         is_ambiguous: bool,
     ):
-        reward = super().__call__(
+        super().__call__(
             action=action,
             env=env,
             has_error=has_error,
@@ -62,7 +65,7 @@ class NoActionRedispReward(RedispReward):
             is_illegal=is_illegal,
             is_ambiguous=is_ambiguous,
         )
-        return reward
+        return self.reward_min if is_done else self.reward_max
 
 
 # def set_experimental_reward(env):
@@ -174,34 +177,34 @@ def main(**kwargs):
         + str(config.environment.difficulty)
     )
 
-    reward_class = (
-        CombinedReward
-        if list(config.environment.reward.reward_components.items())[0][0]
-        == "Experimental"
-        else CombinedScaledReward
-    )
+    # reward_class = (
+    # CombinedReward
+    # if list(config.environment.reward.reward_components.items())[0][0]
+    # == "Experimental"
+    # else CombinedScaledReward
+    # )
 
     # Train Environment
     env_train = grid2op.make(
         config.environment.name + "_train80",
-        reward_class=reward_class,
+        reward_class=FlatReward(per_timestep=5),
         chronics_class=MultifolderWithCache,
         difficulty=config.environment.difficulty,
     )
 
-    if reward_class == CombinedScaledReward:
-        set_reward(env_train, config)
-    else:
-        set_experimental_reward(env_train)
+    # if reward_class == CombinedScaledReward:
+    #    set_reward(env_train, config)
+    # else:
+    #    set_experimental_reward(env_train)
 
     # Validation Environment
     # WARNING: chronics_class bugs the runner, don't set it in env_val
     env_val = grid2op.make(
         config.environment.name + "_val10",
-        reward_class=CombinedScaledReward,
+        reward_class=MyFlatReward(per_step=5),
         difficulty=config.environment.difficulty,
     )
-    set_l2rpn_reward(env_val, alarm=False)
+    # set_l2rpn_reward(env_val, alarm=False)
 
     # Set seed for reproducibility
     print("Running with seed: " + str(config.reproducibility.seed))
@@ -238,14 +241,26 @@ def main(**kwargs):
         )
 
     if config.training.train:
-        print("Loading chronics up to 1000...")
 
-        env_train.chronics_handler.set_filter(
-            lambda path: re.match(".*[0-9][0-9][0-9].*", path) is not None
-        )
+        if config.training.chronics == -1:
+            print("Loading chronics up to 1000...")
+            env_train.chronics_handler.set_filter(
+                lambda path: re.match(".*[0-9][0-9][0-9].*", path) is not None
+            )
+        elif config.training.chronics == 10:
+            print("Loading chronics up to 10...")
+            env_train.chronics_handler.set_filter(
+                lambda path: re.match(".*00[0-9].*", path) is not None
+            )
+        elif config.training.chronics == 100:
+            print("Loading chronics up to 100...")
+            env_train.chronics_handler.set_filter(
+                lambda path: re.match(".*0[0-9][0-9].*", path) is not None
+            )
+
         kept = env_train.chronics_handler.real_data.reset()
         print(
-            "Loaded " + str(len(kept)) + " chronics. Training" + str(config.model.name)
+            "Loaded " + str(len(kept)) + " chronics. Training " + str(config.model.name)
         )
         # yappi.set_clock_type("cpu")
         # yappi.start(builtins=True)

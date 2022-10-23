@@ -55,6 +55,7 @@ class TrainingParameters:
     skip: int = 1
     local: bool = False
     pre_train: bool = False
+    chronics: int = -1
 
 
 @dataclass(frozen=True)
