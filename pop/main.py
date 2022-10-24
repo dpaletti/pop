@@ -187,7 +187,6 @@ def main(**kwargs):
     # Train Environment
     env_train = grid2op.make(
         config.environment.name + "_train80",
-        reward_class=FlatReward(per_timestep=5),
         chronics_class=MultifolderWithCache,
         difficulty=config.environment.difficulty,
     )
@@ -201,7 +200,6 @@ def main(**kwargs):
     # WARNING: chronics_class bugs the runner, don't set it in env_val
     env_val = grid2op.make(
         config.environment.name + "_val10",
-        reward_class=MyFlatReward(per_step=5),
         difficulty=config.environment.difficulty,
     )
     # set_l2rpn_reward(env_val, alarm=False)
