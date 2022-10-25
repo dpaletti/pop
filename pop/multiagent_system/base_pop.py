@@ -1,8 +1,10 @@
 import itertools
+from pathlib import Path
 import time
 from abc import abstractmethod
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional, Tuple, Union
+import pandas as pd
 
 import dgl
 import networkx as nx
@@ -1278,7 +1280,11 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
 
 def train(
-    env: BaseEnv, iterations: int, dpop, save_frequency: int = 3600, skip: int = 1
+    env: BaseEnv,
+    iterations: int,
+    dpop: BasePOP,
+    save_frequency: int = 3600,
+    skip: int = 1,
 ):
 
     training_step: int = 0
@@ -1287,6 +1293,9 @@ def train(
     reward = env.reward_range[0]
     total_episodes = len(env.chronics_handler.subpaths)
 
+    reward_file = Path(Path(dpop.log_file).parents[0], "reward.csv")
+    rewards = []
+
     last_save_time = time.time()
     print("Model will be checkpointed every " + str(save_frequency) + " seconds")
     with tqdm(total=iterations - training_step) as pbar:
@@ -1294,17 +1303,15 @@ def train(
             encoded_action = dpop.my_act(dpop.convert_obs(obs), reward, done)
             action = dpop.convert_act(encoded_action)
             next_obs, _, done, _ = env.step(action)
+            reward = 5 if not done else 100 if obs.current_step == obs.max_step else 0
             dpop.step(
                 action=encoded_action,
                 observation=obs,
-                reward=5
-                if not done
-                else 100
-                if obs.current_step == obs.max_step
-                else 0,
+                reward=reward,
                 next_observation=next_obs,
                 done=done,
             )
+            rewards.append(reward)
             obs = next_obs
             training_step += 1
 
@@ -1322,6 +1329,7 @@ def train(
                 env.reset()
                 env.fast_forward_chronics(sampled_skip)
                 obs = env.get_obs()
+                pd.Series(rewards).to_csv(str(reward_file))
 
             pbar.update(1)
 
