@@ -1293,7 +1293,9 @@ def train(
     reward = env.reward_range[0]
     total_episodes = len(env.chronics_handler.subpaths)
 
-    reward_file = Path(Path(dpop.log_file).parents[0], "reward.csv")
+    extra_dir = Path(Path(dpop.log_file).parents[0], "extras")
+    extra_dir.mkdir()
+    reward_file = Path(extra_dir, "reward.csv")
     rewards = []
 
     last_save_time = time.time()
