@@ -1294,7 +1294,7 @@ def train(
     total_episodes = len(env.chronics_handler.subpaths)
 
     extra_dir = Path(Path(dpop.log_file).parents[0], "extras")
-    extra_dir.mkdir()
+    extra_dir.mkdir(exist_ok=True)
     reward_file = Path(extra_dir, "reward.csv")
     rewards = []
 
