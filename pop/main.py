@@ -34,6 +34,7 @@ from pop.multiagent_system.base_pop import train
 from pop.multiagent_system.dpop import DPOP
 from pop.constants import PER_PROCESS_GPU_MEMORY_FRACTION
 import re
+from lightsim2grid import LightSimBackend
 
 logging.getLogger("lightning").addHandler(logging.NullHandler())
 logging.getLogger("lightning").propagate = False
@@ -189,6 +190,7 @@ def main(**kwargs):
         config.environment.name + "_train80",
         chronics_class=MultifolderWithCache,
         difficulty=config.environment.difficulty,
+        backend=LightSimBackend(),
     )
 
     # if reward_class == CombinedScaledReward:
@@ -201,6 +203,7 @@ def main(**kwargs):
     env_val = grid2op.make(
         config.environment.name + "_val10",
         difficulty=config.environment.difficulty,
+        backend=LightSimBackend(),
     )
     # set_l2rpn_reward(env_val, alarm=False)
 
