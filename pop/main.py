@@ -252,7 +252,7 @@ def main(**kwargs):
         )
 
         if config.model.architecture.pop.enable_expert:
-            agent = ExpertPop(pop=agent)
+            agent = ExpertPop(pop=agent, checkpoint_dir=config.model.checkpoint_dir)
 
     if config.training.train:
 

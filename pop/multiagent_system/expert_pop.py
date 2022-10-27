@@ -9,8 +9,8 @@ from pop.networks.serializable_module import SerializableModule
 
 
 class ExpertPop(SerializableModule):
-    def __init__(self, pop: DPOP) -> None:
-        super().__init__(log_dir=pop.log_file, name=pop.name)
+    def __init__(self, pop: DPOP, checkpoint_dir: str) -> None:
+        super().__init__(log_dir=checkpoint_dir, name=pop.name)
         self.greedy_reconnect_agent = RecoPowerlineAgent(pop.env.action_space)
         self.safe_max_rho = pop.architecture.pop.safe_max_rho
         self.expert_steps = -1
@@ -60,7 +60,7 @@ class ExpertPop(SerializableModule):
         else:
             self.pop.alive_steps += 1
             if done:
-                self.pop.log_alive_steps(self.alive_steps, self.episodes)
+                self.pop.log_alive_steps(self.pop.alive_steps, self.pop.episodes)
                 self.pop.episodes += 1
                 self.pop.alive_steps = 0
 
@@ -103,6 +103,11 @@ class ExpertPop(SerializableModule):
             reset_exploration,
             architecture,
         )
-        expert_pop = ExpertPop(pop)
+        expert_pop = ExpertPop(
+            pop,
+            checkpoint_dir
+            if checkpoint_dir is not None
+            else checkpoint["checkpoint_dir"],
+        )
         expert_pop.expert_steps = checkpoint["expert_steps"]
         return expert_pop
