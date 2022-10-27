@@ -176,11 +176,14 @@ class DPOP(BasePOP):
         local: bool = False,
         pre_train: bool = False,
         reset_exploration: bool = False,
+        architecture: Optional[Architecture] = None,
     ) -> "DPOP":
         dpop: "DPOP" = DPOP(
             env=env,
             name=checkpoint["name"] if name is None else name,
-            architecture=Architecture(load_from_dict=checkpoint["architecture"]),
+            architecture=Architecture(load_from_dict=checkpoint["architecture"])
+            if architecture is None
+            else architecture,
             training=training,
             tensorboard_dir=tensorboard_dir,
             checkpoint_dir=checkpoint_dir,
@@ -204,6 +207,7 @@ class DPOP(BasePOP):
                 checkpoint=agent_state,
                 training=training,
                 reset_exploration=reset_exploration,
+                architecture=architecture.agent if architecture is not None else None,
             )
             if "optimizer_state" in list(agent_state.keys())
             else RayShallowGCNAgent.load(checkpoint=agent_state)
@@ -215,6 +219,7 @@ class DPOP(BasePOP):
                 checkpoint=manager_state,
                 training=training,
                 reset_exploration=reset_exploration,
+                architecture=architecture.manager if architecture is not None else None,
             ): history
             for _, (manager_state, history) in tqdm(
                 checkpoint["managers_state"].items()
@@ -241,6 +246,9 @@ class DPOP(BasePOP):
             checkpoint=checkpoint["head_manager_state"],
             training=training,
             reset_exploration=reset_exploration,
+            architecture=architecture.head_manager
+            if architecture is not None
+            else None,
         )
         print("Loading is over")
         return dpop

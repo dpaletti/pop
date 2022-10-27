@@ -63,7 +63,9 @@ class RayGCNAgent(BaseGCNAgent):
         agent: ObjectRef = RayGCNAgent.remote(
             agent_actions=checkpoint["agent_actions"],
             node_features=checkpoint["node_features"],
-            architecture=AgentArchitecture(load_from_dict=checkpoint["architecture"]),
+            architecture=AgentArchitecture(load_from_dict=checkpoint["architecture"])
+            if kwargs.get("architecture") is None
+            else kwargs["architecture"],
             name=checkpoint["name"],
             training=bool(kwargs.get("training")),
             device=checkpoint["device"],
