@@ -238,7 +238,7 @@ def main(**kwargs):
             architecture=config.model.architecture,
         )
     else:
-        agent = agentType(
+        agent = DPOP(
             env=env_train,
             name=config.model.name,
             architecture=config.model.architecture,
@@ -250,6 +250,9 @@ def main(**kwargs):
             local=config.training.local,
             pre_train=config.training.pre_train,
         )
+
+        if config.model.architecture.pop.enable_expert:
+            agent = ExpertPop(pop=agent)
 
     if config.training.train:
 
