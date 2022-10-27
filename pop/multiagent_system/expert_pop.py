@@ -27,7 +27,6 @@ class ExpertPop(SerializableModule):
             action = reconnection_action
 
         elif max(observation.rho) > self.safe_max_rho:
-            print("Querying RL agent")
             self.step_dpop = True
             # If there is some powerline overloaded ask the agent what to do
             action = self.pop.act(observation, reward, done)
