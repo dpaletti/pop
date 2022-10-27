@@ -26,7 +26,6 @@ pylru = "^1.2.1"
 pandas = "1.0.3"
 networkx = "2.6.2"
 numpy = "1.19.5"
-LightSim2Grid = "^0.7.0"
 
 [tool.poetry.dev-dependencies]
 
