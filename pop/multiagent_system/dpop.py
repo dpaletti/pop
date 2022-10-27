@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import dgl
 import networkx as nx
+from networkx.classes.function import restricted_view
 from pop.configs import architecture
 import psutil
 from grid2op.Environment import BaseEnv
@@ -174,6 +175,7 @@ class DPOP(BasePOP):
         training: Optional[bool] = None,
         local: bool = False,
         pre_train: bool = False,
+        reset_exploration: bool = False,
     ) -> "DPOP":
         dpop: "DPOP" = DPOP(
             env=env,
@@ -201,6 +203,7 @@ class DPOP(BasePOP):
             sub_id: RayGCNAgent.load(
                 checkpoint=agent_state,
                 training=training,
+                reset_exploration=reset_exploration,
             )
             if "optimizer_state" in list(agent_state.keys())
             else RayShallowGCNAgent.load(checkpoint=agent_state)
@@ -211,6 +214,7 @@ class DPOP(BasePOP):
             Manager.load(
                 checkpoint=manager_state,
                 training=training,
+                reset_exploration=reset_exploration,
             ): history
             for _, (manager_state, history) in tqdm(
                 checkpoint["managers_state"].items()
@@ -236,6 +240,7 @@ class DPOP(BasePOP):
         dpop.head_manager = Manager.load(
             checkpoint=checkpoint["head_manager_state"],
             training=training,
+            reset_exploration=reset_exploration,
         )
         print("Loading is over")
         return dpop

@@ -78,5 +78,6 @@ class RayGCNAgent(BaseGCNAgent):
             alive_steps=checkpoint["alive_steps"],
             train_steps=checkpoint["train_steps"],
             learning_steps=checkpoint["learning_steps"],
+            reset_exploration=kwargs["reset_exploration"],
         )
         return agent

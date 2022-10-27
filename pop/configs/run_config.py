@@ -70,6 +70,7 @@ class EvaluationParameters:
 class LoadingParameters:
     load: bool
     load_dir: str
+    reset_exploration: bool = False
 
 
 @dataclass(frozen=True)

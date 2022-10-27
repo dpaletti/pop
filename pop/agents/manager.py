@@ -90,7 +90,7 @@ class Manager(BaseGCNAgent):
             node_features=checkpoint["node_features"],
             architecture=AgentArchitecture(load_from_dict=checkpoint["architecture"]),
             name=checkpoint["name"],
-            training=checkpoint["training"],
+            training=kwargs["training"],
             device=checkpoint["device"],
             edge_features=checkpoint["edge_features"],
             single_node_features=checkpoint["single_node_features"],
@@ -104,5 +104,6 @@ class Manager(BaseGCNAgent):
             alive_steps=checkpoint["alive_steps"],
             train_steps=checkpoint["train_steps"],
             learning_steps=checkpoint["learning_steps"],
+            reset_exploration=kwargs["reset_exploration"],
         )
         return manager

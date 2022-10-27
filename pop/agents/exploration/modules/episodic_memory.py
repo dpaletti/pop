@@ -145,6 +145,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             if len(self.memory) <= self.neighbors:
                 neighbor_distances = [0]
             else:
+                # TODO: replace this with MiniBatchKMeans so that we do not need to keep a memory
                 # Compute K nearest neighbors wrt inverse kernel from memory
                 neighbors_model = NearestNeighbors(
                     n_neighbors=self.neighbors, metric=self._inverse_kernel

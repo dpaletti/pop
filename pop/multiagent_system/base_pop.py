@@ -1293,11 +1293,6 @@ def train(
     reward = env.reward_range[0]
     total_episodes = len(env.chronics_handler.subpaths)
 
-    extra_dir = Path(Path(dpop.log_file).parents[0], "extras")
-    extra_dir.mkdir(exist_ok=True)
-    reward_file = Path(extra_dir, "reward.csv")
-    rewards = []
-
     last_save_time = time.time()
     print("Model will be checkpointed every " + str(save_frequency) + " seconds")
     with tqdm(total=iterations - training_step) as pbar:
@@ -1313,7 +1308,6 @@ def train(
                 next_observation=next_obs,
                 done=done,
             )
-            rewards.append(reward)
             obs = next_obs
             training_step += 1
 
@@ -1331,11 +1325,11 @@ def train(
                 env.reset()
                 env.fast_forward_chronics(sampled_skip)
                 obs = env.get_obs()
-                pd.Series(rewards).to_csv(str(reward_file))
+                dpop.writer.flush()
 
             pbar.update(1)
 
     print("\nSaving\n")
-
+    dpop.writer.close()
     dpop.save()
     ray.shutdown()

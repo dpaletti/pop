@@ -392,6 +392,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         alive_steps: int,
         train_steps: int,
         learning_steps: int,
+        reset_exploration: bool = False,
     ) -> None:
         self.alive_steps = alive_steps
         self.train_steps = train_steps
@@ -400,7 +401,8 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         self.q_network.load_state_dict(q_network_state)
         self.target_network.load_state_dict(target_network_state)
         self.memory.load_state(memory)
-        self.exploration.load_state(exploration)
+        if not reset_exploration:
+            self.exploration.load_state(exploration)
 
     @staticmethod
     def batch_observations(graphs: List[DGLHeteroGraph]) -> DGLHeteroGraph:

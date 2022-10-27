@@ -223,6 +223,7 @@ def main(**kwargs):
             training=config.training.train,
             local=config.training.local,
             pre_train=config.training.pre_train,
+            reset_exploration=config.loading.reset_exploration,
         )
     else:
         agent = DPOP(
