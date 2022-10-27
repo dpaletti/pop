@@ -36,22 +36,25 @@ class ExpertPop(DPOP):
             checkpoint_dir,
             tensorboard_dir,
             device,
+            local,
+            pre_train,
         )
         self.greedy_reconnect_agent = RecoPowerlineAgent(env.action_space)
         self.safe_max_rho = architecture.pop.safe_max_rho
         self.expert_steps = -1
         self.step_dpop = False
 
-    def act(self, observation, reward, done=False):
+    def my_act(self, observation, reward, done=False):
         self.expert_steps += 1
         reconnection_action = self.greedy_reconnect_agent.act(observation, reward)
 
-        if reconnection_action.impact_on_objects["has_impact"]:
+        if reconnection_action.impact_on_objects()["has_impact"]:
             self.step_dpop = False
             # If there is some powerline to reconnect do it
             action = reconnection_action
 
         elif max(observation.rho) > self.safe_max_rho:
+            print("Querying RL agent")
             self.step_dpop = True
             # If there is some powerline overloaded ask the agent what to do
             action = super().act(observation, reward, done)
@@ -62,6 +65,13 @@ class ExpertPop(DPOP):
             action = self.env.action_space({})
 
         self.writer.add_text("Expert Action", str(action), self.expert_steps)
+        return action
+
+    def convert_act(self, action):
+        return action
+
+    def convert_obs(self, observation: BaseObservation) -> BaseObservation:
+        return observation
 
     def step(
         self,
@@ -71,11 +81,12 @@ class ExpertPop(DPOP):
         next_observation: BaseObservation,
         done: bool,
     ):
+        self.log_reward(reward, self.expert_steps, name="Expert Reward")
+
         if self.step_dpop:
             super().step(action, observation, reward, next_observation, done)
         else:
             self.alive_steps += 1
-            self.log_reward(reward, self.expert_steps, name="Expert Reward")
             if done:
                 self.log_alive_steps(self.alive_steps, self.episodes)
                 self.episodes += 1

@@ -262,13 +262,6 @@ class CommunityDetector:
         for node in graph_t1.nodes:
             node_community = [community for community in comm_t1 if node in community]
             if len(node_community) > 1:
-                print(
-                    "Found more than one community with "
-                    + str(node)
-                    + " inside "
-                    + str(node_community)
-                    + ". Keeping the largest."
-                )
                 largest_community = node_community[
                     np.argmax([len(community) for community in node_community])
                 ]
