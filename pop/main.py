@@ -35,6 +35,9 @@ from pop.multiagent_system.dpop import DPOP
 from pop.constants import PER_PROCESS_GPU_MEMORY_FRACTION
 import re
 
+from pop.multiagent_system.expert_pop import ExpertPop
+from lightsim2grid import LightSimBackend
+
 logging.getLogger("lightning").addHandler(logging.NullHandler())
 logging.getLogger("lightning").propagate = False
 
@@ -189,6 +192,7 @@ def main(**kwargs):
         config.environment.name + "_train80",
         chronics_class=MultifolderWithCache,
         difficulty=config.environment.difficulty,
+        backend=LightSimBackend(),
     )
 
     # if reward_class == CombinedScaledReward:
@@ -201,6 +205,7 @@ def main(**kwargs):
     env_val = grid2op.make(
         config.environment.name + "_val10",
         difficulty=config.environment.difficulty,
+        backend=LightSimBackend(),
     )
     # set_l2rpn_reward(env_val, alarm=False)
 
@@ -208,13 +213,19 @@ def main(**kwargs):
     print("Running with seed: " + str(config.reproducibility.seed))
     fix_seed(env_train, env_val, seed=config.reproducibility.seed)
 
+    if config.model.architecture.pop.enable_expert:
+        agentType = ExpertPop
+    else:
+        agentType = DPOP
+
     if (
         config.loading.load
         and Path(config.loading.load_dir).parents[0].exists()
         and len(list(Path(config.loading.load_dir).parents[0].iterdir())) > 0
     ):
+
         print("Loading " + config.model.name + " from " + config.loading.load_dir)
-        agent = DPOP.load(
+        agent = agentType.load(
             log_file=config.loading.load_dir,
             env=env_train if config.training.train else env_val,
             tensorboard_dir=config.training.tensorboard_dir,
@@ -227,7 +238,7 @@ def main(**kwargs):
             architecture=config.model.architecture,
         )
     else:
-        agent = DPOP(
+        agent = agentType(
             env=env_train,
             name=config.model.name,
             architecture=config.model.architecture,

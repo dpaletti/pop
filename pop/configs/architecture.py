@@ -27,6 +27,8 @@ class POPArchitecture:
     no_action_reward: bool = False
     incentives: Optional[Dict[str, Any]] = None
     dictatorship_penalty: Optional[Dict[str, Any]] = None
+    enable_expert: bool = False
+    safe_max_rho: float = 0.99
 
 
 @dataclass(frozen=True)
