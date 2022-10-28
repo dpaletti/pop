@@ -1294,6 +1294,7 @@ def train(
     total_episodes = len(env.chronics_handler.subpaths)
 
     last_save_time = time.time()
+    env.chronics_handler.shuffle()
     print("Model will be checkpointed every " + str(save_frequency) + " seconds")
     with tqdm(total=iterations - training_step) as pbar:
         while training_step < iterations:

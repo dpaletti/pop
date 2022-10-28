@@ -1,4 +1,5 @@
 from typing import Any, Dict, Optional
+from grid2op.Agent.agentWithConverter import AgentWithConverter
 from grid2op.Environment.BaseEnv import BaseEnv
 from grid2op.Agent.recoPowerlineAgent import RecoPowerlineAgent
 from grid2op.Observation.baseObservation import BaseObservation
@@ -8,7 +9,7 @@ from pop.multiagent_system.space_factorization import EncodedAction
 from pop.networks.serializable_module import SerializableModule
 
 
-class ExpertPop(SerializableModule):
+class ExpertPop(SerializableModule, AgentWithConverter):
     def __init__(self, pop: DPOP, checkpoint_dir: str) -> None:
         super().__init__(log_dir=checkpoint_dir, name=pop.name)
         self.greedy_reconnect_agent = RecoPowerlineAgent(pop.env.action_space)
