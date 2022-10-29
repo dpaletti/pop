@@ -274,9 +274,7 @@ def main(**kwargs):
         else:
             print("Loading chronics matching " + str(config.training.chronics))
             env_train.chronics_handler.set_filter(
-                lambda path: re.match(
-                    ".*(" + str(config.training.chronics) + ").*", path
-                )
+                lambda path: re.match(".*" + str(config.training.chronics) + ".*", path)
                 is not None
             )
 
