@@ -130,6 +130,7 @@ def factor_action_space(
     n_substations: int,
     composite_actions: bool = False,
     generator_storage_only: bool = False,
+    remove_no_action: bool = False,
 ) -> Tuple[Dict[int, List[int]], Dict[HashableAction, int]]:
     # TODO: take storage into account, take observation_space.storage_to_subid
 
@@ -167,10 +168,17 @@ def factor_action_space(
         ]
     )
 
-    action_space_dict = {
-        substation: [(full_converter.all_actions[0], 0)]
-        for substation in range(n_substations)
-    }
+    if not remove_no_action:
+        action_space_dict = {
+            substation: [(full_converter.all_actions[0], 0)]
+            for substation in range(n_substations)
+        }
+    else:
+        action_space_dict = {
+            substation: [(full_converter.all_actions[0], 0)]
+            for substation in range(n_substations)
+        }
+
     for owner, action, encoded_action in zip(owners, actions, encoded_actions):
         action_space_dict[owner].append((action, encoded_action))
 

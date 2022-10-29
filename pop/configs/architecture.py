@@ -30,6 +30,7 @@ class POPArchitecture:
     enable_expert: bool = False
     safe_max_rho: float = 0.99
     generator_storage_only: bool = False
+    remove_no_action: bool = False
 
 
 @dataclass(frozen=True)
