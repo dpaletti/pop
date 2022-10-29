@@ -66,6 +66,7 @@ def _assign_action(
     line_extremity_to_node: np.array,
     encoded_action: int,
     composite_actions: bool = False,
+    generator_storage_only: bool = False,
 ) -> Optional[Tuple[int, BaseAction, int]]:
     (
         _,
@@ -73,7 +74,7 @@ def _assign_action(
         topology,
         line,
         redispatching,
-        _,
+        storage,
         curtailment,
     ) = action.get_types()
     action_impact = action.impact_on_objects()
@@ -82,7 +83,7 @@ def _assign_action(
         if [topology, line, redispatching, curtailment].count(True) > 1:
             return
 
-    if topology:
+    if topology and not generator_storage_only:
         action_impact_on_topology = action_impact["topology"]
         if (
             len(action_impact_on_topology) == 1 or composite_actions
@@ -99,7 +100,7 @@ def _assign_action(
                 action,
                 encoded_action,
             )
-    if line:
+    if line and not generator_storage_only:
         if (
             (action_impact["switch_line"]["count"] == 1 or composite_actions)
             and not list(action_impact["force_line"]["reconnections"]["powerlines"])
@@ -117,12 +118,18 @@ def _assign_action(
         for generator in action_impact["redispatch"]["generators"]:
             return generator_to_node[generator["gen_id"]], action, encoded_action
 
+    if storage:
+        raise Exception("Storage not supported: " + str(action_impact))
+    if curtailment:
+        raise Exception("Curtailment not supported: " + str(action_impact))
+
 
 def factor_action_space(
     observation_space: ObservationSpace,
     full_converter: IdToAct,
     n_substations: int,
     composite_actions: bool = False,
+    generator_storage_only: bool = False,
 ) -> Tuple[Dict[int, List[int]], Dict[HashableAction, int]]:
     # TODO: take storage into account, take observation_space.storage_to_subid
 
@@ -150,6 +157,7 @@ def factor_action_space(
                     line_extremity_to_node,
                     encoded_action,
                     composite_actions=composite_actions,
+                    generator_storage_only=generator_storage_only,
                 )
                 for encoded_action, action in enumerate(
                     tqdm(full_converter.all_actions[1:])

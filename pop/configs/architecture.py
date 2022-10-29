@@ -29,6 +29,7 @@ class POPArchitecture:
     dictatorship_penalty: Optional[Dict[str, Any]] = None
     enable_expert: bool = False
     safe_max_rho: float = 0.99
+    generator_storage_only: bool = False
 
 
 @dataclass(frozen=True)

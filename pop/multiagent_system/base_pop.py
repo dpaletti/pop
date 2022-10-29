@@ -124,6 +124,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             self.converter,
             self.env.n_sub,
             composite_actions=self.architecture.pop.composite_actions,
+            generator_storage_only=self.architecture.pop.generator_storage_only,
         )
 
         self.substation_to_action_converter = self._get_substation_to_agent_mapping(
