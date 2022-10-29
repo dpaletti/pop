@@ -55,7 +55,7 @@ class TrainingParameters:
     skip: int = 1
     local: bool = False
     pre_train: bool = False
-    chronics: int = -1
+    chronics: Union[int, str] = -1
 
 
 @dataclass(frozen=True)

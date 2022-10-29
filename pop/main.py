@@ -271,6 +271,14 @@ def main(**kwargs):
             env_train.chronics_handler.set_filter(
                 lambda path: re.match(".*0[0-9][0-9].*", path) is not None
             )
+        else:
+            print("Loading chronics matching " + str(config.training.chronics))
+            env_train.chronics_handler.set_filter(
+                lambda path: re.match(
+                    ".*(" + str(config.training.chronics) + ").*", path
+                )
+                is not None
+            )
 
         kept = env_train.chronics_handler.real_data.reset()
         print(
