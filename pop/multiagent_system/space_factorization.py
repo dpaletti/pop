@@ -168,19 +168,17 @@ def factor_action_space(
         ]
     )
 
-    if not remove_no_action:
-        action_space_dict = {
-            substation: [(full_converter.all_actions[0], 0)]
-            for substation in range(n_substations)
-        }
-    else:
-        action_space_dict = {
-            substation: [(full_converter.all_actions[0], 0)]
-            for substation in range(n_substations)
-        }
+    action_space_dict = {
+        substation: [(full_converter.all_actions[0], 0)] if not remove_no_action else []
+        for substation in range(n_substations)
+    }
 
     for owner, action, encoded_action in zip(owners, actions, encoded_actions):
         action_space_dict[owner].append((action, encoded_action))
+
+    for _, action_list in action_space_dict.items():
+        if not action_list:
+            action_list.append((full_converter.all_actions[0], 0))
 
     sub_id_to_action_space = {
         substation: [action[0] for action in action_space_dict[substation]]
