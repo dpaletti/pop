@@ -1,21 +1,13 @@
 from typing import Optional, Dict, Any, List, Tuple
 
 import networkx as nx
-import ray
 from dgl import DGLHeteroGraph
 from ray import ObjectRef
 
 from pop.agents.base_gcn_agent import BaseGCNAgent
 from pop.configs.agent_architecture import AgentArchitecture
 
-from pop.constants import PER_PROCESS_GPU_MEMORY_FRACTION
-import torch as th
 
-
-@ray.remote(
-    num_cpus=0.1,
-    num_gpus=PER_PROCESS_GPU_MEMORY_FRACTION * 1e-2 if th.cuda.is_available() else 0,
-)
 class RayShallowGCNAgent(BaseGCNAgent):
     def __init__(
         self,
@@ -55,10 +47,8 @@ class RayShallowGCNAgent(BaseGCNAgent):
         return self.name
 
     @staticmethod
-    def factory(checkpoint: Dict[str, Any], **kwargs) -> ObjectRef:
-        agent = RayShallowGCNAgent.remote(
-            name=checkpoint["name"], device=checkpoint["device"]
-        )
+    def factory(checkpoint: Dict[str, Any], **kwargs):
+        agent = RayShallowGCNAgent(name=checkpoint["name"], device=checkpoint["device"])
         return agent
 
     def take_action(

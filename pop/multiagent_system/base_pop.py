@@ -10,6 +10,7 @@ import dgl
 import networkx as nx
 import numpy as np
 import ray
+from ray.util.client.common import ClientActorHandle
 import torch as th
 from grid2op.Action import BaseAction
 from grid2op.Agent import AgentWithConverter
@@ -145,7 +146,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 device=self.device,
             )
             if len(action_space) > 1
-            else RayShallowGCNAgent.remote(
+            else RayShallowGCNAgent(
                 name="agent_" + str(sub_id) + "_" + self.name,
                 device=self.device,
             )
@@ -303,19 +304,10 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             for idx, community in enumerate(list(self.community_to_manager.keys()))
         }
 
-        agent_names: List[str] = ray.get(
-            [
-                agent.get_name.remote()
-                for agent in list(self.substation_to_agent.values())
-            ]
-        )
-
-        agent_names: List[str] = [
-            "_".join(name.split("_")[0:2]) for name in agent_names
-        ]
-        substation_to_names: Dict[Substation, str] = {
-            substation: agent_names[idx]
-            for idx, substation in enumerate(list(self.substation_to_agent.keys()))
+        agent_names: Dict[Substation, str] = {
+            sub: "_".join(ray.get(agent.get_name.remote()).split("_")[0:2])
+            for sub, agent in self.substation_to_agent.items()
+            if type(agent) is ClientActorHandle
         }
 
         if self.action_detector.is_repeated(self.chosen_action):
@@ -338,12 +330,12 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             if community_to_q_values
             else None,
             agent_actions={
-                substation_to_names[sub_id]: action
-                for sub_id, action in self.substation_to_local_action.items()
+                agent_names[sub]: action
+                for sub, action in self.substation_to_local_action.items()
             },
             agent_q_values={
-                substation_to_names[sub_id]: action
-                for sub_id, action in substation_to_q_values.items()
+                agent_names[sub]: q_value
+                for sub, q_value in substation_to_q_values.items()
             }
             if substation_to_q_values
             else None,
@@ -362,11 +354,12 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             agent_explorations={
                 name: exploration_state
                 for name, exploration_state in zip(
-                    agent_names,
+                    agent_names.values(),
                     ray.get(
                         [
                             agent.get_exploration_logs.remote()
                             for agent in self.substation_to_agent.values()
+                            if type(agent) is ClientActorHandle
                         ]
                     ),
                 )
@@ -632,9 +625,12 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         Children may use this as a starting point for reporting system state
         """
 
-        agents_state: List[Dict[str, Any]] = ray.get(
-            [agent.get_state.remote() for _, agent in self.substation_to_agent.items()]
-        )
+        agents_state: List[Dict[str, Any]] = [
+            ray.get(agent.get_state.remote())
+            if type(agent) is ClientActorHandle
+            else agent.get_state()
+            for _, agent in self.substation_to_agent.items()
+        ]
 
         managers_state: List[Dict[str, Any]] = ray.get(
             [manager.get_state.remote() for manager in self.managers_history.keys()]
@@ -710,6 +706,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 for idx, (sub_id, observation) in enumerate(
                     factored_observation.items()
                 )
+                if type(self.substation_to_agent[sub_id]) is ClientActorHandle
             ],
         )
 
@@ -795,7 +792,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             graph,
             {
                 node_id: {
-                    "action": substation_to_encoded_action[node_data["sub_id"]],
+                    "action": substation_to_encoded_action[node_data["sub_id"]]
+                    if substation_to_encoded_action.get(node_data["sub_id"])
+                    else 0,
                 }
                 for node_id, node_data in graph.nodes.data()
             },
@@ -826,6 +825,8 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             graph,
             {
                 community: substation_to_encoded_action[substation]
+                if substation_to_encoded_action.get(substation)
+                else 0
                 for community, substation in community_to_substation.items()
             },
             sub_graphs,
