@@ -70,9 +70,7 @@ class Manager(BaseGCNAgent):
     def _take_action(
         self, transformed_observation: DGLHeteroGraph, mask: List[int] = None
     ) -> int:
-        if len(mask) == 0:
-            # Mask must be not none but may be empty
-            return 0
+        # Mask must be not none
 
         action_list = list(range(self.actions))
 

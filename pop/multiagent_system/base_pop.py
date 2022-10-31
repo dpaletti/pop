@@ -742,34 +742,33 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         # Managers are queried for an action
         # Each manager chooses one action for each community she handles
+
+        enabled_nodes = [
+            node
+            for community in communities
+            for node in community
+            if not self.architecture.pop.manager_remove_no_action
+            or len(
+                self.substation_to_action_converter[
+                    graph.nodes[node]["sub_id"]
+                ].all_actions
+            )
+            > 1
+        ]
+
         actions, q_values = zip(
             *ray.get(
-                list(
-                    filter(
-                        lambda x: x is not None,
-                        [
-                            community_to_manager[community].take_action.remote(
-                                transformed_observation=community_to_sub_graphs_dict[
-                                    community
-                                ],
-                                mask=frozenset(
-                                    [
-                                        node
-                                        for node in community
-                                        if self.architecture.pop.manager_remove_no_action
-                                        and len(
-                                            self.substation_to_action_converter[
-                                                graph.nodes[node]["sub_id"]
-                                            ].all_actions
-                                        )
-                                        > 1
-                                    ]
-                                ),
-                            )
-                            for community in communities
-                        ],
+                [
+                    community_to_manager[community].take_action.remote(
+                        transformed_observation=community_to_sub_graphs_dict[community],
+                        mask=frozenset(
+                            [node for node in community if node in enabled_nodes]
+                            if set(community).intersection(set(enabled_nodes))
+                            else [list(community)[0]]
+                        ),
                     )
-                )
+                    for community in communities
+                ],
             )
         )
 

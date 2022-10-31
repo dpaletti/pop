@@ -86,8 +86,8 @@ class DPOP(BasePOP):
             mask = [
                 node
                 for node in range(graph.num_nodes())
-                if self.architecture.pop.manager_remove_no_action
-                and graph.ndata["embedding_community_action"][node][-1].item() != 0
+                if not self.architecture.pop.manager_remove_no_action
+                or graph.ndata["embedding_community_action"][node][-1].item() != 0
             ]
 
             chosen_node, q_value = ray.get(
