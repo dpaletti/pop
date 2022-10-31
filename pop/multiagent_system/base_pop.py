@@ -752,7 +752,19 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                                 transformed_observation=community_to_sub_graphs_dict[
                                     community
                                 ],
-                                mask=frozenset([node for node in community]),
+                                mask=frozenset(
+                                    [
+                                        node
+                                        for node in community
+                                        if self.architecture.pop.manager_remove_no_action
+                                        and len(
+                                            self.substation_to_action_converter[
+                                                graph.nodes[node]["sub_id"]
+                                            ].all_actions
+                                        )
+                                        > 1
+                                    ]
+                                ),
                             )
                             for community in communities
                         ],

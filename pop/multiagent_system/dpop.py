@@ -83,10 +83,15 @@ class DPOP(BasePOP):
         if self.pre_train:
             return random.sample(list(range(graph.num_nodes())), 1)[0], None
         else:
+            mask = [
+                node
+                for node in range(graph.num_nodes())
+                if self.architecture.pop.manager_remove_no_action
+                and graph.ndata["embedding_community_action"][node][-1].item() != 0
+            ]
+
             chosen_node, q_value = ray.get(
-                self.head_manager.take_action.remote(
-                    graph, mask=list(range(graph.num_nodes()))
-                )
+                self.head_manager.take_action.remote(graph, mask=mask)
             )
 
         self.log_exploration(

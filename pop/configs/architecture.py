@@ -31,6 +31,7 @@ class POPArchitecture:
     safe_max_rho: float = 0.99
     generator_storage_only: bool = False
     remove_no_action: bool = False
+    manager_remove_no_action: bool = False
 
 
 @dataclass(frozen=True)
