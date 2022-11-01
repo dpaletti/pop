@@ -703,21 +703,33 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         actions_taken = ray.get(
             [
                 self.substation_to_agent[sub_id].take_action.remote(observation)
-                for idx, (sub_id, observation) in enumerate(
-                    factored_observation.items()
-                )
+                for sub_id, observation in factored_observation.items()
                 if type(self.substation_to_agent[sub_id]) is ClientActorHandle
-            ],
+            ]
         )
 
         actions, q_values = zip(*actions_taken)
 
         return {
             sub_id: action
-            for sub_id, action in zip(factored_observation.keys(), actions)
+            for sub_id, action in zip(
+                [
+                    sub
+                    for sub in factored_observation.keys()
+                    if type(self.substation_to_agent[sub]) is ClientActorHandle
+                ],
+                actions,
+            )
         }, {
             sub_id: q_value
-            for sub_id, q_value in zip(factored_observation.keys(), q_values)
+            for sub_id, q_value in zip(
+                [
+                    sub
+                    for sub in factored_observation.keys()
+                    if type(self.substation_to_agent[sub]) is ClientActorHandle
+                ],
+                q_values,
+            )
         }
 
     def _get_manager_actions(

@@ -58,6 +58,31 @@ def _get_topological_action_owner(
         )
 
 
+def _assign_action_gen_only(
+    action: BaseAction,
+    generator_to_node: np.array,
+    encoded_action: int,
+) -> Optional[Tuple[int, int]]:
+
+    (
+        _,
+        _,
+        topology,
+        line,
+        redispatching,
+        _,
+        curtailment,
+    ) = action.get_types()
+    action_impact = action.impact_on_objects()
+
+    if [topology, line, redispatching, curtailment].count(True) > 1:
+        return
+
+    if redispatching:
+        for generator in action_impact["redispatch"]["generators"]:
+            return generator_to_node[generator["gen_id"]], encoded_action
+
+
 def _assign_action(
     action: BaseAction,
     load_to_node: np.array,
@@ -67,7 +92,7 @@ def _assign_action(
     encoded_action: int,
     composite_actions: bool = False,
     generator_storage_only: bool = False,
-) -> Optional[Tuple[int, BaseAction, int]]:
+) -> Optional[Tuple[int, int]]:
     (
         _,
         _,
@@ -83,45 +108,47 @@ def _assign_action(
         if [topology, line, redispatching, curtailment].count(True) > 1:
             return
 
-    if topology and not generator_storage_only:
-        action_impact_on_topology = action_impact["topology"]
-        if (
-            len(action_impact_on_topology) == 1 or composite_actions
-        ) and not action_impact_on_topology["assigned_bus"]:
-            # Topological switches which include only 1 action
-            return (
-                _get_topological_action_owner(
-                    action_impact_on_topology["bus_switch"][0],
-                    load_to_node,
-                    generator_to_node,
-                    line_origin_to_node,
-                    line_extremity_to_node,
-                ),
-                action,
-                encoded_action,
-            )
-    if line and not generator_storage_only:
-        if (
-            (action_impact["switch_line"]["count"] == 1 or composite_actions)
-            and not list(action_impact["force_line"]["reconnections"]["powerlines"])
-            and not list(action_impact["force_line"]["disconnections"]["powerlines"])
-        ):
-            # Switches are taken into account
-            return (
-                line_origin_to_node[
-                    list(action_impact["switch_line"]["powerlines"])[0]
-                ],
-                action,
-                encoded_action,
-            )
     if redispatching:
         for generator in action_impact["redispatch"]["generators"]:
-            return generator_to_node[generator["gen_id"]], action, encoded_action
+            return generator_to_node[generator["gen_id"]], encoded_action
 
     if storage:
         raise Exception("Storage not supported: " + str(action_impact))
     if curtailment:
         raise Exception("Curtailment not supported: " + str(action_impact))
+
+    if not generator_storage_only:
+        if topology:
+            action_impact_on_topology = action_impact["topology"]
+            if (
+                len(action_impact_on_topology) == 1 or composite_actions
+            ) and not action_impact_on_topology["assigned_bus"]:
+                # Topological switches which include only 1 action
+                return (
+                    _get_topological_action_owner(
+                        action_impact_on_topology["bus_switch"][0],
+                        load_to_node,
+                        generator_to_node,
+                        line_origin_to_node,
+                        line_extremity_to_node,
+                    ),
+                    encoded_action,
+                )
+        if line:
+            if (
+                (action_impact["switch_line"]["count"] == 1 or composite_actions)
+                and not list(action_impact["force_line"]["reconnections"]["powerlines"])
+                and not list(
+                    action_impact["force_line"]["disconnections"]["powerlines"]
+                )
+            ):
+                # Switches are taken into account
+                return (
+                    line_origin_to_node[
+                        list(action_impact["switch_line"]["powerlines"])[0]
+                    ],
+                    encoded_action,
+                )
 
 
 def factor_action_space(
@@ -144,37 +171,57 @@ def factor_action_space(
         "WARNING: Storage objects are ignored, check if they are present in the environment"
     )
     print("Factoring Action Space")
-
-    # Factoring Action Lookup Table
-    owners, actions, encoded_actions = zip(
-        *[
-            action_assignment
-            for action_assignment in [
-                _assign_action(
-                    action,
-                    load_to_node,
-                    generator_to_node,
-                    line_origin_to_node,
-                    line_extremity_to_node,
-                    encoded_action,
-                    composite_actions=composite_actions,
-                    generator_storage_only=generator_storage_only,
-                )
-                for encoded_action, action in enumerate(
-                    tqdm(full_converter.all_actions[1:])
-                )
+    if not composite_actions and generator_storage_only:
+        # Factoring Action Lookup Table
+        owners, encoded_actions = zip(
+            *[
+                action_assignment
+                for action_assignment in [
+                    _assign_action_gen_only(
+                        action,
+                        generator_to_node,
+                        encoded_action,
+                    )
+                    for encoded_action, action in enumerate(
+                        tqdm(full_converter.all_actions[1:])
+                    )
+                ]
+                if action_assignment is not None
             ]
-            if action_assignment is not None
-        ]
-    )
+        )
+    else:
+        # Factoring Action Lookup Table
+        owners, encoded_actions = zip(
+            *[
+                action_assignment
+                for action_assignment in [
+                    _assign_action(
+                        action,
+                        load_to_node,
+                        generator_to_node,
+                        line_origin_to_node,
+                        line_extremity_to_node,
+                        encoded_action,
+                        composite_actions=composite_actions,
+                        generator_storage_only=generator_storage_only,
+                    )
+                    for encoded_action, action in enumerate(
+                        tqdm(full_converter.all_actions[1:])
+                    )
+                ]
+                if action_assignment is not None
+            ]
+        )
 
     action_space_dict = {
         substation: [(full_converter.all_actions[0], 0)] if not remove_no_action else []
         for substation in range(n_substations)
     }
 
-    for owner, action, encoded_action in zip(owners, actions, encoded_actions):
-        action_space_dict[owner].append((action, encoded_action))
+    for owner, encoded_action in zip(owners, encoded_actions):
+        action_space_dict[owner].append(
+            (full_converter.all_actions[encoded_action], encoded_action)
+        )
 
     for _, action_list in action_space_dict.items():
         if not action_list:
