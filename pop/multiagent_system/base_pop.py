@@ -1326,8 +1326,7 @@ def train(
         while training_step < iterations:
             encoded_action = dpop.my_act(dpop.convert_obs(obs), reward, done)
             action = dpop.convert_act(encoded_action)
-            next_obs, _, done, _ = env.step(action)
-            reward = 5 if not done or obs.current_step == obs.max_step else 0
+            next_obs, reward, done, _ = env.step(action)
             dpop.step(
                 action=encoded_action,
                 observation=obs,

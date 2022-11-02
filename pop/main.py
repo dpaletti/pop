@@ -26,6 +26,7 @@ from grid2op.Reward import (
     CombinedScaledReward,
     IncreasingFlatReward,
     RedispReward,
+    EpisodeDurationReward,
 )
 from grid2op.Runner import Runner
 from grid2op.utils import ScoreL2RPN2022
@@ -179,6 +180,10 @@ def main(**kwargs):
         + " with difficulty "
         + str(config.environment.difficulty)
     )
+    reward = {
+        "Episode Duration": EpisodeDurationReward(per_timestep=5),
+        "Flat": FlatReward(per_timestep=5),
+    }
 
     # reward_class = (
     # CombinedReward
@@ -192,6 +197,7 @@ def main(**kwargs):
         config.environment.name + "_train80",
         chronics_class=MultifolderWithCache,
         difficulty=config.environment.difficulty,
+        reward_class=reward[config.environment.reward],
         backend=LightSimBackend(),
     )
 

@@ -74,14 +74,9 @@ class LoadingParameters:
 
 
 @dataclass(frozen=True)
-class RewardSpecification:
-    reward_components: Dict[str, float]
-
-
-@dataclass(frozen=True)
 class EnvironmentParameters:
     name: str
-    reward: RewardSpecification
+    reward: str
     difficulty: Union[int, str]
 
     def __init__(
@@ -93,7 +88,7 @@ class EnvironmentParameters:
         object.__setattr__(
             self,
             "reward",
-            RewardSpecification(reward_components=environment_dict["reward"]),
+            environment_dict["reward"],
         )
 
 
