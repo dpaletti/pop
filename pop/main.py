@@ -181,7 +181,7 @@ def main(**kwargs):
         + str(config.environment.difficulty)
     )
     reward = {
-        "Episode Duration": EpisodeDurationReward(per_timestep=20),
+        "Episode Duration": EpisodeDurationReward(per_timestep=1 / 20),
         "Flat": FlatReward(per_timestep=5),
     }
 
