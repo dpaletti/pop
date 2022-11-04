@@ -78,6 +78,10 @@ class ExpertPop(SerializableModule, AgentWithConverter):
     def writer(self):
         return self.pop.writer
 
+    @property
+    def train_steps(self):
+        return self.pop.train_steps
+
     @staticmethod
     def factory(
         checkpoint: Dict[str, Any],

@@ -293,7 +293,7 @@ def main(**kwargs):
         # yappi.start(builtins=True)
         train(
             env_train,
-            iterations=config.training.steps,
+            iterations=config.training.steps - agent.train_steps,
             dpop=agent,
             save_frequency=config.training.save_frequency,
             skip=config.training.skip,
