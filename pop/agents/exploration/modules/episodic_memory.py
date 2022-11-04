@@ -39,6 +39,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
 
         self.memory = deque(maxlen=self.exploration_parameters.size)
         self.neighbors = self.exploration_parameters.neighbors
+        self.maximum_similarity = self.exploration_parameters.maximum_similarity
         self.exploration_bonus_limit = (
             self.exploration_parameters.exploration_bonus_limit
         )
@@ -160,7 +161,10 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             self.memory.append(current_embedding_detached)
 
             # Episodic Reward
-            return 1 / np.sqrt(np.sum(neighbor_distances) + denominator_constant)
+            episodic_reward = 1 / np.sqrt(
+                np.sum(neighbor_distances) + denominator_constant
+            )
+            return episodic_reward if episodic_reward <= self.maximum_similarity else 0
         except ValueError:
             return 0
 
@@ -180,7 +184,13 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             else 1
         )
 
-    def _inverse_kernel(self, x: np.array, y: np.array, epsilon: float = 1e-5) -> float:
+    def _inverse_kernel(
+        self,
+        x: np.array,
+        y: np.array,
+        epsilon: float = 0.01,
+        cluster_distance: float = 0.008,
+    ) -> float:
         # x <- current_state_embedding as computed by the inverse model
         # y <- K nearest neighbors to x in M (all Ks, then the outputs of the kernels are summed)
         squared_euclidean_distance = float(norm(x - y) ** 2)
@@ -189,8 +199,14 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             epsilon
             / (
                 (
-                    squared_euclidean_distance
-                    / self.k_squared_distance_running_mean.value
+                    max(
+                        (
+                            squared_euclidean_distance
+                            / self.k_squared_distance_running_mean.value
+                            - cluster_distance
+                        ),
+                        0,
+                    )
                 )
                 + epsilon
             )
@@ -229,7 +245,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             self.loss = nn.CrossEntropyLoss()
 
             self.optimizer: th.optim.Optimizer = th.optim.Adam(
-                self.parameters(), lr=architecture.learning_rate
+                self.parameters(), lr=architecture.learning_rate, eps=1e-4
             )
 
         def forward(
@@ -259,6 +275,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
                 th.Tensor([action]).long(),
             )
             loss.backward()
+            nn.utils.clip_grad_norm_(self.parameters(), max_norm=40)
             self.optimizer.step()
 
     class RunningMean:

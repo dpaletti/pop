@@ -42,6 +42,7 @@ class EpisodicMemoryParameters(ExplorationParameters):
     size: int
     neighbors: int
     exploration_bonus_limit: int
+    maximum_similarity: float
     random_network_distiller: RandomNetworkDistillerArchitecture
     inverse_model: InverseModelArchitecture
 
@@ -62,6 +63,7 @@ class EpisodicMemoryParameters(ExplorationParameters):
         object.__setattr__(self, "method", d["method"])
         object.__setattr__(self, "size", d["size"])
         object.__setattr__(self, "neighbors", d["neighbors"])
+        object.__setattr__(self, "maximum_similarity", d["maximum_similarity"])
         object.__setattr__(
             self, "exploration_bonus_limit", d["exploration_bonus_limit"]
         )
@@ -103,7 +105,7 @@ class ReplayMemoryParameters:
     alpha: float
     max_beta: float
     min_beta: float
-    beta_decay: int
+    annihilation_rate: int
     capacity: int
 
 
@@ -120,6 +122,7 @@ class AgentArchitecture:
     gamma: float
     huber_loss_delta: float
     batch_size: int
+    intrinsic_reward_relevance: float = 0
 
     def __init__(
         self,
@@ -213,6 +216,12 @@ class AgentArchitecture:
         object.__setattr__(self, "gamma", agent_dict["gamma"])
         object.__setattr__(self, "huber_loss_delta", agent_dict["huber_loss_delta"])
         object.__setattr__(self, "batch_size", agent_dict["batch_size"])
+        if agent_dict.get("intrinsic_reward_relevance"):
+            object.__setattr__(
+                self,
+                "intrinsic_reward_relevance",
+                agent_dict["intrinsic_reward_relevance"],
+            )
 
     @staticmethod
     def _parse_network_architectures(

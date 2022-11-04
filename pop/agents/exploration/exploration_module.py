@@ -40,8 +40,7 @@ class ExplorationModule(abc.ABC):
         ...
 
     def apply_intrinsic_reward(
-        self,
-        step_function: Callable,
+        self, step_function: Callable, intrinsic_reward_relevance: float
     ) -> Callable:
         @functools.wraps(step_function)
         def wrap(
@@ -59,7 +58,7 @@ class ExplorationModule(abc.ABC):
             return step_function(
                 observation,
                 action,
-                intrinsic_reward + reward,
+                reward + intrinsic_reward_relevance * intrinsic_reward,
                 next_observation,
                 done,
                 stop_decay=stop_decay,

@@ -4,7 +4,7 @@ from dataclasses import asdict
 import numpy as np
 from typing import Dict, Tuple, List, Any
 import pandas as pd
-import torch as th
+from math import log10
 
 from pop.configs.agent_architecture import ReplayMemoryParameters
 
@@ -25,7 +25,7 @@ class ReplayMemory(object):
         self.steps: int = 0
         self.max_beta: float = architecture.max_beta
         self.min_beta: float = architecture.min_beta
-        self.half_life: float = architecture.beta_decay
+        self.annihilation_rate: float = architecture.annihilation_rate
         self.beta: float = self.max_beta
         self.apply_uniform: bool = False
 
@@ -67,9 +67,15 @@ class ReplayMemory(object):
 
     def update(self):
         self.steps += 1
-        self.beta = self.min_beta + (self.max_beta - self.min_beta) * np.exp(
-            -1.0 * self.steps / self.half_life
+        self.beta = self.max_beta + (self.min_beta - self.max_beta) * np.exp(
+            -1.0 * self.steps / self.annihilation_rate
         )
+
+    @staticmethod
+    def _logarithmic_growth(
+        initial_value: float, growth_rate: float, steps: int
+    ) -> float:
+        return growth_rate * log10(steps + 1) + initial_value
 
     def sample(
         self, batch_size: int, epsilon: float = 1e-4

@@ -21,5 +21,4 @@ bias = true
 [conv]
 out_feats = "784"
 bias = true
-weight = true
 allow_zero_in_degree = true

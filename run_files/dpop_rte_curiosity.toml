@@ -15,6 +15,7 @@ tensorboard_dir = "<<model_data_dir>>/pop_runs/tensorboard/<<model_name>>"
 save_frequency=3600
 curriculum = false
 reset_decay = true
+chronics = 10
 
 [evaluation]
 episodes = 100
@@ -28,7 +29,6 @@ load_dir = "<<model_checkpoint_dir>>/<<model_name>>.pt"
 
 [environment]
 name = "rte_case14_realistic"
+# name = "l2rpn_wcci_2020"
 difficulty = 0
-
-[environment.reward]
-Experimental = 1
+reward = "Episode Duration"

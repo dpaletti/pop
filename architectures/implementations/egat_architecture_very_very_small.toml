@@ -9,5 +9,4 @@ bias = true
 [conv]
 out_feats = "32"
 bias = true
-weight = true
 allow_zero_in_degree = true

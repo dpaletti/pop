@@ -36,7 +36,6 @@ class EGATNodeConv(nn.Module):
         in_feats: int,
         out_feats: int,
         bias=True,
-        weight=True,
         allow_zero_in_degree=True,
     ):
         super(EGATNodeConv, self).__init__()
@@ -44,7 +43,6 @@ class EGATNodeConv(nn.Module):
             in_feats,
             out_feats,
             bias=bias,
-            weight=weight,
             allow_zero_in_degree=allow_zero_in_degree,
         )
 

@@ -245,6 +245,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         # Backward propagation
         self.optimizer.zero_grad()
         loss.backward()
+        nn.utils.clip_grad_norm_(self.q_network.parameters(), max_norm=40)
         self.optimizer.step()
 
         # Update priorities for sampling
@@ -339,7 +340,9 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
                 self._add_fake_edge_features(next_observation)
 
         if self.training:
-            return self.exploration.apply_intrinsic_reward(self._step)(
+            return self.exploration.apply_intrinsic_reward(
+                self._step, self.architecture.intrinsic_reward_relevance
+            )(
                 self,
                 observation,
                 action,

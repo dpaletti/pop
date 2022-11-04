@@ -38,6 +38,7 @@ class RandomNetworkDistiller(nn.Module):
         self.distiller_optimizer: th.optim.Optimizer = th.optim.Adam(
             self.prediction_network.parameters(),
             lr=architecture.learning_rate,
+            eps=1e-4,
         )
 
         self.mse_loss = nn.MSELoss()
@@ -53,5 +54,6 @@ class RandomNetworkDistiller(nn.Module):
         if self.last_loss is not None:
             self.distiller_optimizer.zero_grad()
             self.last_loss.backward()
+            nn.utils.clip_grad_norm_(self.parameters(), max_norm=40)
             self.distiller_optimizer.step()
             self.last_loss = None

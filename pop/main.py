@@ -45,11 +45,11 @@ logging.getLogger("lightning").propagate = False
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-class MyFlatReward(BaseReward):
+class DQNReward(BaseReward):
     def __init__(self, per_step: int = 1):
         super(BaseReward, self).__init__()
         self._per_step = per_step
-        self.reward_min = 0
+        self.reward_min = -1
         self.reward_max = self._per_step
 
     def __call__(
@@ -183,6 +183,7 @@ def main(**kwargs):
     reward = {
         "Episode Duration": EpisodeDurationReward(per_timestep=1 / 20),
         "Flat": FlatReward(per_timestep=5),
+        "DQNReward": DQNReward(per_step=1),
     }
 
     # reward_class = (

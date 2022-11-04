@@ -1,15 +1,14 @@
 [pop]
-node_features = 6
-edge_features = 14
-agent_neighbourhood_radius = 1
-decentralized = false
-epsilon_beta_scheduling = false
-enable_power_supply_modularity = false # rte community detection works only this way
-manager_history_size = 1e5
-manager_initialization_half_life = 26 # 2 * substations
-agent_type = "uniform"
-disabled_action_loops_length = 1
-repeated_action_penalty = 0
+node_features = ['p', 'q', 'v', 'sub_id', 'theta', 'cooldown']
+edge_features = ['p','p_or','p_ex','q_or','q_ex','a_or','a_ex','theta_or','theta_ex','rho','cooldown','status','thermal_limit','timestep_overflow']
+agent_selective_learning = false
+manager_selective_learning = true
+no_action_reward = true
+enable_expert = true
+generator_storage_only = true
+remove_no_action = true
+manager_remove_no_action = true
+safe_max_rho = 0.99
 
 [agent]
 embedding = "egat_architecture_small"
@@ -27,6 +26,7 @@ method = "episodic_memory"
 size = 1000
 neighbors = 10
 exploration_bonus_limit = 10
+maximum_similarity = 8
 
 [agent.exploration.random_network_distiller]
 network = "egat_architecture_very_very_small"
@@ -41,7 +41,7 @@ learning_rate = 1e-2
 alpha = 0.5
 max_beta = 1.0
 min_beta = 0.0
-beta_decay = 200
+annihilation_rate = 200
 capacity = 1000
 
 [manager]
@@ -60,6 +60,7 @@ method = "episodic_memory"
 size = 1000
 neighbors = 10
 exploration_bonus_limit = 10
+maximum_similarity = 8
 
 [manager.exploration.random_network_distiller]
 network = "egat_architecture_very_very_small"
@@ -74,7 +75,7 @@ learning_rate = 1e-2
 alpha = 0.5
 max_beta = 1.0
 min_beta = 0.0
-beta_decay = 200
+annihilation_rate = 200
 capacity = 1000
 
 [head_manager]
@@ -93,6 +94,7 @@ method = "episodic_memory"
 size = 1000
 neighbors = 10
 exploration_bonus_limit = 10
+maximum_similarity = 8
 
 [head_manager.exploration.random_network_distiller]
 network = "gat_architecture_very_small"
@@ -107,7 +109,7 @@ learning_rate = 1e-2
 alpha = 0.5
 max_beta = 1.0
 min_beta = 0.0
-beta_decay = 200
+annihilation_rate = 200
 capacity = 1000
 
 

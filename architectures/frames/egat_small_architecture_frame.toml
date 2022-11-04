@@ -19,6 +19,4 @@ module = "pop.graph_convolutional_networks.custom_layers"
 in_feats = "<<attention1_out_node_feats>> * <<attention1_num_heads>>"
 out_feats = "..."
 bias = "..."
-weight = "..."
 allow_zero_in_degree = "..."
-
