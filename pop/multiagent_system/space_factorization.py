@@ -151,6 +151,63 @@ def _assign_action(
                 )
 
 
+def generate_redispatching_action_space(env, actions_per_generator: int = 10):
+    print("Generating redispatching action space")
+    print("WARNING: ignoring actions on storage")
+    sub_to_action_space = {sub: [] for sub in range(env.n_sub)}
+    all_actions = []
+    lookup_table = {}
+    converter = IdToAct(env.action_space)
+
+    curtailment_values = np.linspace(0.1, 0.9, actions_per_generator)
+
+    print("Available curtailment values\n" + str(curtailment_values))
+    for gen, sub in enumerate(env.gen_to_subid):
+        if env.gen_redispatchable[gen]:
+            redispatching_values = np.linspace(
+                -env.gen_max_ramp_down[gen],
+                env.gen_max_ramp_up[gen],
+                actions_per_generator + 2,
+            )[1:-1]
+            print(
+                "Redispatching values for generator "
+                + str(gen)
+                + "\n"
+                + str(redispatching_values)
+            )
+            for redispatching_value in redispatching_values:
+                action = env.action_space()
+                action.redispatch = [(gen, redispatching_value)]
+                if (
+                    not action.is_ambiguous()[0]
+                    and action.impact_on_objects()["has_impact"]
+                ):
+                    sub_to_action_space[sub].append(action)
+                    all_actions.append(action)
+
+        if env.gen_renewable[gen]:
+            for curtailment_value in curtailment_values:
+                action = env.action_space()
+                action.curtail = [(gen, curtailment_value)]
+                if (
+                    not action.is_ambiguous()[0]
+                    and action.impact_on_objects()["has_impact"]
+                ):
+                    sub_to_action_space[sub].append(action)
+                    all_actions.append(action)
+
+    for _, action_space in sub_to_action_space.items():
+        if not action_space:
+            action_space.append(env.action_space({}))
+
+    converter.init_converter(all_actions=all_actions)
+    converter_actions = list(converter.all_actions)
+    for action in converter_actions:
+        lookup_table[HashableAction(action)] = converter_actions.index(action)
+
+    return sub_to_action_space, lookup_table
+
+
 def factor_action_space(
     observation_space: ObservationSpace,
     full_converter: IdToAct,

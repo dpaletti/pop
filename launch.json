@@ -41,6 +41,15 @@
         "request": "launch",
         "name": "dpop_sight_test"
     },
+
+        {
+        "type": "python",
+        "args": "--run-file ./run_files/dpop_base.toml",
+        "cwd" : "${workspaceFolder}",
+        "target-module": "pop/main.py",
+        "request": "launch",
+        "name": "dpop_base_test"
+    },
         {
         "name": "Python: Attach",
         "type": "python",

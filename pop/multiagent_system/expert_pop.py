@@ -14,7 +14,8 @@ class ExpertPop(SerializableModule, AgentWithConverter):
         super().__init__(log_dir=checkpoint_dir, name=pop.name)
         self.greedy_reconnect_agent = RecoPowerlineAgent(pop.env.action_space)
         self.safe_max_rho = pop.architecture.pop.safe_max_rho
-        self.expert_steps = -1
+        self.curtail_storage_limit = pop.architecture.pop.curtail_storage_limit
+        self.expert_steps = 0
         self.step_pop = False
         self.pop = pop
 
@@ -23,18 +24,19 @@ class ExpertPop(SerializableModule, AgentWithConverter):
         reconnection_action = self.greedy_reconnect_agent.act(observation, reward)
 
         if reconnection_action.impact_on_objects()["has_impact"]:
-            self.step_dpop = False
             # If there is some powerline to reconnect do it
+            self.step_dpop = False
             action = reconnection_action
 
         elif max(observation.rho) > self.safe_max_rho:
-            self.step_dpop = True
             # If there is some powerline overloaded ask the agent what to do
+            self.step_dpop = True
             action = self.pop.act(observation, reward, done)
+            action.limit_curtail_storage(observation, margin=self.curtail_storage_limit)
 
         else:
-            self.step_dpop = False
             # else do nothing
+            self.step_dpop = False
             action = self.pop.env.action_space({})
 
         self.pop.writer.add_text("Expert Action", str(action), self.expert_steps)
@@ -80,7 +82,7 @@ class ExpertPop(SerializableModule, AgentWithConverter):
 
     @property
     def train_steps(self):
-        return self.pop.train_steps
+        return self.expert_steps
 
     @staticmethod
     def factory(

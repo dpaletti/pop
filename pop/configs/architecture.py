@@ -29,6 +29,8 @@ class POPArchitecture:
     dictatorship_penalty: Optional[Dict[str, Any]] = None
     enable_expert: bool = False
     safe_max_rho: float = 0.99
+    curtail_storage_limit: float = 10
+    actions_per_generator: int = 10
     generator_storage_only: bool = False
     remove_no_action: bool = False
     manager_remove_no_action: bool = False

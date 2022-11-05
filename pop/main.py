@@ -69,7 +69,7 @@ class DQNReward(BaseReward):
             is_illegal=is_illegal,
             is_ambiguous=is_ambiguous,
         )
-        return self.reward_min if is_done else self.reward_max
+        return self.reward_min if has_error else self.reward_max
 
 
 # def set_experimental_reward(env):

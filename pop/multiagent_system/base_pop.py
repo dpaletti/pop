@@ -32,6 +32,7 @@ from pop.multiagent_system.space_factorization import (
     HashableAction,
     Substation,
     factor_action_space,
+    generate_redispatching_action_space,
     factor_observation,
     split_graph_into_communities,
 )
@@ -119,15 +120,24 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             Dict[Substation, Union[RayGCNAgent, RayShallowGCNAgent]]
         ] = None
 
-        # Agents Initialization
-        substation_to_action_space, self.action_lookup_table = factor_action_space(
-            env.observation_space,
-            self.converter,
-            self.env.n_sub,
-            composite_actions=self.architecture.pop.composite_actions,
-            generator_storage_only=self.architecture.pop.generator_storage_only,
-            remove_no_action=self.architecture.pop.remove_no_action,
-        )
+        # Action Space Initialization
+        if self.architecture.pop.generator_storage_only:
+            (
+                substation_to_action_space,
+                self.action_lookup_table,
+            ) = generate_redispatching_action_space(
+                self.env, self.architecture.pop.actions_per_generator
+            )
+        else:
+
+            substation_to_action_space, self.action_lookup_table = factor_action_space(
+                env.observation_space,
+                self.converter,
+                self.env.n_sub,
+                composite_actions=self.architecture.pop.composite_actions,
+                generator_storage_only=self.architecture.pop.generator_storage_only,
+                remove_no_action=self.architecture.pop.remove_no_action,
+            )
 
         self.substation_to_action_converter = self._get_substation_to_agent_mapping(
             substation_to_action_space
@@ -313,10 +323,16 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         if self.action_detector.is_repeated(self.chosen_action):
             self.chosen_action = 0
 
+        chosen_substation = graph.nodes[self.chosen_node]["sub_id"]
+
         # Log to Tensorboard
         self.log_system_behaviour(
             best_action=self.chosen_action,
-            best_action_str=str(self.converter.all_actions[self.chosen_action]),
+            best_action_str=str(
+                self.substation_to_action_converter[chosen_substation].all_actions[
+                    self.substation_to_local_action[chosen_substation]
+                ]
+            ),
             head_manager_action=self.chosen_node,
             head_manager_q_value=chosen_node_q_value,
             manager_actions={
