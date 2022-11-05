@@ -168,7 +168,6 @@ class LoggableModule:
     def log_system_behaviour(
         self,
         best_action: int,
-        best_action_str: str,
         head_manager_action: int,
         manager_actions: Dict[FrozenSet, Tuple[Set, str]],
         agent_actions: Dict[str, int],
@@ -186,7 +185,6 @@ class LoggableModule:
 
         self.log_head_manager_behaviour(
             best_action=head_manager_action,
-            best_action_str=best_action_str,
             head_manager_q_value=head_manager_q_value,
             train_steps=train_steps,
         )
@@ -233,15 +231,11 @@ class LoggableModule:
         self,
         best_action: int,
         head_manager_q_value: Optional[float],
-        best_action_str: str,
         train_steps: int,
     ) -> None:
         if not self.is_logging_active():
             return
         self.writer.add_scalar("Manager Action/head_manager", best_action, train_steps)
-        self.writer.add_text(
-            "Manager Action/Head Manager", best_action_str, train_steps
-        )
 
         if head_manager_q_value is not None:
             self.writer.add_scalar(

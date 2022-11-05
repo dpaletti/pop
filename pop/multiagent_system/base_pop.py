@@ -323,16 +323,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         if self.action_detector.is_repeated(self.chosen_action):
             self.chosen_action = 0
 
-        chosen_substation = graph.nodes[self.chosen_node]["sub_id"]
-
         # Log to Tensorboard
         self.log_system_behaviour(
             best_action=self.chosen_action,
-            best_action_str=str(
-                self.substation_to_action_converter[chosen_substation].all_actions[
-                    self.substation_to_local_action[chosen_substation]
-                ]
-            ),
             head_manager_action=self.chosen_node,
             head_manager_q_value=chosen_node_q_value,
             manager_actions={
