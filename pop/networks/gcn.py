@@ -60,12 +60,6 @@ class GCN(nn.Module, SerializableModule):
         g = self._add_self_loop_to_batched_graph(g)
         node_embeddings: Tensor
 
-        # TODO: normalize the features
-        # TODO: may well help training
-        # TODO: test normalization on dpop_base
-        # TODO: if it works re-run already ran tests
-        # TODO: else ignore it
-
         if self.edge_features is not None:
             # -> (nodes*batch_size, heads, out_node_features)
             node_embeddings = self.model(
@@ -128,17 +122,13 @@ class GCN(nn.Module, SerializableModule):
         if features:
             normalized_features: List[Tensor] = []
             for feature in features:
-                normalized_feature = (
-                    th.tensor(
-                        normalize(feature.reshape(-1, 1), axis=0)
-                        if len(feature.shape) == 1
-                        else normalize(feature, axis=0)
-                    )
-                    .squeeze()
-                    .type(feature.dtype)
-                )
+                normalized_feature = th.tensor(
+                    normalize(feature.reshape(-1, 1), axis=0)
+                    if len(feature.shape) == 1
+                    else normalize(feature, axis=0)
+                ).type(feature.dtype)
                 normalized_features.append(normalized_feature)
-            return th.stack(normalized_features).transpose(0, 1).float()
+            return th.stack(normalized_features).transpose(0, 1).float().squeeze()
         raise Exception("Empty dict passed to _to_tensor")
 
     @staticmethod
