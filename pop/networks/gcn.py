@@ -128,7 +128,14 @@ class GCN(nn.Module, SerializableModule):
                     else normalize(feature, axis=0)
                 ).type(feature.dtype)
                 normalized_features.append(normalized_feature)
-            return th.stack(normalized_features).transpose(0, 1).float().squeeze()
+
+            # CARE: unsqueeze single node features
+            feature_tensor = th.stack(normalized_features).transpose(0, 1).float()
+            return (
+                feature_tensor.squeeze()
+                if len(feature_tensor.shape) >= 3
+                else feature_tensor.unsqueeze(0)
+            )
         raise Exception("Empty dict passed to _to_tensor")
 
     @staticmethod
