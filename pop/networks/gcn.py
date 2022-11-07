@@ -14,6 +14,7 @@ from pop.networks.network_architecture_parsing import (
 from pop.networks.serializable_module import SerializableModule
 from pop.configs.network_architecture import NetworkArchitecture
 from dataclasses import asdict
+from sklearn.preprocessing import normalize
 
 # ----------------------------------------------------------------#
 # This imports must be aliased this way for network instantiation
@@ -59,6 +60,12 @@ class GCN(nn.Module, SerializableModule):
         g = self._add_self_loop_to_batched_graph(g)
         node_embeddings: Tensor
 
+        # TODO: normalize the features
+        # TODO: may well help training
+        # TODO: test normalization on dpop_base
+        # TODO: if it works re-run already ran tests
+        # TODO: else ignore it
+
         if self.edge_features is not None:
             # -> (nodes*batch_size, heads, out_node_features)
             node_embeddings = self.model(
@@ -70,7 +77,8 @@ class GCN(nn.Module, SerializableModule):
         else:
             # -> (nodes*batch_size, heads, out_node_features)
             node_embeddings = self.model(
-                g, self._to_tensor(dict(g.ndata), self.node_features)
+                g,
+                self._to_tensor(dict(g.ndata), self.node_features),
             )
 
         if len(node_embeddings.shape) == 3:
@@ -118,7 +126,19 @@ class GCN(nn.Module, SerializableModule):
     def _to_tensor(d: Dict[Any, Tensor], feature_size: int) -> Tensor:
         features: List[Tensor] = list(d.values())
         if features:
-            return th.stack(features).transpose(0, 1).float()
+            normalized_features: List[Tensor] = []
+            for feature in features:
+                normalized_feature = (
+                    th.tensor(
+                        normalize(feature.reshape(-1, 1), axis=0)
+                        if len(feature.shape) == 1
+                        else normalize(feature, axis=0)
+                    )
+                    .squeeze()
+                    .type(feature.dtype)
+                )
+                normalized_features.append(normalized_feature)
+            return th.stack(normalized_features).transpose(0, 1).float()
         raise Exception("Empty dict passed to _to_tensor")
 
     @staticmethod
