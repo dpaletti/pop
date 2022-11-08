@@ -51,6 +51,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         architecture: Architecture,
         training: bool,
         seed: int,
+        feature_ranges: Dict[str, Tuple[float, float]],
         checkpoint_dir: Optional[str] = None,
         tensorboard_dir: Optional[str] = None,
         device: Optional[str] = None,
@@ -65,6 +66,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
         self.env = env
         self.node_features: List[str] = architecture.pop.node_features
         self.edge_features: List[str] = architecture.pop.edge_features
+        self.feature_ranges = feature_ranges
         self.pre_train = pre_train
 
         # Converter
@@ -154,6 +156,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 name="agent_" + str(sub_id) + "_" + self.name,
                 training=self.training,
                 device=self.device,
+                feature_ranges=feature_ranges,
             )
             if len(action_space) > 1
             else RayShallowGCNAgent(
@@ -163,6 +166,23 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             for sub_id, action_space in substation_to_action_space.items()
         }
         # Managers
+        self.manager_feature_ranges = {
+            "node_features": {
+                **feature_ranges["node_features"],
+                "action": tuple(
+                    [
+                        0,
+                        max(
+                            [
+                                len(action_space)
+                                for action_space in substation_to_action_space.values()
+                            ]
+                        ),
+                    ]
+                ),
+            },
+            "edge_features": feature_ranges["edge_features"],
+        }
         self.community_to_manager: Optional[Dict[Community, Manager]] = None
         self.managers_history: Dict[Manager, FixedSet] = {}
         self.manager_initialization_threshold: int = 1
@@ -669,6 +689,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             "manager_initialization_threshold": self.manager_initialization_threshold,
             "name": self.name,
             "architecture": asdict(self.architecture),
+            "feature_ranges": self.feature_ranges,
             "seed": self.seed,
             "device": str(self.device),
         }
@@ -888,6 +909,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                     name="manager_" + str(idx) + "_" + self.name,
                     training=self.training,
                     device=self.device,
+                    feature_ranges=self.manager_feature_ranges,
                 )
                 for idx in range(len(new_communities))
             ]
@@ -948,6 +970,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                     name="manager_" + str(len(self.managers_history)) + "_" + self.name,
                     training=self.training,
                     device=self.device,
+                    feature_ranges=self.manager_feature_ranges,
                 )
                 self.managers_history[manager] = FixedSet(
                     int(self.architecture.pop.manager_history_size)
@@ -1292,7 +1315,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                 self.architecture.pop.head_manager_embedding_name
             ] = th.cat(
                 (
-                    summarized_graph.nodes[community_list[0]]["embedding"],
+                    th.sigmoid(summarized_graph.nodes[community_list[0]]["embedding"]),
                     th.tensor(
                         [
                             1 if substation in community else 0
@@ -1302,7 +1325,7 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
                     th.tensor([manager_actions[community]]).to(self.device),
                 ),
                 dim=-1,
-            )
+            ).squeeze()
 
         # The summarized graph is returned in DGL format
         # Each supernode has the action chosen by its community manager

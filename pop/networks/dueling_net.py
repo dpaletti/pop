@@ -1,6 +1,6 @@
 from dataclasses import asdict
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 import torch as th
 import torch.nn as nn
@@ -22,6 +22,7 @@ class DuelingNet(nn.Module, SerializableModule):
         embedding_architecture: NetworkArchitecture,
         advantage_stream_architecture: NetworkArchitecture,
         value_stream_architecture: NetworkArchitecture,
+        feature_ranges: Dict[str, Tuple[float, float]],
         name: str,
         log_dir: Optional[str] = None,
         edge_features: Optional[int] = None,
@@ -41,6 +42,7 @@ class DuelingNet(nn.Module, SerializableModule):
             architecture=embedding_architecture,
             name=name + "_embedding",
             log_dir=None,
+            feature_ranges=feature_ranges,
         )
 
         # This attribute is used for reflection

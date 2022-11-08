@@ -51,6 +51,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             architecture=self.exploration_parameters.inverse_model,
             name=self.name + "_inverse_model",
             log_dir=None,
+            feature_ranges=agent.feature_ranges,
         )
         self.k_squared_distance_running_mean = self.RunningMean()
 
@@ -59,6 +60,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             edge_features=edge_features,
             architecture=self.exploration_parameters.random_network_distiller,
             name=self.name + "_distiller",
+            feature_ranges=agent.feature_ranges,
         )
         self.distiller_error_running_mean = self.RunningMean()
         self.distiller_error_running_standard_deviation = (
@@ -222,6 +224,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             actions: int,
             architecture: InverseModelArchitecture,
             name: str,
+            feature_ranges: Dict[str, Tuple[float, float]],
             log_dir: Optional[str] = None,
         ):
             super(self.__class__, self).__init__()
@@ -231,6 +234,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
                 architecture=architecture.embedding,
                 name=name + "_current_state_embedding",
                 log_dir=log_dir,
+                feature_ranges=feature_ranges,
             )
             # These attributes are used for reflection
             # Do not remove it

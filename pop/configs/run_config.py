@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Union
+from typing import Dict, Union, Tuple
 
 import toml
+import json
 
 from pop.configs.architecture import Architecture
 from pop.configs.placeholders_handling import replace_backward_reference
@@ -78,6 +79,7 @@ class EnvironmentParameters:
     name: str
     reward: str
     difficulty: Union[int, str]
+    feature_ranges: Dict[str, Tuple[float, float]]
 
     def __init__(
         self,
@@ -89,6 +91,19 @@ class EnvironmentParameters:
             self,
             "reward",
             environment_dict["reward"],
+        )
+        object.__setattr__(
+            self,
+            "feature_ranges",
+            {
+                node_or_edge: {
+                    feature_name: tuple(feature_range)
+                    for feature_name, feature_range in features.items()
+                }
+                for node_or_edge, features in dict(
+                    json.loads(Path(environment_dict["feature_ranges"]).read_text())
+                ).items()
+            },
         )
 
 

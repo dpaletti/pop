@@ -1,4 +1,4 @@
-from typing import Optional, Any, Dict, List
+from typing import Optional, Any, Dict, List, Tuple
 import dgl
 
 import torch as th
@@ -14,7 +14,8 @@ from pop.networks.network_architecture_parsing import (
 from pop.networks.serializable_module import SerializableModule
 from pop.configs.network_architecture import NetworkArchitecture
 from dataclasses import asdict
-from sklearn.preprocessing import normalize
+from sklearn.preprocessing import MinMaxScaler
+import numpy as np
 
 # ----------------------------------------------------------------#
 # This imports must be aliased this way for network instantiation
@@ -38,6 +39,7 @@ class GCN(nn.Module, SerializableModule):
         node_features: int,
         architecture: NetworkArchitecture,
         name: str,
+        feature_ranges: Dict[str, Dict[str, Tuple[float, float]]],
         log_dir: Optional[str] = None,
         edge_features: Optional[int] = None,
     ) -> None:
@@ -54,25 +56,51 @@ class GCN(nn.Module, SerializableModule):
         self.model: nn.Sequential = get_network(
             self, architecture, is_graph_network=True
         )
+        self.node_scaler: MinMaxScaler = MinMaxScaler(feature_range=(-1, 1))
+        self.feature_ranges = feature_ranges
+
+        node_feature_ranges_array = np.array(
+            [
+                [f_min for (f_min, _) in feature_ranges["node_features"].values()],
+                [f_max for (_, f_max) in feature_ranges["node_features"].values()],
+            ]
+        )
+        self.node_scaler.fit(node_feature_ranges_array)
+
+        if feature_ranges.get("edge_features"):
+            self.edge_scaler: MinMaxScaler = MinMaxScaler()
+            edge_feature_ranges_array = np.array(
+                [
+                    [f_min for (f_min, _) in feature_ranges["edge_features"].values()],
+                    [f_max for (_, f_max) in feature_ranges["edge_features"].values()],
+                ]
+            )
+            self.edge_scaler.fit(edge_feature_ranges_array)
         self.architecture: NetworkArchitecture = architecture
 
     def forward(self, g: DGLHeteroGraph) -> Tensor:
         g = self._add_self_loop_to_batched_graph(g)
         node_embeddings: Tensor
 
+        # TODO: normalize the features
+        # TODO: may well help training
+        # TODO: test normalization on dpop_base
+        # TODO: if it works re-run already ran tests
+        # TODO: else ignore it
+
         if self.edge_features is not None:
             # -> (nodes*batch_size, heads, out_node_features)
             node_embeddings = self.model(
                 g,
-                self._to_tensor(dict(g.ndata), self.node_features),
-                self._to_tensor(dict(g.edata), self.edge_features),
+                self._to_tensor(dict(g.ndata), self.node_scaler),
+                self._to_tensor(dict(g.edata), self.edge_scaler),
             )
 
         else:
             # -> (nodes*batch_size, heads, out_node_features)
             node_embeddings = self.model(
                 g,
-                self._to_tensor(dict(g.ndata), self.node_features),
+                self._to_tensor(dict(g.ndata), self.node_scaler),
             )
 
         if len(node_embeddings.shape) == 3:
@@ -97,6 +125,7 @@ class GCN(nn.Module, SerializableModule):
             "node_features": self.node_features,
             "edge_features": self.edge_features,
             "architecture": asdict(self.architecture),
+            "feature_ranges": self.feature_ranges,
             "log_file": self.log_file,
         }
 
@@ -111,32 +140,22 @@ class GCN(nn.Module, SerializableModule):
             log_dir=str(Path(checkpoint["log_file"]).parents[0])
             if checkpoint["log_file"] is not None
             else None,
+            feature_ranges=checkpoint["feature_ranges"],
         )
 
         gcn.load_state_dict(checkpoint["network_state"])
         return gcn
 
     @staticmethod
-    def _to_tensor(d: Dict[Any, Tensor], feature_size: int) -> Tensor:
+    def _to_tensor(d: Dict[str, Tensor], scaler: MinMaxScaler) -> Tensor:
         features: List[Tensor] = list(d.values())
         if features:
-            normalized_features: List[Tensor] = []
-            for feature in features:
-                normalized_feature = th.tensor(
-                    normalize(feature.reshape(-1, 1), axis=0)
-                    if len(feature.shape) == 1
-                    else normalize(feature, axis=0)
-                ).type(feature.dtype)
-                normalized_features.append(normalized_feature)
-
-            # CARE: unsqueeze single node features
-            feature_tensor = th.stack(normalized_features).transpose(0, 1).float()
-            return (
-                feature_tensor.squeeze()
-                if len(feature_tensor.shape) >= 3
-                else feature_tensor.unsqueeze(0)
-            )
-        raise Exception("Empty dict passed to _to_tensor")
+            stacked_features = th.stack(features).transpose(0, 1)
+            if len(features) == 1:
+                # this check handles correctly the 1 feature case
+                # together with the 1 node case that in general must not be squeezed
+                stacked_features.squeeze_()
+            return th.tensor(scaler.transform(stacked_features)).float()
 
     @staticmethod
     def _add_self_loop_to_batched_graph(g: DGLHeteroGraph) -> DGLHeteroGraph:

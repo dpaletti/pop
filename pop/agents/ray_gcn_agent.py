@@ -1,6 +1,6 @@
 import logging
 import warnings
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import ray
 from ray import ObjectRef
@@ -34,6 +34,7 @@ class RayGCNAgent(BaseGCNAgent):
         name: str,
         training: bool,
         device: str,
+        feature_ranges: Dict[str, Tuple[float, float]],
         edge_features: Optional[int] = None,
     ):
         BaseGCNAgent.__init__(
@@ -47,6 +48,7 @@ class RayGCNAgent(BaseGCNAgent):
             device=device,
             tensorboard_dir=None,
             log_dir=None,
+            feature_ranges=feature_ranges,
         )
 
     def get_q_network(self) -> DuelingNet:
@@ -70,6 +72,7 @@ class RayGCNAgent(BaseGCNAgent):
             training=bool(kwargs.get("training")),
             device=checkpoint["device"],
             edge_features=checkpoint["edge_features"],
+            feature_ranges=checkpoint["feature_ranges"],
         )
         agent.load_state.remote(
             optimizer_state=checkpoint["optimizer_state"],

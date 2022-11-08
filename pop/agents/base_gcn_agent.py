@@ -40,6 +40,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         device: str,
         log_dir: Optional[str],
         tensorboard_dir: Optional[str],
+        feature_ranges: Dict[str, Tuple[float, float]],
         edge_features: Optional[List[str]] = None,
         single_node_features: Optional[int] = None,
     ):
@@ -47,6 +48,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         LoggableModule.__init__(self, tensorboard_dir=tensorboard_dir)
 
         # Agent Architecture
+        self.feature_ranges = feature_ranges
         self.architecture = architecture
         self.actions = agent_actions
         self.node_features_schema: Optional[List[str]] = node_features
@@ -81,6 +83,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
             value_stream_architecture=architecture.value_stream,
             name=name + "_dueling",
             log_dir=None,
+            feature_ranges=feature_ranges,
         ).to(self.device)
         self.target_network: DuelingNet = copy.deepcopy(self.q_network).to(self.device)
 
@@ -362,7 +365,6 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
                 stop_decay=stop_decay,
             )
 
-    # TODO: fix state
     def get_state(
         self,
     ) -> Dict[str, Any]:
@@ -383,6 +385,7 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
             "name": self.name,
             "training": self.training,
             "device": self.device,
+            "feature_ranges": self.feature_ranges,
         }
 
     def load_state(

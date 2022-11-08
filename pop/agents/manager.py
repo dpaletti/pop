@@ -1,6 +1,6 @@
 import logging
 import warnings
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from pop.configs import architecture
 
 import ray
@@ -38,6 +38,7 @@ class Manager(BaseGCNAgent):
         name: str,
         training: bool,
         device: str,
+        feature_ranges: Dict[str, Tuple[float, float]],
         edge_features: Optional[List[str]] = None,
         single_node_features: Optional[int] = None,
     ):
@@ -53,6 +54,7 @@ class Manager(BaseGCNAgent):
             tensorboard_dir=None,
             log_dir=None,
             single_node_features=single_node_features,
+            feature_ranges=feature_ranges,
         )
 
         self.embedding_size = self.q_network.get_embedding_size()
@@ -97,6 +99,7 @@ class Manager(BaseGCNAgent):
             device=checkpoint["device"],
             edge_features=checkpoint["edge_features"],
             single_node_features=checkpoint["single_node_features"],
+            feature_ranges=checkpoint["feature_ranges"],
         )
 
         manager.load_state.remote(

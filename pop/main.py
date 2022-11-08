@@ -256,6 +256,7 @@ def main(**kwargs):
             device=config.reproducibility.device,
             local=config.training.local,
             pre_train=config.training.pre_train,
+            feature_ranges=config.environment.feature_ranges,
         )
 
         if config.model.architecture.pop.enable_expert:

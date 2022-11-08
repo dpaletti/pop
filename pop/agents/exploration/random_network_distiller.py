@@ -1,5 +1,5 @@
 import copy
-from typing import Optional
+from typing import Optional, Dict, Tuple
 
 import dgl
 import torch as th
@@ -16,6 +16,7 @@ class RandomNetworkDistiller(nn.Module):
         edge_features: Optional[int],
         architecture: RandomNetworkDistillerArchitecture,
         name: str,
+        feature_ranges: Dict[str, Tuple[float, float]],
     ):
         super(RandomNetworkDistiller, self).__init__()
 
@@ -24,6 +25,7 @@ class RandomNetworkDistiller(nn.Module):
             edge_features=edge_features,
             architecture=architecture.network,
             name=name + "_distiller_prediction",
+            feature_ranges=feature_ranges,
         )
 
         # Target Network is a frozen randomly initialized network
@@ -32,6 +34,7 @@ class RandomNetworkDistiller(nn.Module):
             edge_features=edge_features,
             architecture=architecture.network,
             name=name + "distiller_target",
+            feature_ranges=feature_ranges,
         )
         self.target_network = self.target_network.requires_grad_(False)
 

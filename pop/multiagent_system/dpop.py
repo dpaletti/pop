@@ -29,6 +29,7 @@ class DPOP(BasePOP):
         architecture: Architecture,
         training: bool,
         seed: int,
+        feature_ranges: Dict[str, Tuple[float, float]],
         checkpoint_dir: Optional[str] = None,
         tensorboard_dir: Optional[str] = None,
         device: Optional[str] = None,
@@ -49,6 +50,7 @@ class DPOP(BasePOP):
             seed=seed,
             device=device,
             pre_train=pre_train,
+            feature_ranges=feature_ranges,
         )
         try:
             node_features = self.architecture.manager.embedding.layers[-1].kwargs[
@@ -60,6 +62,16 @@ class DPOP(BasePOP):
             node_features = self.architecture.manager.embedding.layers[-2].kwargs[
                 "out_feats"
             ]
+        sub_ranges = {
+            "sub_" + str(n_sub): tuple([0, 1]) for n_sub in range(self.env.n_sub * 2)
+        }
+        embedding_ranges = {
+            "embedding_" + str(feat): tuple([0, 1])
+            for feat in range(int(node_features))
+        }
+        action_ranges = {
+            "action": self.manager_feature_ranges["node_features"]["action"]
+        }
 
         # Head Manager Initialization
         self.head_manager: Optional[Manager] = Manager.remote(
@@ -72,6 +84,9 @@ class DPOP(BasePOP):
             single_node_features=int(node_features)
             + self.env.n_sub * 2
             + 1,  # Manager Node Embedding + Manager Community (1 hot encoded) + selected action
+            feature_ranges={
+                "node_features": {**sub_ranges, **embedding_ranges, **action_ranges}
+            },
         )
         if self.architecture.pop.dictatorship_penalty:
             self.dictatorship_penalty = DictatorshipPenalizer(
@@ -196,6 +211,7 @@ class DPOP(BasePOP):
             device=checkpoint["device"],
             local=local,
             pre_train=pre_train,
+            feature_ranges=checkpoint["feature_ranges"],
         )
         dpop.pre_initialized = True
         dpop.alive_steps = checkpoint["alive_steps"] if training else 0

@@ -19,18 +19,8 @@ class RayShallowGCNAgent(BaseGCNAgent):
         architecture: Optional[AgentArchitecture] = None,
         training: bool = False,
     ):
-        BaseGCNAgent.__init__(
-            self,
-            agent_actions=agent_actions,
-            node_features=[],
-            edge_features=[],
-            architecture=architecture,
-            name=name,
-            training=training,
-            device=device,
-            log_dir=None,
-            tensorboard_dir=None,
-        )
+        self.name = name
+        self.device = device
 
     def get_state(
         self,
