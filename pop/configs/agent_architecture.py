@@ -27,13 +27,15 @@ class ExplorationParameters(abc.ABC):
 class InverseModelArchitecture:
     embedding: NetworkArchitecture
     action_prediction_stream: NetworkArchitecture
-    learning_rate: int
+    learning_rate: float
+    adam_epsilon: float
 
 
 @dataclass(frozen=True)
 class RandomNetworkDistillerArchitecture:
     network: NetworkArchitecture
-    learning_rate: int
+    learning_rate: float
+    adam_epsilon: float
 
 
 @dataclass(frozen=True)
@@ -118,6 +120,7 @@ class AgentArchitecture:
     replay_memory: ReplayMemoryParameters
     learning_rate: float
     learning_frequency: int
+    adam_epsilon: float
     target_network_weight_replace_steps: int
     gamma: float
     huber_loss_delta: float
@@ -214,6 +217,7 @@ class AgentArchitecture:
             agent_dict["target_network_weight_replace_steps"],
         )
         object.__setattr__(self, "gamma", agent_dict["gamma"])
+        object.__setattr__(self, "adam_epsilon", agent_dict["adam_epsilon"])
         object.__setattr__(self, "huber_loss_delta", agent_dict["huber_loss_delta"])
         object.__setattr__(self, "batch_size", agent_dict["batch_size"])
         if agent_dict.get("intrinsic_reward_relevance"):

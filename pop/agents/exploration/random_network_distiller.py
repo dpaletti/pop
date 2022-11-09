@@ -41,7 +41,7 @@ class RandomNetworkDistiller(nn.Module):
         self.distiller_optimizer: th.optim.Optimizer = th.optim.Adam(
             self.prediction_network.parameters(),
             lr=architecture.learning_rate,
-            eps=1e-4,
+            eps=architecture.adam_epsilon,
         )
 
         self.mse_loss = nn.MSELoss()

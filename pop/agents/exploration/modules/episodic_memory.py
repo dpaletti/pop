@@ -249,7 +249,9 @@ class EpisodicMemory(nn.Module, ExplorationModule):
             self.loss = nn.CrossEntropyLoss()
 
             self.optimizer: th.optim.Optimizer = th.optim.Adam(
-                self.parameters(), lr=architecture.learning_rate, eps=1e-4
+                self.parameters(),
+                lr=architecture.learning_rate,
+                eps=architecture.adam_epsilon,
             )
 
         def forward(

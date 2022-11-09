@@ -95,7 +95,9 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
 
         # Optimizer
         self.optimizer: th.optim.Optimizer = th.optim.Adam(
-            self.q_network.parameters(), lr=self.architecture.learning_rate
+            self.q_network.parameters(),
+            lr=self.architecture.learning_rate,
+            eps=self.architecture.adam_epsilon,
         )
 
         # Huber Loss initialization with delta
