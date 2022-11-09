@@ -1,0 +1,35 @@
+[reproducibility]
+seed = 0
+device = "cpu"
+
+[model]
+name = "dpop_base"
+architecture_path = "architectures/dpop_base.toml"
+data_dir = "test_data/"
+checkpoint_dir = "<<model_data_dir>>/pop_runs/checkpoint/<<model_name>>"
+
+[training]
+steps = 1000
+train = true
+tensorboard_dir = "<<model_data_dir>>/pop_runs/tensorboard/<<model_name>>"
+save_frequency=3600
+curriculum = false
+reset_decay = true
+chronics = 10
+local = true
+
+[evaluation]
+episodes = 100
+evaluation_dir = "<<model_data_dir>>/evaluation/<<model_name>>"
+generate_grid2viz_data = false
+compute_score = true
+
+[loading]
+load = true
+load_dir = "<<model_checkpoint_dir>>/<<model_name>>.pt"
+
+[environment]
+name = "l2rpn_case14_sandbox"
+difficulty = 0
+reward = "DQNReward"
+feature_ranges="l2rpn_sandbox_feature_ranges.json"
