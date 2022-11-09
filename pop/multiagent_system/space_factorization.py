@@ -298,10 +298,19 @@ def factor_action_space(
 
 
 def factor_observation(
-    obs_graph: nx.Graph, device: str, radius: int = 1
+    obs_graph: nx.Graph,
+    node_features: List[str],
+    edge_features: List[str],
+    device: str,
+    radius: int = 1,
 ) -> Dict[Substation, dgl.DGLHeteroGraph]:
     if radius < 1:
-        dgl_graph = BaseGCNAgent.from_networkx_to_dgl(obs_graph, device)
+        dgl_graph = BaseGCNAgent.from_networkx_to_dgl(
+            graph=obs_graph,
+            node_features=node_features,
+            edge_features=edge_features,
+            device=device,
+        )
         return {
             sub_id: dgl_graph
             for sub_id in [
@@ -323,16 +332,30 @@ def factor_observation(
             )
 
     return {
-        sub_id: BaseGCNAgent.from_networkx_to_dgl(ego_graph, device)
+        sub_id: BaseGCNAgent.from_networkx_to_dgl(
+            graph=ego_graph,
+            node_features=node_features,
+            edge_features=edge_features,
+            device=device,
+        )
         for sub_id, ego_graph in ego_graphs_dict.items()
     }
 
 
 def split_graph_into_communities(
-    graph: nx.Graph, communities: List[Community], device: str
+    graph: nx.Graph,
+    communities: List[Community],
+    node_features: List[str],
+    edge_features: List[str],
+    device: str,
 ) -> Dict[Community, dgl.DGLHeteroGraph]:
 
     return {
-        community: BaseGCNAgent.from_networkx_to_dgl(graph.subgraph(community), device)
+        community: BaseGCNAgent.from_networkx_to_dgl(
+            graph=graph.subgraph(community),
+            node_features=node_features,
+            edge_features=edge_features,
+            device=device,
+        )
         for community in communities
     }

@@ -416,9 +416,11 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         # Observation is factored for each agent by taking the ego_graph of each substation
         factored_observation: Dict[Substation, dgl.DGLHeteroGraph] = factor_observation(
-            observation_graph,
-            str(self.device),
-            self.architecture.pop.agent_neighbourhood_radius,
+            obs_graph=observation_graph,
+            node_features=self.node_features,
+            edge_features=self.edge_features,
+            device=str(self.device),
+            radius=self.architecture.pop.agent_neighbourhood_radius,
         )
 
         return factored_observation, observation_graph
@@ -581,7 +583,9 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
             next_factored_observation: Dict[
                 Substation, Optional[dgl.DGLHeteroGraph]
             ] = factor_observation(
-                next_graph,
+                obs_graph=next_graph,
+                node_features=self.node_features,
+                edge_features=self.edge_features,
                 device=str(self.device),
                 radius=self.architecture.pop.agent_neighbourhood_radius,
             )
@@ -844,9 +848,13 @@ class BasePOP(AgentWithConverter, SerializableModule, LoggableModule):
 
         return (
             split_graph_into_communities(
-                graph,
-                self.communities if new_communities is None else new_communities,
-                str(self.device),
+                graph=graph,
+                node_features=self.node_features + ["action"],
+                edge_features=self.edge_features,
+                communities=self.communities
+                if new_communities is None
+                else new_communities,
+                device=str(self.device),
             ),
             substation_to_encoded_action,
         )

@@ -149,13 +149,12 @@ class GCN(nn.Module, SerializableModule):
     @staticmethod
     def _to_tensor(d: Dict[str, Tensor], scaler: MinMaxScaler) -> Tensor:
         features: List[Tensor] = list(d.values())
-        if features:
-            stacked_features = th.stack(features).transpose(0, 1)
-            if len(features) == 1:
-                # this check handles correctly the 1 feature case
-                # together with the 1 node case that in general must not be squeezed
-                stacked_features.squeeze_()
-            return th.tensor(scaler.transform(stacked_features)).float()
+        stacked_features = th.stack(features).transpose(0, 1)
+        if len(features) == 1:
+            # this check handles correctly the 1 feature case
+            # together with the 1 node case that in general must not be squeezed
+            stacked_features.squeeze_()
+        return th.tensor(scaler.transform(stacked_features)).float()
 
     @staticmethod
     def _add_self_loop_to_batched_graph(g: DGLHeteroGraph) -> DGLHeteroGraph:

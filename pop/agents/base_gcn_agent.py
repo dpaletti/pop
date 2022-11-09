@@ -415,24 +415,12 @@ class BaseGCNAgent(SerializableModule, LoggableModule, ABC):
         return dgl.batch(graphs)
 
     @staticmethod
-    def to_dgl(obs: BaseObservation, device: str) -> DGLHeteroGraph:
-
-        # Convert Grid2Op graph to a directed (for compatibility reasons) networkx graph
-        net = obs.as_networkx()
-        net = net.to_directed()  # Typing error from networkx, ignore it
-
-        # Convert from networkx to dgl graph
-        return BaseGCNAgent.from_networkx_to_dgl(net, device)
-
-    @staticmethod
-    def from_networkx_to_dgl(graph: nx.Graph, device: str) -> DGLHeteroGraph:
+    def from_networkx_to_dgl(
+        graph: nx.Graph, node_features: List[str], edge_features: List[str], device: str
+    ) -> DGLHeteroGraph:
         return dgl.from_networkx(
             graph.to_directed(),
-            node_attrs=list(graph.nodes[choice(list(graph.nodes))].keys())
-            if len(graph.nodes) > 0
-            else [],
-            edge_attrs=list(graph.edges[choice(list(graph.edges))].keys())
-            if len(graph.edges) > 0
-            else [],
+            node_attrs=node_features if len(graph.nodes) > 0 else [],
+            edge_attrs=edge_features if len(graph.edges) > 0 else [],
             device=device,
         )
