@@ -20,12 +20,13 @@ target_network_weight_replace_steps = 500
 gamma = 0.99
 huber_loss_delta = 1.0
 batch_size = 4
+intrinsic_reward_relevance = 1e-3
 
 [agent.exploration]
 method = "episodic_memory"
 size = 1000
 neighbors = 10
-exploration_bonus_limit = 10
+exploration_bonus_limit = 5
 maximum_similarity = 8
 
 [agent.exploration.random_network_distiller]
@@ -57,9 +58,9 @@ batch_size = 4
 
 [manager.exploration]
 method = "episodic_memory"
-size = 1000
+size = 10000
 neighbors = 10
-exploration_bonus_limit = 10
+exploration_bonus_limit = 5
 maximum_similarity = 8
 
 [manager.exploration.random_network_distiller]
@@ -91,9 +92,9 @@ batch_size = 4
 
 [head_manager.exploration]
 method = "episodic_memory"
-size = 1000
+size = 30000
 neighbors = 10
-exploration_bonus_limit = 10
+exploration_bonus_limit = 5
 maximum_similarity = 8
 
 [head_manager.exploration.random_network_distiller]

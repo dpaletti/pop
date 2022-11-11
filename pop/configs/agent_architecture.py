@@ -9,6 +9,7 @@ from pop.configs.type_aliases import EventuallyNestedDict
 
 @dataclass(frozen=True)
 class ExplorationParameters(abc.ABC):
+    @abc.abstractmethod
     def __init__(self, d: dict):
         ...
 
@@ -61,7 +62,7 @@ class EpisodicMemoryParameters(ExplorationParameters):
         ]
 
     def __init__(self, d: dict):
-        super(EpisodicMemoryParameters, self).__init__(d)
+        super().__init__(d)
         object.__setattr__(self, "method", d["method"])
         object.__setattr__(self, "size", d["size"])
         object.__setattr__(self, "neighbors", d["neighbors"])
@@ -91,7 +92,7 @@ class EpsilonGreedyParameters(ExplorationParameters):
         return "epsilon_greedy"
 
     def __init__(self, d: dict):
-        super(EpsilonGreedyParameters, self).__init__(d)
+        super().__init__(d)
         object.__setattr__(self, "method", d["method"])
         object.__setattr__(self, "max_epsilon", d["max_epsilon"])
         object.__setattr__(self, "min_epsilon", d["min_epsilon"])
@@ -100,6 +101,22 @@ class EpsilonGreedyParameters(ExplorationParameters):
     @staticmethod
     def network_architecture_fields() -> List[List[str]]:
         return []
+
+
+@dataclass(frozen=True)
+class EpsilonEpisodicParameters(
+    EpisodicMemoryParameters, EpsilonGreedyParameters, ExplorationParameters
+):
+    @staticmethod
+    def get_method() -> str:
+        return "epsilon_episodic"
+
+    def __init__(self, d: dict):
+        super().__init__(d)
+
+    @staticmethod
+    def network_architecture_fields() -> List[List[str]]:
+        return EpisodicMemoryParameters.network_architecture_fields()
 
 
 @dataclass(frozen=True)

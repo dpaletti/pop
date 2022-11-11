@@ -51,16 +51,26 @@
         "name": "dpop_base_test"
     },
         {
-        "name": "Python: Attach",
+        "name": "python: attach",
         "type": "python",
         "request": "attach",
         "port": 5678,
         "host": "127.0.0.1",
-        "pathMappings": [
+        "pathmappings": [
             {
-            "localRoot": "${workspaceFolder}",
-            "remoteRoot": "."
+            "localroot": "${workspacefolder}",
+            "remoteroot": "."
             }
         ]
-    }]
+    },
+        {
+        "type": "python",
+        "args": "--run-file ./run_files/dpop_base_curiosity.toml",
+        "cwd" : "${workspaceFolder}",
+        "target-module": "pop/main.py",
+        "request": "launch",
+        "name": "dpop_base_curiosity_test"
+    }
+
+    ]
 }

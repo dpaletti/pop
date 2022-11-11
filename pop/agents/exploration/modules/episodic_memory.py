@@ -23,32 +23,30 @@ from typing import cast
 import pandas as pd
 
 
-class EpisodicMemory(nn.Module, ExplorationModule):
+class EpisodicMemory(ExplorationModule):
     def __init__(
         self,
         agent: BaseGCNAgent,
     ):
-        super(EpisodicMemory, self).__init__()
+        super().__init__(agent)
 
-        self.exploration_parameters: EpisodicMemoryParameters = cast(
+        exploration_parameters: EpisodicMemoryParameters = cast(
             EpisodicMemoryParameters, agent.architecture.exploration
         )
         node_features = agent.node_features
         edge_features = agent.edge_features
         self.name = agent.name + "_episodic_memory"
 
-        self.memory = deque(maxlen=self.exploration_parameters.size)
-        self.neighbors = self.exploration_parameters.neighbors
-        self.maximum_similarity = self.exploration_parameters.maximum_similarity
-        self.exploration_bonus_limit = (
-            self.exploration_parameters.exploration_bonus_limit
-        )
+        self.memory = deque(maxlen=exploration_parameters.size)
+        self.neighbors = exploration_parameters.neighbors
+        self.maximum_similarity = exploration_parameters.maximum_similarity
+        self.exploration_bonus_limit = exploration_parameters.exploration_bonus_limit
 
         self.inverse_model = self.InverseNetwork(
             node_features=node_features,
             edge_features=edge_features,
             actions=agent.actions,
-            architecture=self.exploration_parameters.inverse_model,
+            architecture=exploration_parameters.inverse_model,
             name=self.name + "_inverse_model",
             log_dir=None,
             feature_ranges=agent.feature_ranges,
@@ -58,7 +56,7 @@ class EpisodicMemory(nn.Module, ExplorationModule):
         self.random_network_distiller = RandomNetworkDistiller(
             node_features=node_features,
             edge_features=edge_features,
-            architecture=self.exploration_parameters.random_network_distiller,
+            architecture=exploration_parameters.random_network_distiller,
             name=self.name + "_distiller",
             feature_ranges=agent.feature_ranges,
         )

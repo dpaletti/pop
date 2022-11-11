@@ -7,6 +7,10 @@ import dgl
 
 class ExplorationModule(abc.ABC):
     @abc.abstractmethod
+    def __init__(self, agent):
+        ...
+
+    @abc.abstractmethod
     def update(self, *args, **kwargs) -> None:
         ...
 

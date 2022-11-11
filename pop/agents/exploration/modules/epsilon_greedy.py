@@ -11,12 +11,13 @@ from configs.agent_architecture import EpsilonGreedyParameters
 
 class EpsilonGreedy(ExplorationModule):
     def __init__(self, agent: BaseGCNAgent):
-        self.exploration_parameters: EpsilonGreedyParameters = cast(
+        super().__init__(agent)
+        exploration_parameters: EpsilonGreedyParameters = cast(
             EpsilonGreedyParameters, agent.architecture.exploration
         )
-        self.max_epsilon = self.exploration_parameters.max_epsilon
-        self.min_epsilon = self.exploration_parameters.min_epsilon
-        self.exponential_half_life = int(self.exploration_parameters.epsilon_decay)
+        self.max_epsilon = exploration_parameters.max_epsilon
+        self.min_epsilon = exploration_parameters.min_epsilon
+        self.exponential_half_life = int(exploration_parameters.epsilon_decay)
         self.decay_steps = 0
         self.number_of_actions = agent.actions
         self.epsilon: float = 0
