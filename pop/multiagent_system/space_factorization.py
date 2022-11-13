@@ -10,6 +10,7 @@ import numpy as np
 
 from pop.agents.base_gcn_agent import BaseGCNAgent
 from pop.community_detection.community_detector import Community
+from grid2op.Exceptions.IllegalActionExceptions import IllegalAction
 from tqdm import tqdm
 
 Substation = int
@@ -160,6 +161,7 @@ def generate_redispatching_action_space(env, actions_per_generator: int = 10):
     converter = IdToAct(env.action_space)
 
     curtailment_values = np.linspace(0.1, 0.9, actions_per_generator)
+    curtailment_actions_available = True
 
     print("Available curtailment values\n" + str(curtailment_values))
     for gen, sub in enumerate(env.gen_to_subid):
@@ -185,16 +187,21 @@ def generate_redispatching_action_space(env, actions_per_generator: int = 10):
                     sub_to_action_space[sub].append(action)
                     all_actions.append(action)
 
-        if env.gen_renewable[gen]:
-            for curtailment_value in curtailment_values:
-                action = env.action_space()
-                action.curtail = [(gen, curtailment_value)]
-                if (
-                    not action.is_ambiguous()[0]
-                    and action.impact_on_objects()["has_impact"]
-                ):
-                    sub_to_action_space[sub].append(action)
-                    all_actions.append(action)
+        if env.gen_renewable[gen] and curtailment_actions_available:
+            try:
+                for curtailment_value in curtailment_values:
+                    action = env.action_space()
+                    action.curtail = [(gen, curtailment_value)]
+                    if (
+                        not action.is_ambiguous()[0]
+                        and action.impact_on_objects()["has_impact"]
+                    ):
+                        sub_to_action_space[sub].append(action)
+                        all_actions.append(action)
+            except IllegalAction:
+                print("Curtailment Actions are disabled in this environment")
+                print("Ignoring renewable generators")
+                curtailment_actions_available = False
 
     for _, action_space in sub_to_action_space.items():
         if not action_space:
