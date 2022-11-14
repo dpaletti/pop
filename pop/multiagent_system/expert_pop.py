@@ -10,7 +10,9 @@ from pop.networks.serializable_module import SerializableModule
 
 
 class ExpertPop(SerializableModule, AgentWithConverter):
-    def __init__(self, pop: DPOP, checkpoint_dir: str) -> None:
+    def __init__(
+        self, pop: DPOP, checkpoint_dir: str, expert_only: bool = False
+    ) -> None:
         super().__init__(log_dir=checkpoint_dir, name=pop.name)
         self.greedy_reconnect_agent = RecoPowerlineAgent(pop.env.action_space)
         self.safe_max_rho = pop.architecture.pop.safe_max_rho
@@ -18,6 +20,7 @@ class ExpertPop(SerializableModule, AgentWithConverter):
         self.expert_steps = 0
         self.step_pop = False
         self.pop = pop
+        self.expert_only = expert_only
 
     def my_act(self, observation, reward, done=False):
         self.expert_steps += 1
@@ -28,7 +31,7 @@ class ExpertPop(SerializableModule, AgentWithConverter):
             self.step_dpop = False
             action = reconnection_action
 
-        elif max(observation.rho) > self.safe_max_rho:
+        elif not self.expert_only and max(observation.rho) > self.safe_max_rho:
             # If there is some powerline overloaded ask the agent what to do
             self.step_dpop = True
             action = self.pop.act(observation, reward, done)

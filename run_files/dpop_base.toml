@@ -7,6 +7,7 @@ name = "dpop_base"
 architecture_path = "architectures/dpop_base.toml"
 data_dir = "test_data/"
 checkpoint_dir = "<<model_data_dir>>/pop_runs/checkpoint/<<model_name>>"
+expert_only = true
 
 [training]
 steps = 1000
