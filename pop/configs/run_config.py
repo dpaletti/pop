@@ -44,7 +44,8 @@ class ModelParameters:
         )
         object.__setattr__(self, "data_dir", model_dict["data_dir"])
         object.__setattr__(self, "checkpoint_dir", model_dict["checkpoint_dir"])
-        object.__setattr__(self, "expert_only", model_dict["expert_only"])
+        if model_dict.get("expert_only"):
+            object.__setattr__(self, "expert_only", model_dict["expert_only"])
 
 
 @dataclass(frozen=True)
