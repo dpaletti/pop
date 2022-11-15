@@ -1350,7 +1350,6 @@ def train(
     iterations: int,
     dpop: BasePOP,
     save_frequency: int = 3600,
-    skip: int = 1,
 ):
 
     training_step: int = 0
@@ -1387,10 +1386,7 @@ def train(
             if dpop.episodes % total_episodes == 0:
                 env.chronics_handler.shuffle()
             if done:
-                sampled_skip = random.sample(range(0, skip), 1)[0]
-                env.reset()
-                env.fast_forward_chronics(sampled_skip)
-                obs = env.get_obs()
+                obs = env.reset()
                 dpop.writer.flush()
 
             pbar.update(1)

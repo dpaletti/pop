@@ -56,7 +56,6 @@ class TrainingParameters:
     curriculum: bool
     reset_decay: bool
     save_frequency: int
-    skip: int = 1
     local: bool = False
     pre_train: bool = False
     chronics: Union[int, str] = -1
