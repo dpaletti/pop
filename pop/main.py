@@ -17,7 +17,7 @@ import torch as th
 from configs.run_config import RunConfiguration
 from grid2op import Environment
 from grid2op.Action import BaseAction
-from grid2op.Agent import BaseAgent
+from grid2op.Agent import BaseAgent, DoNothingAgent
 from grid2op.Chronics import MultifolderWithCache
 from grid2op.Environment import BaseEnv
 from grid2op.Reward import (
@@ -125,7 +125,10 @@ def evaluate(
     nb_episode: int = 1,
     nb_process: int = 1,
     sequential: bool = True,
+    do_nothing=False,
 ):
+    if do_nothing:
+        agent = DoNothingAgent(env.action_space())
     if not Path(path_save).exists():
         Path(path_save).mkdir(parents=True, exist_ok=False)
 
@@ -229,6 +232,7 @@ def main(**kwargs):
         config.loading.load
         and Path(config.loading.load_dir).parents[0].exists()
         and len(list(Path(config.loading.load_dir).parents[0].iterdir())) > 0
+        and not config.model.do_nothing
     ):
 
         print("Loading " + config.model.name + " from " + config.loading.load_dir)
@@ -313,6 +317,7 @@ def main(**kwargs):
             path_save=config.evaluation.evaluation_dir,
             nb_episode=config.evaluation.episodes,
             sequential=True,
+            do_nothing=config.model.do_nothing,
         )
 
 

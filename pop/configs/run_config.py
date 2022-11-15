@@ -23,6 +23,7 @@ class ModelParameters:
     data_dir: str
     checkpoint_dir: str
     expert_only: bool = False
+    do_nothing: bool = False
 
     def __init__(self, model_dict: Dict[str, Union[int, bool, str, float]]):
         architecture_path = model_dict["architecture_path"]
@@ -46,6 +47,8 @@ class ModelParameters:
         object.__setattr__(self, "checkpoint_dir", model_dict["checkpoint_dir"])
         if model_dict.get("expert_only"):
             object.__setattr__(self, "expert_only", model_dict["expert_only"])
+        if model_dict.get("do_nothing"):
+            object.__setattr__(self, "do_nothing", model_dict["do_nothing"])
 
 
 @dataclass(frozen=True)
