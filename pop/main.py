@@ -128,7 +128,7 @@ def evaluate(
     do_nothing=False,
 ):
     if do_nothing:
-        agent = DoNothingAgent(env.action_space())
+        agent = DoNothingAgent(env.action_space)
     if not Path(path_save).exists():
         Path(path_save).mkdir(parents=True, exist_ok=False)
 
