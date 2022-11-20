@@ -140,9 +140,9 @@ def evaluate(
     if config.evaluation.compute_score:
         csv_path = Path(
             path_save,
-            "l2rpn_202" + "2"
-            if not score2020
-            else "0" + "_score_" + str(config.environment.difficulty) + ".csv",
+            ("l2rpn_2022_score_" if not score2020 else "l2rpn_2020_score_")
+            + str(config.environment.difficulty)
+            + ".csv",
         )
         if csv_path.exists():
             return pd.read_csv(csv_path)
