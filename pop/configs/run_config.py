@@ -70,6 +70,7 @@ class EvaluationParameters:
     evaluation_dir: str
     generate_grid2viz_data: str
     compute_score: str
+    score: str = "2022"
 
 
 @dataclass(frozen=True)

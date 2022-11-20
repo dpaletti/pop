@@ -11,6 +11,7 @@ import dgl
 import grid2op.Environment
 from grid2op.Reward.BaseReward import BaseReward
 from grid2op.Reward.FlatReward import FlatReward
+from grid2op.utils.l2rpn_2020_scores import ScoreL2RPN2020
 import numpy as np
 import pandas as pd
 import torch as th
@@ -29,7 +30,7 @@ from grid2op.Reward import (
     EpisodeDurationReward,
 )
 from grid2op.Runner import Runner
-from grid2op.utils import ScoreL2RPN2022
+from grid2op.utils import ScoreL2RPN2022, ScoreL2RPN2020
 
 from pop.multiagent_system.base_pop import train
 from pop.multiagent_system.dpop import DPOP
@@ -126,6 +127,7 @@ def evaluate(
     nb_process: int = 1,
     sequential: bool = True,
     do_nothing=False,
+    score2020=False,
 ):
     if do_nothing:
         agent = DoNothingAgent(env.action_space)
@@ -137,12 +139,16 @@ def evaluate(
 
     if config.evaluation.compute_score:
         csv_path = Path(
-            path_save, "l2rpn_2022_score_" + str(config.environment.difficulty) + ".csv"
+            path_save,
+            "l2rpn_202" + "2"
+            if not score2020
+            else "0" + "_score_" + str(config.environment.difficulty) + ".csv",
         )
         if csv_path.exists():
             return pd.read_csv(csv_path)
         print("Created Directory: " + str(csv_path))
-        score = ScoreL2RPN2022(
+        score_func = ScoreL2RPN2022 if not score2020 else ScoreL2RPN2020
+        score = score_func(
             env, nb_scenario=nb_episode, verbose=2, nb_process_stats=nb_process
         )
         agent_score = score.get(agent)
@@ -318,6 +324,7 @@ def main(**kwargs):
             nb_episode=config.evaluation.episodes,
             sequential=True,
             do_nothing=config.model.do_nothing,
+            score2020=True if config.evaluation.score == "2020" else False,
         )
 
 
