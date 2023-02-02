@@ -17,7 +17,9 @@ We are in the middle of a climate crisis, renewable energies must readily be imp
 
 For this reason, RTE (Réeseau de Transport d&rsquo;Electricité) has been organizing the **Learning to Run a Power Network (L2RPN)** challenge to foster AI applications to power network control, see below for a timeline of the competitions:
 
-![img](./readme_resources/l2rpn_timeline.png)
+<p float="left" align="middle">
+    <img src="./readme_resources/l2rpn_timeline.png" width="60%"/>
+</p>
 
 L2RPN challenges cast the power network control problem in the Reinforcement Learning (RL) framework. The actions allowed to the autonomous agent are akin to those available to a human operator (e.g. line switching and power production changes). The control problem ends when the total demand is not met anymore, i.e., a blackout is triggered.
 
@@ -32,26 +34,29 @@ We developed a hierarchical Multi-Agent RL (MARL) system:
 <a id="org09277c3"></a>
 
 # Problem Description
+<p float="left" align="middle">
+    <img src="./readme_resources/graph_rte.png" width="60%"/>
+</p>
 
 The L2RPN challenge is a series of competitions that model the sequential decision-makig environments of real-time power network operation. The participants&rsquo; algorithms must control a simulated power network within an RL framework.
-RTE has developed Grid2Op, a python module that casts the power grid operational decision process into a Markov Decision Process (MDP). Grid2Op represents a power grid as a set of objects: powerlines, loads, and generators, with substations linking everything together. **Powerlines connect substations and allow power to flow from one place to another**. A graph akin to the one in below naturally models the power grid as we have described it:
+RTE has developed Grid2Op, a python module that casts the power grid operational decision process into a Markov Decision Process (MDP). Grid2Op represents a power grid as a set of objects: powerlines, loads, and generators, with substations linking everything together. **Powerlines connect substations and allow power to flow from one place to another**.
 
-![img](./readme_resources/graph_rte.png)
 
 However, our power network model needs to take into account also the **internal structure of substations**, where we find two busbars to which every grid object connects.
-
-![img](./readme_resources/bus.png)
-
 Substations connect elements through switches which allow the operator to electrically separate elements from each other.
+Below we see the buses inside of a substation (on the left) and the switches inside a bus (on the right).
 
-![img](./readme_resources/switch.png)
-
+<p float="left" align="middle">
+  <img src="./readme_resources/bus.png" width="30%" /> 
+  <img src="./readme_resources/switch.png" width="30%" />
+</p>
 
 <a id="orged2481f"></a>
 
 # System Description
-
-![img](./readme_resources/system_arch_blind.png)
+<p float="left" align="middle">
+    <img src="./readme_resources/system_arch_blind.png" width="60%"/>
+</p>
 
 We developed a **hierarchical multi-agent RL system**. The system has three main actors: substation agents, community managers, and head managers.
 
