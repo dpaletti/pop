@@ -1,0 +1,34 @@
+[reproducibility]
+seed = 0
+device = "cpu"
+
+[model]
+name = "dpop_exp1_neurips"
+architecture_path = "/content/drive/MyDrive/pop_configs_new/FINAL/architectures/dpop_exp1.toml"
+data_dir = "/content/drive/MyDrive/pop_data_new/"
+checkpoint_dir = "<<model_data_dir>>/checkpoint/<<model_name>>"
+
+[training]
+steps = 5000000
+train = false
+tensorboard_dir = "<<model_data_dir>>/tensorboard/<<model_name>>_evaluation"
+curriculum = false
+reset_decay = true
+save_frequency = 3600
+
+
+[evaluation]
+episodes = 10
+evaluation_dir = "<<model_data_dir>>/evaluation/<<model_name>>"
+generate_grid2viz_data = false
+compute_score = true
+
+[loading]
+load = true
+load_dir = "<<model_checkpoint_dir>>/<<model_name>>.pt"
+
+[environment]
+name = "l2rpn_neurips_2020_track1_small"
+difficulty = 0
+reward = "DQNReward"
+feature_ranges = "/content/drive/MyDrive/pop_configs_new/l2rpn_sandbox_feature_ranges.json"

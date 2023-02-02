@@ -3,22 +3,18 @@ seed = 0
 device = "cpu"
 
 [model]
-name = "dpop_base"
-architecture_path = "architectures/dpop_base.toml"
-data_dir = "test_data/"
-checkpoint_dir = "<<model_data_dir>>/pop_runs/checkpoint/<<model_name>>"
-do_nothing= true
-
+name = "dpop_gamma4"
+architecture_path = "/content/drive/MyDrive/pop_configs_new/FINAL/architectures/<<model_name>>.toml"
+data_dir = "/content/drive/MyDrive/pop_data_new/"
+checkpoint_dir = "<<model_data_dir>>/checkpoint/<<model_name>>"
 
 [training]
-steps = 1000
+steps = 5000000
 train = true
-tensorboard_dir = "<<model_data_dir>>/pop_runs/tensorboard/<<model_name>>"
-save_frequency=3600
+tensorboard_dir = "<<model_data_dir>>/tensorboard/<<model_name>>"
 curriculum = false
 reset_decay = true
-chronics = 10
-local = true
+save_frequency = 3600
 
 [evaluation]
 episodes = 100
@@ -34,4 +30,3 @@ load_dir = "<<model_checkpoint_dir>>/<<model_name>>.pt"
 name = "l2rpn_case14_sandbox"
 difficulty = 0
 reward = "DQNReward"
-feature_ranges="l2rpn_sandbox_feature_ranges.json"

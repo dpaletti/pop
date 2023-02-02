@@ -1,0 +1,27 @@
+[attention1]
+type = "GATv2Conv"
+module = "dgl"
+in_feats = "<node_features>"
+out_feats = "..."
+num_heads = "..."
+residual = "..."
+activation = "..."
+allow_zero_in_degree = "..."
+bias = "..."
+share_weights = "..."
+
+[flatten1]
+type = "GATFlatten"
+module = "custom_layers"
+
+[attention2]
+type = "GATv2Conv"
+module = "dgl"
+in_feats = "<<attention1_out_feats>> * <<attention1_num_heads>>"
+out_feats = "..."
+num_heads = "..."
+residual = "..."
+activation = "..."
+allow_zero_in_degree = "..."
+bias = "..."
+share_weights = "..."

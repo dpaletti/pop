@@ -1,0 +1,24 @@
+frame = "egat_architecture_frame"
+
+[attention1]
+out_node_feats = "16"
+out_edge_feats = "16"
+num_heads = 2
+bias = true
+
+[attention2]
+out_node_feats = "32"
+out_edge_feats = "32"
+num_heads = 4
+bias = true
+
+[attention3]
+out_node_feats = "64"
+out_edge_feats = "64"
+num_heads = 6
+bias = true
+
+[conv]
+out_feats = "784"
+bias = true
+allow_zero_in_degree = true

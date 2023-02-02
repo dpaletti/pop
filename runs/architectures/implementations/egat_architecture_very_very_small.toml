@@ -1,0 +1,12 @@
+frame = "egat_small_architecture_frame"
+
+[attention1]
+out_node_feats = "32"
+out_edge_feats = "32"
+num_heads = 2
+bias = true
+
+[conv]
+out_feats = "128"
+bias = true
+allow_zero_in_degree = true

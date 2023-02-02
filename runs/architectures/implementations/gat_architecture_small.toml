@@ -1,0 +1,20 @@
+frame = "gat_architecture_frame"
+
+[attention1]
+out_feats = "128"
+num_heads = "2"
+residual = true
+activation = "ReLU"
+allow_zero_in_degree = true
+bias = true
+share_weights = true
+
+
+[attention2]
+out_feats = "512"
+num_heads = "4"
+residual = true
+activation = "ReLU"
+allow_zero_in_degree = true
+bias = true
+share_weights = true

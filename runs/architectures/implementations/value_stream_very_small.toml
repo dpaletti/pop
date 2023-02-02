@@ -1,0 +1,5 @@
+frame = "value_stream_frame"
+
+[linear1]
+out_features = 256
+bias = true

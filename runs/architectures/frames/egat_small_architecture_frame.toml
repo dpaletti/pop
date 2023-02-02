@@ -1,0 +1,23 @@
+[attention1]
+type = "EGATConv"
+module = "dgl"
+in_node_feats = "<node_features>"
+in_edge_feats = "<edge_features>"
+out_node_feats = "..."
+out_edge_feats = "..."
+num_heads = "..."
+bias = "..."
+
+
+[flatten1]
+type = "EGATFlatten"
+module = "custom_layers"
+
+[conv]
+type = "EGATNodeConv"
+module = "pop.graph_convolutional_networks.custom_layers"
+in_feats = "<<attention1_out_node_feats>> * <<attention1_num_heads>>"
+out_feats = "..."
+bias = "..."
+allow_zero_in_degree = "..."
+

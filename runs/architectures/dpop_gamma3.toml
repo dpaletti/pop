@@ -1,0 +1,83 @@
+[pop]
+node_features = ['p', 'q', 'v', 'sub_id', 'theta', 'cooldown']
+edge_features = ['p','p_or','p_ex','q_or','q_ex','a_or','a_ex','theta_or','theta_ex','rho','cooldown','status','thermal_limit','timestep_overflow']
+enable_expert = true
+safe_max_rho = 0.99
+actions_per_generator = 10
+manager_selective_learning = true
+generator_storage_only = true
+remove_no_action = true
+manager_remove_no_action = true
+
+[agent]
+embedding = "egat_architecture_very_very_small"
+advantage_stream = "advantage_stream_very_small"
+value_stream = "value_stream_very_small"
+learning_rate = 1e-4
+learning_frequency = 4
+target_network_weight_replace_steps = 100
+gamma = 0.9
+huber_loss_delta = 2
+batch_size = 288
+
+
+[agent.exploration]
+method = "epsilon_greedy"
+max_epsilon = 1.0
+min_epsilon = 0.01
+epsilon_decay = 2500
+
+[agent.replay_memory]
+alpha = 0.7
+max_beta = 1.0
+min_beta = 0.5
+annihilation_rate = 1250
+capacity = 1000
+
+[manager]
+embedding = "egat_architecture_very_small"
+advantage_stream = "advantage_stream_small"
+value_stream = "value_stream_small"
+learning_rate = 1e-4
+learning_frequency = 4
+target_network_weight_replace_steps = 100
+gamma = 0.9
+huber_loss_delta = 2
+batch_size = 288
+
+[manager.exploration]
+method = "epsilon_greedy"
+max_epsilon = 1.0
+min_epsilon = 0.01
+epsilon_decay = 2500
+
+[manager.replay_memory]
+alpha = 0.7
+max_beta = 1.0
+min_beta = 0.5
+annihilation_rate = 1250
+capacity = 10000
+
+[head_manager]
+embedding = "gat_architecture_small"
+advantage_stream = "advantage_stream_small"
+value_stream = "value_stream_small"
+learning_rate = 1e-4
+learning_frequency = 4
+target_network_weight_replace_steps = 100
+gamma = 0.9
+huber_loss_delta = 2
+batch_size = 288
+
+[head_manager.exploration]
+method = "epsilon_greedy"
+max_epsilon = 1.0
+min_epsilon = 0.01
+epsilon_decay = 2500
+
+[head_manager.replay_memory]
+alpha = 0.7
+max_beta = 1.0
+min_beta = 0.5
+annihilation_rate = 1250
+capacity = 100000

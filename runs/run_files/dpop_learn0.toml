@@ -1,0 +1,33 @@
+[reproducibility]
+seed = 0
+device = "cpu"
+
+[model]
+name = "dpop_learn0"
+architecture_path = "/content/drive/MyDrive/pop_configs_new/FINAL/architectures/<<model_name>>.toml"
+data_dir = "/content/drive/MyDrive/pop_data_new/"
+checkpoint_dir = "<<model_data_dir>>/checkpoint/<<model_name>>"
+
+[training]
+steps = 5000000
+train = true
+tensorboard_dir = "<<model_data_dir>>/tensorboard/<<model_name>>"
+curriculum = false
+reset_decay = true
+save_frequency = 3600
+
+[evaluation]
+episodes = 100
+evaluation_dir = "<<model_data_dir>>/evaluation/<<model_name>>"
+generate_grid2viz_data = false
+compute_score = true
+
+[loading]
+load = true
+load_dir = "<<model_checkpoint_dir>>/<<model_name>>.pt"
+
+[environment]
+name = "l2rpn_case14_sandbox"
+difficulty = 0
+feature_ranges = "/content/drive/MyDrive/pop_configs_new/l2rpn_sandbox_feature_ranges.json"
+reward = "DQNReward"
