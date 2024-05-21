@@ -12,6 +12,7 @@
 <a id="org78e4d6c"></a>
 
 # Introduction
+[Thesis](https://www.politesi.polimi.it/retrieve/42d6db27-0396-4cd4-8373-1f6e34da5bef/Tesi_L2RPN.pdf)
 
 We are in the middle of a climate crisis, renewable energies must readily be implemented in the power grids. However, solar and wind power integration in the grid is challenging, their production depends on the weather, and our overall storage capacity is insufficient. We hope artificial intelligence (AI) can assist grid operators.
 
